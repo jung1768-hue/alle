@@ -4,6 +4,7 @@ import {
   INITIAL_MENUS,
   INITIAL_ORDERS,
   INITIAL_PREFERENCES,
+  INITIAL_SAVED_LOCATIONS,
   INITIAL_STORES,
   resolveBundledImage,
 } from '../data/seedData';
@@ -31,6 +32,8 @@ export function getDefaultState(): AllePersistedState {
       },
     },
     priceReports: [],
+    savedLocations: structuredClone(INITIAL_SAVED_LOCATIONS),
+    selectedLocationId: INITIAL_SAVED_LOCATIONS[0].id,
   };
 }
 
@@ -122,6 +125,18 @@ export function loadDemoState(): {
             : EXAMPLE_CONDITION_QUERY,
         reviewReplies: parsed.reviewReplies ?? {},
         priceReports: Array.isArray(parsed.priceReports) ? parsed.priceReports : [],
+        savedLocations:
+          Array.isArray(parsed.savedLocations) && parsed.savedLocations.length > 0
+            ? parsed.savedLocations
+            : structuredClone(INITIAL_SAVED_LOCATIONS),
+        selectedLocationId:
+          typeof parsed.selectedLocationId === 'string' &&
+          (Array.isArray(parsed.savedLocations) && parsed.savedLocations.length > 0
+            ? parsed.savedLocations
+            : INITIAL_SAVED_LOCATIONS
+          ).some((loc) => loc.id === parsed.selectedLocationId)
+            ? parsed.selectedLocationId
+            : INITIAL_SAVED_LOCATIONS[0].id,
       },
       storageMode: 'localStorage',
     };

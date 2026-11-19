@@ -9,6 +9,7 @@ import {
   OrderStatus,
   OwnerProfitComparison,
   Review,
+  SavedLocation,
   Store,
   UserPreferences,
 } from '../types/alle';
@@ -855,4 +856,44 @@ export const INITIAL_ERRANDS: ErrandRequest[] = [
     status: ErrandStatus.OPEN,
     createdAt: '2026-11-13 15:40',
   },
+];
+
+export const INITIAL_SAVED_LOCATIONS: SavedLocation[] = [
+  {
+    id: 'loc-home',
+    label: '우리집',
+    areaName: '대구 수성구 범어동',
+    detailAddress: '수성구 범어동 수령지 A',
+    tag: 'home',
+  },
+  {
+    id: 'loc-work',
+    label: '회사',
+    areaName: '대구 중구 동성로',
+    detailAddress: '중구 동성로 오피스 A',
+    tag: 'work',
+  },
+  {
+    id: 'loc-campus',
+    label: '경북대 북문',
+    areaName: '대구 북구 산격동',
+    detailAddress: '북구 경북대 북문 수령지 C',
+    tag: 'etc',
+  },
+  {
+    id: 'loc-meeting',
+    label: '동인동 미팅',
+    areaName: '대구 중구 동인동',
+    detailAddress: '중구 동인동 수령지 D',
+    tag: 'etc',
+  },
+];
+
+export const QUICK_DAEGU_AREAS: string[] = [
+  '대구 수성구 범어동',
+  '대구 중구 동성로',
+  '대구 중구 대봉동',
+  '대구 수성구 만촌동',
+  '대구 북구 산격동',
+  '대구 달서구 월성동',
 ];

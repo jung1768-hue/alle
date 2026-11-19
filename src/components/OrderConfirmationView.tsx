@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -6,6 +6,7 @@ import {
   CalendarClock,
   Check,
   CreditCard,
+  MapPin,
   Sparkles,
   Users,
   Wallet,
@@ -50,8 +51,10 @@ interface OrderConfirmationViewProps {
   initialSharedDelivery?: boolean;
   initialReservationSlot?: string;
   initialPaymentMethod?: PaymentMethod;
+  defaultAddressAlias?: string;
   stampCount: number;
   defaultNote: string;
+  onOpenLocationPicker?: () => void;
   onBack: () => void;
   onConfirmOrder: (payload: {
     menuId: string;
@@ -78,8 +81,10 @@ export function OrderConfirmationView({
   initialSharedDelivery = false,
   initialReservationSlot = 'now',
   initialPaymentMethod = 'local_currency',
+  defaultAddressAlias = '수성구 범어동 수령지 A',
   stampCount,
   defaultNote,
+  onOpenLocationPicker,
   onBack,
   onConfirmOrder,
 }: OrderConfirmationViewProps) {
@@ -94,9 +99,11 @@ export function OrderConfirmationView({
     initialReservationSlot || 'now'
   );
   const [customerAlias, setCustomerAlias] = useState<string>('고객 A');
-  const [addressAlias, setAddressAlias] = useState<string>(
-    '대구 수성구 범어동 수령지 A'
-  );
+  const [addressAlias, setAddressAlias] = useState<string>(defaultAddressAlias);
+
+  useEffect(() => {
+    setAddressAlias(defaultAddressAlias);
+  }, [defaultAddressAlias]);
   const [customerNote, setCustomerNote] = useState<string>(defaultNote);
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>(initialPaymentMethod);
@@ -455,9 +462,21 @@ export function OrderConfirmationView({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#374033] mb-1">
-                배달지
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="block text-xs font-medium text-[#374033]">
+                  배달지
+                </label>
+                {onOpenLocationPicker && (
+                  <button
+                    type="button"
+                    onClick={onOpenLocationPicker}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2E531A] hover:underline underline-offset-2 cursor-pointer"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    <span>등록 위치 변경</span>
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 value={addressAlias}

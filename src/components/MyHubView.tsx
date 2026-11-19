@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   CalendarClock,
   Check,
+  ChevronDown,
+  MapPin,
   QrCode,
   Share2,
   ShieldCheck,
@@ -13,7 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
-import { DemoRole, UserPreferences } from '../types/alle';
+import { DemoRole, SavedLocation, UserPreferences } from '../types/alle';
 import { formatWon } from '../utils/parser';
 
 interface MyHubViewProps {
@@ -27,6 +29,7 @@ interface MyHubViewProps {
   regularMenuName?: string;
   regularStoreName?: string;
   regularServings?: number;
+  activeLocation?: SavedLocation;
   onTopupWalletConfirmed: (amount: number) => void;
   onEarnStamp: () => void;
   onChangeRole: (nextRole: DemoRole) => void;
@@ -34,6 +37,7 @@ interface MyHubViewProps {
   onGoToHomePrefs: () => void;
   onQuickReorderToConfirm?: (menuId: string, servings: number) => void;
   onOpenAiChat?: (initialPrompt?: string) => void;
+  onOpenLocationPicker?: () => void;
 }
 
 export function MyHubView({
@@ -47,6 +51,7 @@ export function MyHubView({
   regularMenuName = '얼큰 소고기국밥',
   regularStoreName = '수성 범어 소고기국밥',
   regularServings = 2,
+  activeLocation,
   onTopupWalletConfirmed,
   onEarnStamp,
   onChangeRole,
@@ -54,6 +59,7 @@ export function MyHubView({
   onGoToHomePrefs,
   onQuickReorderToConfirm,
   onOpenAiChat,
+  onOpenLocationPicker,
 }: MyHubViewProps) {
   const [confirmTopupAmount, setConfirmTopupAmount] = useState<number | null>(
     null
@@ -67,9 +73,19 @@ export function MyHubView({
         <div>
           <h1 className="text-2xl font-bold text-[#141812]">MY 올이</h1>
         </div>
-        <span className="text-xs font-bold text-[#2E531A]">
-          고객 A · 대구 수성구 범어동
-        </span>
+        <button
+          type="button"
+          onClick={() => onOpenLocationPicker?.()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#EFF5E6] border border-[#DDE3D7] text-xs font-bold text-[#2E531A] cursor-pointer transition-colors"
+        >
+          <MapPin className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            {activeLocation
+              ? `${activeLocation.label} · ${activeLocation.areaName}`
+              : '고객 A · 대구 수성구 범어동'}
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+        </button>
       </div>
 
       {/* Encrypted Alias Profile & Mock Wallet */}
@@ -81,7 +97,7 @@ export function MyHubView({
               <span>안심 가명 프로필</span>
             </div>
             <div className="text-lg font-bold text-[#141812] mt-1">
-              고객 A · 수령지 A
+              고객 A · {activeLocation?.detailAddress ?? '수령지 A'}
             </div>
             <p className="text-xs text-[#4A5246] mt-0.5 tabular-nums">
               주문 {orderCount}건 · 찜 {wishlistCount}개 · 스탬프{' '}

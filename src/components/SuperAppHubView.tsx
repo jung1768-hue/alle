@@ -26,6 +26,7 @@ import {
   ErrandStatus,
   MenuItem,
   Order,
+  SavedLocation,
   Store,
   SuperAppTab,
 } from '../types/alle';
@@ -39,6 +40,7 @@ interface SuperAppHubViewProps {
   menus: MenuItem[];
   errands: ErrandRequest[];
   latestOrder?: Order;
+  activeLocation?: SavedLocation;
   onJoinGroupBuy: (menuId: string) => void;
   onCreateB2BOrder: (payload: {
     menuId: string;
@@ -68,6 +70,7 @@ export function SuperAppHubView({
   menus,
   errands,
   latestOrder,
+  activeLocation,
   onJoinGroupBuy,
   onCreateB2BOrder,
   onCreateErrand,
@@ -124,7 +127,9 @@ export function SuperAppHubView({
   const [errandTitle, setErrandTitle] = useState<string>('약국 일반 상비약 구매 대행');
   const [errandCategory, setErrandCategory] = useState<string>('생활/약국 심부름');
   const [pickupAlias, setPickupAlias] = useState<string>('동네 약국 A');
-  const [dropoffAlias, setDropoffAlias] = useState<string>('수령지 A');
+  const [dropoffAlias, setDropoffAlias] = useState<string>(
+    activeLocation?.detailAddress ?? '수령지 A'
+  );
   const [estimatedItemCost, setEstimatedItemCost] = useState<number>(6000);
   const [errandFee, setErrandFee] = useState<number>(2000);
   const [errandError, setErrandError] = useState<string | null>(null);
@@ -246,7 +251,7 @@ export function SuperAppHubView({
                 다음 일정 감지 · 동성로 오후 미팅
               </p>
               <p className="text-xs sm:text-sm font-bold text-white truncate">
-                범어동 수령지 A → 동성로 중앙로역 (13:15 출발)
+                {activeLocation?.detailAddress ?? '범어동 수령지 A'} → 동성로 중앙로역 (13:15 출발)
               </p>
             </div>
           </div>
@@ -283,7 +288,7 @@ export function SuperAppHubView({
                   <p className="text-xs text-[#DCECD0]">
                     {taxiEtaAdjusted
                       ? '배달 5분 지연 시나리오 반영 → 택시 픽업 시각이 13:20으로 자동 재조정되었습니다.'
-                      : '13:15 범어동 수령지 A 앞 대기 예정 · 배달 도착 변동 시 호출 시각 자동 동기화'}
+                      : `13:15 ${activeLocation?.detailAddress ?? '범어동 수령지 A'} 앞 대기 예정 · 배달 도착 변동 시 호출 시각 자동 동기화`}
                   </p>
                 </div>
               </div>

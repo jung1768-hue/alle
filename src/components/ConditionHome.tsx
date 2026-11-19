@@ -31,6 +31,7 @@ import {
   MenuItem,
   Order,
   ParsedCondition,
+  SavedLocation,
   Store,
   SuperAppTab,
   UserPreferences,
@@ -64,6 +65,8 @@ interface ConditionHomeProps {
   onOpenSuperApp: (tab: SuperAppTab) => void;
   onSavePreferences: (next: UserPreferences) => void;
   onApplyPreferencesToInput: (prefs: UserPreferences) => void;
+  activeLocation?: SavedLocation;
+  onOpenLocationPicker?: () => void;
 }
 
 function WaveformAccent() {
@@ -106,6 +109,8 @@ export function ConditionHome({
   onOpenSuperApp,
   onSavePreferences,
   onApplyPreferencesToInput,
+  activeLocation,
+  onOpenLocationPicker,
 }: ConditionHomeProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [editingPrefs, setEditingPrefs] = useState(false);
@@ -251,13 +256,25 @@ export function ConditionHome({
 
   return (
     <div className="space-y-6">
-      {/* Compact Location Bar */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div className="flex items-center gap-1.5 text-sm font-bold text-[#141812]">
+      {/* Compact Clickable Location Bar */}
+      <div className="flex items-center justify-between gap-2 px-0.5">
+        <button
+          type="button"
+          onClick={() => onOpenLocationPicker?.()}
+          aria-label="등록된 위치 변경하기"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 -ml-1.5 rounded-xl hover:bg-[#E7EFE1] active:bg-[#DCE8D3] transition-colors text-sm font-bold text-[#141812] cursor-pointer min-w-0"
+        >
           <MapPin className="w-4 h-4 text-[#2E531A] shrink-0" />
-          <span>대구 수성구 범어동</span>
-          <ChevronDown className="w-3.5 h-3.5 text-[#4A5246]" />
-        </div>
+          {activeLocation?.label && (
+            <span className="text-[11px] font-bold text-[#2E531A] bg-[#E7EFE1] border border-[#CBDCC0] px-1.5 py-0.5 rounded-md shrink-0">
+              {activeLocation.label}
+            </span>
+          )}
+          <span className="truncate">
+            {activeLocation?.areaName ?? '대구 수성구 범어동'}
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 text-[#4A5246] shrink-0" />
+        </button>
         <button
           type="button"
           onClick={() => onEarnStamp()}

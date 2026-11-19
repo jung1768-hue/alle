@@ -253,6 +253,14 @@ export interface ExcludedCandidate {
   reasons: string[];
 }
 
+export interface SavedLocation {
+  id: string;
+  label: string;
+  areaName: string;
+  detailAddress: string;
+  tag: 'home' | 'work' | 'etc';
+}
+
 export interface AllePersistedState {
   stores: Store[];
   menus: MenuItem[];
@@ -265,4 +273,6 @@ export interface AllePersistedState {
   lastConditionInput: string;
   reviewReplies: Record<string, ReviewReply>;
   priceReports: PriceReport[];
+  savedLocations: SavedLocation[];
+  selectedLocationId: string;
 }

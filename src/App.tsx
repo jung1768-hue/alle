@@ -16,6 +16,7 @@ import { AiChatOrderView } from './components/AiChatOrderView';
 import { AlleLogo } from './components/AlleBrand';
 import { ConditionHome } from './components/ConditionHome';
 import { FutureScopeModal } from './components/FutureScopeModal';
+import { LocationPickerModal } from './components/LocationPickerModal';
 import { MyHubView } from './components/MyHubView';
 import { OrderConfirmationView } from './components/OrderConfirmationView';
 import { OrderStatusView } from './components/OrderStatusView';
@@ -39,6 +40,7 @@ import {
   ParsedCondition,
   PaymentMethod,
   PriceReport,
+  SavedLocation,
   SuperAppTab,
   UserPreferences,
 } from './types/alle';
@@ -149,6 +151,7 @@ export default function App() {
     string | undefined
   >(undefined);
   const [showFutureModal, setShowFutureModal] = useState<boolean>(false);
+  const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false);
   const [showDemoSwitcher, setShowDemoSwitcher] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -167,6 +170,61 @@ export default function App() {
     window.setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
     }, 3000);
+  };
+
+  const activeLocation: SavedLocation = useMemo(() => {
+    return (
+      appState.savedLocations.find(
+        (loc) => loc.id === appState.selectedLocationId
+      ) ??
+      appState.savedLocations[0] ?? {
+        id: 'loc-home',
+        label: '우리집',
+        areaName: '대구 수성구 범어동',
+        detailAddress: '수성구 범어동 수령지 A',
+        tag: 'home',
+      }
+    );
+  }, [appState.savedLocations, appState.selectedLocationId]);
+
+  const handleSelectLocation = (locationId: string) => {
+    const target = appState.savedLocations.find((loc) => loc.id === locationId);
+    if (!target) return;
+    setAppState((prev) => ({
+      ...prev,
+      selectedLocationId: target.id,
+    }));
+    showToast(`위치가 '${target.label} (${target.areaName})'으로 변경되었습니다.`);
+  };
+
+  const handleAddLocation = (payload: Omit<SavedLocation, 'id'>) => {
+    const newLoc: SavedLocation = {
+      ...payload,
+      id: `loc-${Date.now()}`,
+    };
+    setAppState((prev) => ({
+      ...prev,
+      savedLocations: [newLoc, ...prev.savedLocations],
+      selectedLocationId: newLoc.id,
+    }));
+    showToast(`'${newLoc.label} (${newLoc.areaName})' 위치가 등록 및 적용되었습니다.`);
+  };
+
+  const handleDeleteLocation = (locationId: string) => {
+    setAppState((prev) => {
+      if (prev.savedLocations.length <= 1) return prev;
+      const remaining = prev.savedLocations.filter((loc) => loc.id !== locationId);
+      const nextSelectedId =
+        prev.selectedLocationId === locationId
+          ? remaining[0].id
+          : prev.selectedLocationId;
+      return {
+        ...prev,
+        savedLocations: remaining,
+        selectedLocationId: nextSelectedId,
+      };
+    });
+    showToast('등록된 위치가 삭제되었습니다.');
   };
 
   const recommendationResult = useMemo(
@@ -1304,6 +1362,8 @@ export default function App() {
             onOpenSuperApp={handleOpenSuperApp}
             onSavePreferences={handleSavePreferences}
             onApplyPreferencesToInput={handleApplyPreferencesToInput}
+            activeLocation={activeLocation}
+            onOpenLocationPicker={() => setShowLocationPicker(true)}
           />
         ) : step === ConsumerStep.AI_CHAT ? (
           <AiChatOrderView
@@ -1349,8 +1409,10 @@ export default function App() {
             initialSharedDelivery={confirmDraft.sharedDeliveryApplied}
             initialReservationSlot={confirmDraft.reservationSlot}
             initialPaymentMethod={confirmDraft.paymentMethod}
+            defaultAddressAlias={activeLocation.detailAddress}
             stampCount={appState.stampCount}
             defaultNote={appState.preferences.memoNote}
+            onOpenLocationPicker={() => setShowLocationPicker(true)}
             onBack={() => setStep(ConsumerStep.RECOMMEND)}
             onConfirmOrder={handleConfirmOrder}
           />
@@ -1378,6 +1440,7 @@ export default function App() {
               appState.orders[0]?.storeName ?? '수성 범어 소고기국밥'
             }
             regularServings={appState.orders[0]?.servings ?? 2}
+            activeLocation={activeLocation}
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onEarnStamp={handleEarnStamp}
             onChangeRole={setRole}
@@ -1392,6 +1455,7 @@ export default function App() {
               setStep(ConsumerStep.AI_CHAT);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            onOpenLocationPicker={() => setShowLocationPicker(true)}
           />
         ) : step === ConsumerStep.SUPERAPP ? (
           <SuperAppHubView
@@ -1401,6 +1465,7 @@ export default function App() {
             menus={appState.menus}
             errands={appState.errands}
             latestOrder={appState.orders[0]}
+            activeLocation={activeLocation}
             onJoinGroupBuy={handleJoinGroupBuy}
             onCreateB2BOrder={handleCreateB2BOrder}
             onCreateErrand={handleCreateErrand}
@@ -1650,6 +1715,16 @@ export default function App() {
           <span>Demo Mode</span>
         </button>
       </div>
+
+      <LocationPickerModal
+        isOpen={showLocationPicker}
+        locations={appState.savedLocations}
+        selectedLocationId={activeLocation.id}
+        onSelectLocation={handleSelectLocation}
+        onAddLocation={handleAddLocation}
+        onDeleteLocation={handleDeleteLocation}
+        onClose={() => setShowLocationPicker(false)}
+      />
 
       <FutureScopeModal
         isOpen={showFutureModal}
