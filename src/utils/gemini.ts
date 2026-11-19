@@ -60,6 +60,10 @@ export function setGeminiApiKey(key: string): void {
   }
 }
 
+export function isServerProxyAvailable(): boolean {
+  return serverProxyAvailable === true;
+}
+
 export function hasGeminiApiKey(): boolean {
   return getGeminiApiKey().length > 0 || serverProxyAvailable === true;
 }

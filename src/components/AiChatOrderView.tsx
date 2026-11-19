@@ -16,7 +16,11 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
 import { MenuItem, ParsedCondition, Store } from '../types/alle';
-import { hasGeminiApiKey, parseConditionWithAI } from '../utils/gemini';
+import {
+  checkServerGeminiAvailable,
+  hasGeminiApiKey,
+  parseConditionWithAI,
+} from '../utils/gemini';
 import {
   evaluateRecommendations,
   formatWon,
@@ -220,7 +224,14 @@ export function AiChatOrderView({
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiReady, setAiReady] = useState(() => hasGeminiApiKey());
   const [showVoiceTips, setShowVoiceTips] = useState(false);
+
+  useEffect(() => {
+    void checkServerGeminiAvailable().then((ok) => {
+      if (ok || hasGeminiApiKey()) setAiReady(true);
+    });
+  }, []);
   const [stagedServings, setStagedServings] = useState<Record<string, number>>({});
   const [stagedOptions, setStagedOptions] = useState<Record<string, string[]>>({});
   const stopVoiceRef = useRef<(() => void) | null>(null);
@@ -599,13 +610,13 @@ export function AiChatOrderView({
               type="button"
               onClick={onOpenAiSettings}
               className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors border ${
-                hasGeminiApiKey()
+                aiReady
                   ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
                   : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:text-[#1A1D1A]'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{hasGeminiApiKey() ? 'Gemini AI 연결됨' : 'AI 키 설정'}</span>
+              <span>{aiReady ? 'Gemini AI 연결됨' : 'AI 키 설정'}</span>
             </button>
           )}
           <button

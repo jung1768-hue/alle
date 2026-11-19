@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, KeyRound, Sparkles, X } from 'lucide-react';
-import { getGeminiApiKey, setGeminiApiKey } from '../utils/gemini';
+import {
+  checkServerGeminiAvailable,
+  getGeminiApiKey,
+  isServerProxyAvailable,
+  setGeminiApiKey,
+} from '../utils/gemini';
 
 interface GeminiKeyModalProps {
   isOpen: boolean;
@@ -15,6 +20,14 @@ export function GeminiKeyModal({
 }: GeminiKeyModalProps) {
   const [apiKeyInput, setApiKeyInput] = useState(() => getGeminiApiKey());
   const [savedFeedback, setSavedFeedback] = useState(false);
+  const [serverConnected, setServerConnected] = useState(() =>
+    isServerProxyAvailable()
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void checkServerGeminiAvailable().then((ok) => setServerConnected(ok));
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -67,6 +80,18 @@ export function GeminiKeyModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {serverConnected && (
+          <div className="p-3 bg-[#EAF1E2] border border-[#82B440] rounded-2xl flex items-start gap-2 text-xs text-[#3D5720]">
+            <CheckCircle2 className="w-4 h-4 text-[#4E6E2A] shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold">서버 AI 프록시(/api/gemini)가 연결되어 있습니다.</p>
+              <p className="text-[11px] opacity-90">
+                Cloudflare 환경변수 키가 정상 인식되었으므로 별도로 키를 입력하지 않으셔도 됩니다.
+              </p>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSave} className="space-y-3">
           <div>
