@@ -286,7 +286,7 @@ export function AiChatOrderView({
         reply =
           '말씀해 주신 조건에 모두 맞는 메뉴가 지금 바로 보이지 않아요. 예산이나 시간을 조금 넓혀서 다시 찾아볼까요?';
       } else {
-        reply = `지금 바로 주문 가능한 인기 메뉴 ${topMatches.length}곳을 엄선했어요. 1순위 추천 메뉴는 아래에서 바로 결제하거나 다른 카드를 눌러 변경할 수 있어요.`;
+        reply = `추천 메뉴 ${topMatches.length}곳을 찾았어요.`;
       }
       return [
         {
@@ -319,7 +319,7 @@ export function AiChatOrderView({
       {
         id: 'welcome',
         sender: 'bot',
-        text: '안녕하세요! 치킨·마라탕·카페·샐러드·야식까지 대구 인기 맛집 26곳이 입점해 있어요. 오늘 끌리는 음식을 말이나 글로 편하게 말씀해 주시면 최적의 3곳을 바로 골라드릴게요.',
+        text: '어떤 음식을 찾아드릴까요?',
         parsed: defaultParsed,
         matchedMenuIds: defaultEval.matches.slice(0, 3).map((m) => m.menu.id),
         servings: defaultParsed.servings,
