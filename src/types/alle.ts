@@ -114,12 +114,25 @@ export interface PriceReport {
   note: string;
 }
 
+export interface AiMediationVerdict {
+  claimType: 'spill' | 'missing' | 'misdelivery' | 'quality';
+  faultParty: 'courier' | 'owner' | 'platform_buffer' | 'escalated';
+  faultLabel: string;
+  confidencePercent: number;
+  processedSeconds: number;
+  summary: string;
+  customerAction: string;
+  ownerAction: string;
+  courierAction: string;
+}
+
 export interface EvidenceRecord {
   ownerSealingChecked: boolean;
   courierConditionChecked: boolean;
   customerMemoNote: string;
   escrowStatus: string;
   recordedAt: string;
+  aiVerdict?: AiMediationVerdict;
 }
 
 export type PaymentMethod =

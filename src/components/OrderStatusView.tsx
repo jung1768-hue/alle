@@ -13,6 +13,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import {
+  AiMediationVerdict,
   DispatchMode,
   ErrandRequest,
   ErrandStatus,
@@ -180,13 +181,102 @@ export function OrderStatusView({
     Record<string, string>
   >({});
 
-  // 4-stage evidence recording UI state
+  // 4-stage evidence recording & AI 10-second mediation UI state
   const [evidenceOrderId, setEvidenceOrderId] = useState<string | null>(null);
+  const [claimType, setClaimType] =
+    useState<AiMediationVerdict['claimType']>('spill');
   const [ownerSealCheck, setOwnerSealCheck] = useState<boolean>(true);
   const [courierCheck, setCourierCheck] = useState<boolean>(true);
   const [customerEvidenceNote, setCustomerEvidenceNote] = useState<string>(
-    '수령 상태 확인 메모'
+    '국물 용기 실링 및 도착 상태 확인 요청'
   );
+
+  const buildAiMediationVerdict = (
+    order: Order,
+    type: AiMediationVerdict['claimType'],
+    ownerSealed: boolean,
+    courierChecked: boolean
+  ): AiMediationVerdict => {
+    if (order.totalAmount > 100000) {
+      return {
+        claimType: type,
+        faultParty: 'escalated',
+        faultLabel: '인간 관리자 에스컬레이션 (10만 원 초과)',
+        confidencePercent: 84,
+        processedSeconds: 1.8,
+        summary:
+          '10만 원 초과 대량 주문 건으로 자동 에스크로 동결 후 전담 CS 감독관 검토 큐로 즉시 연결되었습니다.',
+        customerAction: '에스크로 보호 대기 (우선 연락)',
+        ownerAction: '제출 증빙 검토 후 정산 확정',
+        courierAction: '배송 로그 보존',
+      };
+    }
+
+    if (type === 'spill') {
+      const faultOwner = !ownerSealed;
+      return {
+        claimType: type,
+        faultParty: faultOwner ? 'owner' : 'courier',
+        faultLabel: faultOwner ? '가맹점주 포장 귀책' : '배달 파트너 이동 중 파손',
+        confidencePercent: 96,
+        processedSeconds: 2.3,
+        summary: faultOwner
+          ? '점주 용기 실링 미확인 상태로 출고되어 포장 미흡으로 판정되었습니다.'
+          : '점주 실링 정상 + 이동 중 충격/기울어짐 로그 교차 검증으로 배달 중 파손 판정되었습니다.',
+        customerAction: `${formatWon(order.totalAmount)} 즉시 환불 + 위로 포인트 3,000원`,
+        ownerAction: faultOwner
+          ? '해당 주문 정산 보류'
+          : '음식값 100% 정상 정산 입금',
+        courierAction: faultOwner
+          ? '배달비 100% 정상 지급'
+          : '시간제 미니보험 기금 처리 (사비 면제)',
+      };
+    }
+
+    if (type === 'missing') {
+      return {
+        claimType: type,
+        faultParty: 'owner',
+        faultLabel: '가맹점주 품목 누락',
+        confidencePercent: 94,
+        processedSeconds: 2.1,
+        summary:
+          '주문 영수증 품목 리스트와 수령 구성품 대조 결과 일부 품목 누락이 감지되었습니다.',
+        customerAction: '누락 품목 즉시 부분 환불 + 1,000원 alle 캐시',
+        ownerAction: '누락 품목 금액만 에스크로 자동 차감',
+        courierAction: '배달비 100% 정상 지급',
+      };
+    }
+
+    if (type === 'misdelivery') {
+      return {
+        claimType: type,
+        faultParty: 'courier',
+        faultLabel: '배달 파트너 오배송 (호수 불일치)',
+        confidencePercent: 97,
+        processedSeconds: 1.9,
+        summary: courierChecked
+          ? '문 앞 사진 호수 번호판 OCR과 수령지 주소 불일치가 감지되어 즉시 재배치 알림을 전송했습니다.'
+          : '수령지 호수 불일치 및 이동 로그 미확인으로 전액 환불 처리되었습니다.',
+        customerAction: `${formatWon(order.totalAmount)} 즉시 환불 또는 원클릭 재주문`,
+        ownerAction: '음식값 100% 정상 정산 입금',
+        courierAction: '5분 내 위치 이동 알림 (미조치 시 배달료 미지급)',
+      };
+    }
+
+    return {
+      claimType: type,
+      faultParty: 'platform_buffer',
+      faultLabel: '상생 버퍼 기금 중재',
+      confidencePercent: 91,
+      processedSeconds: 2.6,
+      summary:
+        '점주 실링·배달 상태 모두 정상으로 확인되어 플랫폼 상생 버퍼 기금으로 원만히 보상합니다.',
+      customerAction: '상생 버퍼 기금 2,000원 위로 쿠폰 즉시 지급',
+      ownerAction: '음식값 100% 정상 정산 입금',
+      courierAction: '배달비 100% 정상 지급',
+    };
+  };
 
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
 
@@ -877,11 +967,15 @@ export function OrderStatusView({
                 )}
 
                 {order.evidenceRecord && (
-                  <div className="p-3.5 bg-[#EAF1E2] border border-[#D4E1C5] rounded-2xl space-y-1 text-xs">
-                    <div className="flex items-center justify-between gap-2 font-bold text-[#3D5720]">
+                  <div className="p-4 bg-[#EAF1E2] border border-[#82B440]/60 rounded-2xl space-y-2.5 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-[#3D5720]">
                       <span className="flex items-center gap-1.5">
                         <ClipboardCheck className="w-4 h-4" />
-                        <span>안심 거래 증적 기록</span>
+                        <span>
+                          {order.evidenceRecord.aiVerdict
+                            ? `⚡ AI 10초 자동 중재 판정 완료 (${order.evidenceRecord.aiVerdict.processedSeconds}초 · 신뢰도 ${order.evidenceRecord.aiVerdict.confidencePercent}%)`
+                            : '안심 거래 증적 기록'}
+                        </span>
                       </span>
                       <span className="font-mono tabular-nums">
                         {order.evidenceRecord.recordedAt}
@@ -892,28 +986,175 @@ export function OrderStatusView({
                       {order.evidenceRecord.courierConditionChecked ? '확인' : '미확인'} · {order.evidenceRecord.escrowStatus}
                     </p>
                     <p className="text-[#555E52]">
-                      메모: {order.evidenceRecord.customerMemoNote}
+                      고객 메모: {order.evidenceRecord.customerMemoNote}
                     </p>
+                    {order.evidenceRecord.aiVerdict && (
+                      <div className="p-3 bg-white border border-[#D4E1C5] rounded-xl space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                          <span className="px-2 py-0.5 rounded-full bg-[#4E6E2A] text-white text-[11px] font-bold">
+                            판정: {order.evidenceRecord.aiVerdict.faultLabel}
+                          </span>
+                        </div>
+                        <p className="text-[#1A1D1A] font-medium leading-relaxed">
+                          {order.evidenceRecord.aiVerdict.summary}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                          <div className="p-2 rounded-lg bg-[#F7F8F5] border border-[#E8ECE4]">
+                            <div className="text-[11px] font-bold text-[#4E6E2A]">
+                              고객 보상
+                            </div>
+                            <div className="text-[#1A1D1A] font-semibold mt-0.5">
+                              {order.evidenceRecord.aiVerdict.customerAction}
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-[#F7F8F5] border border-[#E8ECE4]">
+                            <div className="text-[11px] font-bold text-[#4E6E2A]">
+                              점주 정산
+                            </div>
+                            <div className="text-[#1A1D1A] font-semibold mt-0.5">
+                              {order.evidenceRecord.aiVerdict.ownerAction}
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-[#F7F8F5] border border-[#E8ECE4]">
+                            <div className="text-[11px] font-bold text-[#4E6E2A]">
+                              파트너 조치
+                            </div>
+                            <div className="text-[#1A1D1A] font-semibold mt-0.5">
+                              {order.evidenceRecord.aiVerdict.courierAction}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {(order.status === OrderStatus.COMPLETED || isCancelled) && (
-                  <div className="pt-3 border-t border-[#E8ECE4] flex items-center justify-between gap-3">
-                    <span className="text-xs text-[#687064]">
-                      이전 옵션 그대로 바로 다시 주문
-                    </span>
-                    <button
-                      type="button"
-                      disabled={!canReorder}
-                      onClick={() =>
-                        onQuickReorderToConfirm(order.menuId, order.servings)
-                      }
-                      className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
-                    >
-                      <span>
-                        {canReorder ? '⚡ 1초 결제 재주문' : '현재 재고 없음'}
+                  <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-[#687064]">
+                        이전 옵션 그대로 바로 다시 주문
                       </span>
-                    </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {order.status === OrderStatus.COMPLETED && !order.evidenceRecord && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEvidenceOrderId((prev) =>
+                                prev === order.id ? null : order.id
+                              )
+                            }
+                            className="min-h-[40px] px-3.5 py-1.5 border border-[#D4E1C5] bg-white hover:bg-[#F7F8F5] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
+                          >
+                            AI 10초 중재 시연
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={!canReorder}
+                          onClick={() =>
+                            onQuickReorderToConfirm(order.menuId, order.servings)
+                          }
+                          className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
+                        >
+                          <span>
+                            {canReorder ? '⚡ 1초 결제 재주문' : '현재 재고 없음'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {order.status === OrderStatus.COMPLETED &&
+                      evidenceOrderId === order.id &&
+                      !order.evidenceRecord && (
+                        <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
+                          <div className="font-bold text-[#1A1D1A]">
+                            4단계 디지털 증적 제출 · AI 10초 자동 중재
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(
+                              [
+                                ['spill', '국물 쏟아짐/파손'],
+                                ['missing', '품목 누락'],
+                                ['misdelivery', '오배송(호수 불일치)'],
+                                ['quality', '단순 변심/품질 문의'],
+                              ] as const
+                            ).map(([key, label]) => (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => setClaimType(key)}
+                                className={`px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
+                                  claimType === key
+                                    ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                                    : 'bg-white border-[#E8ECE4] text-[#434B40]'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-[#1A1D1A]">
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={ownerSealCheck}
+                                onChange={(e) => setOwnerSealCheck(e.target.checked)}
+                                className="accent-[#4E6E2A]"
+                              />
+                              <span>1. 점주 실링/영수증 정상</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={courierCheck}
+                                onChange={(e) => setCourierCheck(e.target.checked)}
+                                className="accent-[#4E6E2A]"
+                              />
+                              <span>2. 파트너 이동/센서 로그 확인</span>
+                            </label>
+                          </div>
+                          <input
+                            type="text"
+                            value={customerEvidenceNote}
+                            onChange={(e) => setCustomerEvidenceNote(e.target.value)}
+                            className="w-full min-h-[38px] px-3 bg-white border border-[#D4E1C5] rounded-xl text-[#1A1D1A]"
+                            placeholder="3. 고객 클레임 내용"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const aiVerdict = buildAiMediationVerdict(
+                                  order,
+                                  claimType,
+                                  ownerSealCheck,
+                                  courierCheck
+                                );
+                                onAttachEvidence(order.id, {
+                                  ownerSealingChecked: ownerSealCheck,
+                                  courierConditionChecked: courierCheck,
+                                  customerMemoNote:
+                                    customerEvidenceNote.trim() || '고객 확인 메모',
+                                  escrowStatus: '에스크로 자동 정산 집행 완료',
+                                  aiVerdict,
+                                });
+                                setEvidenceOrderId(null);
+                              }}
+                              className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
+                            >
+                              AI 10초 자동 중재 실행
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceOrderId(null)}
+                              className="min-h-[38px] px-3 py-1.5 border border-[#D4E1C5] bg-white text-[#555E52] font-semibold rounded-xl cursor-pointer"
+                            >
+                              닫기
+                            </button>
+                          </div>
+                        </div>
+                      )}
                   </div>
                 )}
 
@@ -1012,7 +1253,30 @@ export function OrderStatusView({
                         {evidenceOrderId === order.id && !order.evidenceRecord && (
                           <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
                             <div className="font-bold text-[#1A1D1A]">
-                              수령 · 포장 상태 기록
+                              4단계 디지털 증적 제출 · AI 10초 자동 중재
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(
+                                [
+                                  ['spill', '국물 쏟아짐/파손'],
+                                  ['missing', '품목 누락'],
+                                  ['misdelivery', '오배송(호수 불일치)'],
+                                  ['quality', '단순 변심/품질 문의'],
+                                ] as const
+                              ).map(([key, label]) => (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => setClaimType(key)}
+                                  className={`px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
+                                    claimType === key
+                                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                                      : 'bg-white border-[#E8ECE4] text-[#434B40]'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
                             </div>
                             <div className="flex flex-wrap gap-3 text-[#1A1D1A]">
                               <label className="flex items-center gap-1.5 cursor-pointer">
@@ -1022,7 +1286,7 @@ export function OrderStatusView({
                                   onChange={(e) => setOwnerSealCheck(e.target.checked)}
                                   className="accent-[#4E6E2A]"
                                 />
-                                <span>1. 점주 실링/영수증 확인</span>
+                                <span>1. 점주 실링/영수증 정상</span>
                               </label>
                               <label className="flex items-center gap-1.5 cursor-pointer">
                                 <input
@@ -1031,7 +1295,7 @@ export function OrderStatusView({
                                   onChange={(e) => setCourierCheck(e.target.checked)}
                                   className="accent-[#4E6E2A]"
                                 />
-                                <span>2. 파트너 이동 상태 확인</span>
+                                <span>2. 파트너 이동/센서 로그 확인</span>
                               </label>
                             </div>
                             <input
@@ -1039,25 +1303,31 @@ export function OrderStatusView({
                               value={customerEvidenceNote}
                               onChange={(e) => setCustomerEvidenceNote(e.target.value)}
                               className="w-full min-h-[38px] px-3 bg-white border border-[#D4E1C5] rounded-xl text-[#1A1D1A]"
-                              placeholder="3. 고객 확인 메모 (예: 국물 용기 상태 확인 요청)"
+                              placeholder="3. 고객 클레임 내용"
                             />
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
+                                  const aiVerdict = buildAiMediationVerdict(
+                                    order,
+                                    claimType,
+                                    ownerSealCheck,
+                                    courierCheck
+                                  );
                                   onAttachEvidence(order.id, {
                                     ownerSealingChecked: ownerSealCheck,
                                     courierConditionChecked: courierCheck,
                                     customerMemoNote:
                                       customerEvidenceNote.trim() || '고객 확인 메모',
-                                    escrowStatus:
-                                      '4. 에스크로 보관 중 (자동 금액 변경 없음)',
+                                    escrowStatus: '에스크로 자동 정산 집행 완료',
+                                    aiVerdict,
                                   });
                                   setEvidenceOrderId(null);
                                 }}
                                 className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
                               >
-                                증적 기록 저장
+                                AI 10초 자동 중재 실행
                               </button>
                               <button
                                 type="button"
