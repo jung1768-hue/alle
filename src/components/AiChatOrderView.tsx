@@ -1326,7 +1326,7 @@ export function AiChatOrderView({
                   }
           }
           transition={{ duration: 1.8, repeat: isAiActive ? Infinity : 0, ease: 'easeInOut' }}
-          className={`p-1.5 rounded-2xl bg-[#F7F8F5] border transition-colors flex items-center gap-2 ${
+          className={`min-w-0 w-full p-1.5 rounded-2xl bg-[#F7F8F5] border transition-colors flex items-center gap-1.5 sm:gap-2 ${
             isListening
               ? 'border-red-300'
               : isAiActive
@@ -1357,8 +1357,8 @@ export function AiChatOrderView({
             onFocus={() => setIsInputFocused(true)}
             onBlur={() => setIsInputFocused(false)}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="원하는 맛, 인원, 도착 시간을 편하게 말씀해 주세요"
-            className="flex-1 min-h-[44px] px-2 bg-transparent text-sm text-[#1A1D1A] placeholder:text-[#687064] focus:outline-none"
+            placeholder="원하는 맛, 인원, 시간을 말씀해 주세요"
+            className="flex-1 min-w-0 w-full min-h-[44px] px-2 bg-transparent text-sm text-[#1A1D1A] placeholder:text-[#687064] focus:outline-none"
           />
 
           <button
