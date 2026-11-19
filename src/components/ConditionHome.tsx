@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import {
   AVAILABLE_TAGS,
+  INITIAL_REVIEWS,
   PRESET_QUERIES,
   VOICE_TRANSCRIPT_SAMPLES,
 } from '../data/seedData';
@@ -643,6 +644,10 @@ export function ConditionHome({
               const storeReviewCount = (
                 item.store.reviewCount ?? 1200
               ).toLocaleString('ko-KR');
+              const menuReviews = INITIAL_REVIEWS.filter(
+                (r) => r.menuId === item.menu.id
+              );
+              const topReview = menuReviews[0];
 
               return (
                 <article
@@ -728,16 +733,33 @@ export function ConditionHome({
                       <div className="px-2.5 py-2 rounded-xl bg-[#EAF1E2] text-[11px] font-medium text-[#3D5720] line-clamp-2 leading-snug">
                         ✨ {reasonText}
                       </div>
+
+                      {topReview && (
+                        <button
+                          type="button"
+                          onClick={() => onQuickSelectMenu(item.menu.id)}
+                          className="w-full text-left px-2.5 py-2 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2]/60 border border-[#E8ECE4] text-[11px] text-[#434B40] line-clamp-2 leading-snug cursor-pointer transition-colors"
+                        >
+                          💬 “{topReview.content}”
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="px-4 pb-4 pt-1 flex items-center gap-2">
+                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onQuickSelectMenu(item.menu.id)}
+                      className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-xs font-semibold rounded-xl cursor-pointer transition-colors"
+                    >
+                      리뷰 보기
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
                         onQuickReorderToConfirm(item.menu.id, item.servings)
                       }
-                      className="flex-1 min-h-[38px] px-3 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      className="min-h-[38px] px-2.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
                     >
                       <Zap className="w-3.5 h-3.5" />
                       <span>1초 주문</span>

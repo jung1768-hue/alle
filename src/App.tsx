@@ -1675,7 +1675,7 @@ export default function App() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1A1D1A]">
-                    Alle AI 알림
+                    alle AI 알림
                   </span>
                   <button
                     type="button"

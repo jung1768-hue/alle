@@ -43,8 +43,8 @@ const PAYMENT_OPTIONS: Array<{
   },
   {
     id: 'alle_regular_pass',
-    shortLabel: 'Alle 단골 패스',
-    label: 'Alle 단골 패스',
+    shortLabel: 'alle 단골 패스',
+    label: 'alle 단골 패스',
     subtitle: '스탬프 +1 자동 적립',
     benefitText: 'AI 단골 구독 결제 · 스탬프 자동 적립 및 이웃 묶음 우선 매칭',
   },

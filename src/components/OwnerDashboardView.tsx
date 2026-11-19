@@ -640,7 +640,7 @@ export function OwnerDashboardView({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-[#4E6E2A]">
-            Alle 파트너 · 점주 OS
+            alle 파트너 · 점주 OS
           </p>
           <h1 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] tracking-tight mt-0.5">
             점주 수익 · 운영 센터
@@ -698,7 +698,7 @@ export function OwnerDashboardView({
               +{formatWon(analytics.profitComparison.totalSavedCommissionAndAdFee)}
             </div>
             <p className="text-xs text-[#4C6235] tabular-nums pt-1">
-              타사 수수료 14.8% → <strong className="text-[#1A1D1A]">Alle 0%</strong> · 상단 광고비 0원
+              타사 수수료 14.8% → <strong className="text-[#1A1D1A]">alle 0%</strong> · 상단 광고비 0원
             </p>
           </div>
 

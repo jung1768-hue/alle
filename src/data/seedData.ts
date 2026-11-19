@@ -1759,7 +1759,7 @@ export const INITIAL_MENUS: MenuItem[] = [
 export const INITIAL_OWNER_PROFIT_COMPARISON: OwnerProfitComparison = {
   periodLabel: '최근 30일 누적 (대구 로컬 시연 데이터)',
   competitorPlatformLabel: '타사 대형 배달앱 평균 (중개·광고 약 14.8%)',
-  alleCommissionRateLabel: 'Alle 상생 수수료 0% (광고비 0원)',
+  alleCommissionRateLabel: 'alle 상생 수수료 0% (광고비 0원)',
   savedCommissionAndAdFee: 1842000,
   savedBreakdown: {
     brokerageFeeSaved: 1122000,

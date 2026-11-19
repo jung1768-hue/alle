@@ -1067,7 +1067,7 @@ export function AiChatOrderView({
                             }
                             className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#F0F3EC] text-[#687064] text-xs font-semibold rounded-xl cursor-pointer transition-colors"
                           >
-                            상세 보기
+                            상세 · 리뷰
                           </button>
                           <button
                             type="button"
