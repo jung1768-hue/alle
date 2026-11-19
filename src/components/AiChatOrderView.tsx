@@ -30,6 +30,7 @@ import {
   parseConditionInput,
 } from '../utils/parser';
 import {
+  getSpeechRecognitionConstructor,
   isSpeechSynthesisSupported,
   speakKoreanText,
   startKoreanVoiceInput,
@@ -261,6 +262,7 @@ export function AiChatOrderView({
   const stopVoiceRef = useRef<(() => void) | null>(null);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastSpokenMsgIdRef = useRef<string | null>(null);
+  const runChatQueryRef = useRef<(rawText: string) => void>(() => {});
 
   const [activeCondition, setActiveCondition] = useState<ParsedCondition>(() =>
     parseConditionInput(
@@ -359,10 +361,28 @@ export function AiChatOrderView({
   }, [messages, voiceReplyEnabled]);
 
   useEffect(() => {
+    if (voiceReplyEnabled && getSpeechRecognitionConstructor()) {
+      stopSpeaking();
+      setIsListening(true);
+      stopVoiceRef.current = startKoreanVoiceInput({
+        onTranscript: (text) => {
+          setIsListening(false);
+          void runChatQueryRef.current(text);
+        },
+        onUnavailableOrError: () => {
+          setIsListening(false);
+        },
+        onEnd: () => {
+          setIsListening(false);
+        },
+      });
+    }
+
     return () => {
       stopVoiceRef.current?.();
       stopSpeaking();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const runChatQuery = async (rawText: string) => {
@@ -620,6 +640,10 @@ export function AiChatOrderView({
     };
 
     setMessages((prev) => [...prev, botMsg]);
+  };
+
+  runChatQueryRef.current = (rawText: string) => {
+    void runChatQuery(rawText);
   };
 
   const handleConfirmTagInChat = (baseParsed: ParsedCondition, tag: string) => {
