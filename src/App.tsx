@@ -1871,7 +1871,7 @@ export default function App() {
         onSaved={(hasKey) =>
           showToast(
             hasKey
-              ? 'Gemini AI 실시간 연동이 활성화되었습니다.'
+              ? 'alle 분석 실시간 연동이 활성화되었습니다.'
               : '로컬 규칙 엔진 모드로 전환되었습니다.'
           )
         }

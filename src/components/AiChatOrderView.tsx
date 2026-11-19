@@ -616,7 +616,7 @@ export function AiChatOrderView({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{aiReady ? 'Gemini AI 연결됨' : 'AI 키 설정'}</span>
+              <span>{aiReady ? 'alle 분석 연결됨' : 'alle 분석 설정'}</span>
             </button>
           )}
           <button
@@ -665,7 +665,7 @@ export function AiChatOrderView({
                   {msg.aiSource === 'gemini' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
                       <Sparkles className="w-2.5 h-2.5" />
-                      Gemini AI 분석
+                      alle 분석
                     </span>
                   )}
                   <p>{msg.text}</p>
@@ -1047,7 +1047,7 @@ export function AiChatOrderView({
             </div>
             <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse" />
-              <span>Gemini AI가 컨디션과 조건에 맞는 매장을 분석하고 있어요...</span>
+              <span>alle 분석이 컨디션과 조건에 맞는 매장을 찾고 있어요...</span>
             </div>
           </div>
         )}

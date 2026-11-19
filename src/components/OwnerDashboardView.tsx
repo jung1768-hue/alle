@@ -567,7 +567,7 @@ export function OwnerDashboardView({
 
       if (!hasGeminiApiKey()) {
         setOcrError(
-          '실제 메뉴판 사진 인식은 Gemini AI 키가 필요합니다. 상단 AI 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
+          '실제 메뉴판 사진 인식은 alle 분석 연동 키가 필요합니다. AI 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
         );
         return;
       }
@@ -1503,7 +1503,7 @@ export function OwnerDashboardView({
                     <div>
                       <p className="text-xs font-bold text-[#1A1D1A] inline-flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                        <span>Gemini Vision 종이 메뉴판 추출 결과</span>
+                        <span>alle 분석 종이 메뉴판 추출 결과</span>
                       </p>
                       <p className="text-[11px] text-[#687064] mt-0.5">
                         인식된 메뉴를 확인하고 선택 항목을 한 번에 등록하세요.
