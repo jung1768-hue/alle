@@ -1506,7 +1506,7 @@ export default function App() {
                 <div
                   role="dialog"
                   aria-label="IR 발표자용 시연 퀵 스위처"
-                  className="absolute right-0 mt-2 w-[min(92vw,344px)] bg-[#1A1D1A]/95 backdrop-blur-xl text-white border border-white/15 rounded-2xl shadow-2xl p-3.5 space-y-2.5 z-50"
+                  className="fixed top-16 left-3 right-3 sm:left-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[344px] max-h-[calc(100vh-6rem)] overflow-y-auto bg-[#1A1D1A]/95 backdrop-blur-xl text-white border border-white/15 rounded-2xl shadow-2xl p-3.5 space-y-2.5 z-50"
                 >
                   <div className="flex items-center justify-between px-1 pb-1.5 border-b border-white/10">
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#EAF1E2]">
