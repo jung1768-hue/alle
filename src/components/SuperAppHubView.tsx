@@ -9,6 +9,7 @@ import {
   MapPin,
   Receipt,
   ShieldCheck,
+  ShoppingBasket,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -26,7 +27,7 @@ import {
   Store,
   SuperAppTab,
 } from '../types/alle';
-import { formatWon } from '../utils/parser';
+import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import { FoodImage } from './FoodImage';
 
 interface SuperAppHubViewProps {
@@ -42,6 +43,10 @@ interface SuperAppHubViewProps {
     menuId: string;
     servings: number;
     reservationSlot: string;
+    customerNote: string;
+  }) => { ok: boolean; error?: string };
+  onCreateMarketBundleOrder: (payload: {
+    items: Array<{ menuId: string; quantity: number }>;
     customerNote: string;
   }) => { ok: boolean; error?: string };
   onCreateErrand: (payload: {
@@ -68,6 +73,7 @@ export function SuperAppHubView({
   activeLocation,
   onJoinGroupBuy,
   onCreateB2BOrder,
+  onCreateMarketBundleOrder,
   onCreateErrand,
   onAdvanceErrand,
 }: SuperAppHubViewProps) {
@@ -98,6 +104,50 @@ export function SuperAppHubView({
   const [b2bSlot, setB2bSlot] = useState<string>(B2B_OFFPEAK_SLOTS[0]);
   const [b2bNote, setB2bNote] = useState<string>('오피스 A 로비 앞 수령');
   const [b2bError, setB2bError] = useState<string | null>(null);
+
+  // Traditional Market / Alley Multi-Store Bundle state
+  const marketBundleCatalog = useMemo(() => {
+    const seenStores = new Set<string>();
+    const picked: Array<{ menu: MenuItem; store: Store; unitPrice: number }> = [];
+    for (const m of availableMenus) {
+      const st = storeMap.get(m.storeId);
+      if (!st || seenStores.has(st.id)) continue;
+      seenStores.add(st.id);
+      picked.push({
+        menu: m,
+        store: st,
+        unitPrice: getEffectiveMenuPrice(m),
+      });
+      if (picked.length >= 6) break;
+    }
+    return picked;
+  }, [availableMenus, storeMap]);
+
+  const [bundleQtyByMenu, setBundleQtyByMenu] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    if (marketBundleCatalog[0]) init[marketBundleCatalog[0].menu.id] = 1;
+    if (marketBundleCatalog[1]) init[marketBundleCatalog[1].menu.id] = 1;
+    return init;
+  });
+  const [bundleNote, setBundleNote] = useState<string>('문 앞 비대면 수령');
+  const [bundleError, setBundleError] = useState<string | null>(null);
+
+  const bundleItems = useMemo(
+    () =>
+      marketBundleCatalog
+        .filter((entry) => (bundleQtyByMenu[entry.menu.id] ?? 0) > 0)
+        .map((entry) => ({
+          ...entry,
+          quantity: bundleQtyByMenu[entry.menu.id] ?? 0,
+        })),
+    [marketBundleCatalog, bundleQtyByMenu]
+  );
+
+  const bundleSubtotal = useMemo(
+    () =>
+      bundleItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
+    [bundleItems]
+  );
 
   // C2C Errand state
   const [errandTitle, setErrandTitle] = useState<string>('약국 일반 상비약 구매 대행');
@@ -202,8 +252,37 @@ export function SuperAppHubView({
         <div
           role="tablist"
           aria-label="생활 확장 서비스 선택"
-          className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-2.5"
         >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === SuperAppTab.MARKET_BUNDLE}
+            onClick={() => onChangeTab(SuperAppTab.MARKET_BUNDLE)}
+            className={`min-h-[68px] p-3 rounded-2xl border text-left flex items-center gap-3 transition-colors cursor-pointer ${
+              activeTab === SuperAppTab.MARKET_BUNDLE
+                ? 'bg-[#EAF1E2] border-[#4E6E2A]'
+                : 'bg-white border-[#E8ECE4] hover:border-[#4E6E2A]/40'
+            }`}
+          >
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                activeTab === SuperAppTab.MARKET_BUNDLE
+                  ? 'bg-[#4E6E2A] text-white'
+                  : 'bg-[#F7F8F5] text-[#687064]'
+              }`}
+            >
+              <ShoppingBasket className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-[#1A1D1A] truncate">
+                시장·골목 묶음
+              </div>
+              <div className="text-[11px] text-[#687064] truncate">
+                한 바구니 1,500원
+              </div>
+            </div>
+          </button>
 
           <button
             type="button"
@@ -297,6 +376,150 @@ export function SuperAppHubView({
         </div>
 
         {/* Active Extension Panel */}
+        {activeTab === SuperAppTab.MARKET_BUNDLE && (
+          <div className="os-card rounded-3xl p-5 sm:p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-[#1A1D1A]">
+                  전통시장 · 골목 가게 한 바구니 묶음
+                </h3>
+                <p className="text-xs text-[#687064] mt-0.5">
+                  여러 동네 점포 메뉴를 최소주문금액 없이 한 번에 담고 배달비 1회(1,500원)로 받아보세요.
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
+                최소주문 0원
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {marketBundleCatalog.map(({ menu, store, unitPrice }) => {
+                const qty = bundleQtyByMenu[menu.id] ?? 0;
+                return (
+                  <div
+                    key={menu.id}
+                    className={`p-3 rounded-2xl border flex items-center justify-between gap-2.5 ${
+                      qty > 0
+                        ? 'bg-[#EAF1E2]/60 border-[#82B440]'
+                        : 'bg-[#F7F8F5] border-[#E8ECE4]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                        <FoodImage
+                          src={menu.image}
+                          alt={menu.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-[#4E6E2A] truncate">
+                          {store.name}
+                        </p>
+                        <p className="text-xs font-bold text-[#1A1D1A] truncate">
+                          {menu.name}
+                        </p>
+                        <p className="text-xs font-mono font-bold text-[#1A1D1A] tabular-nums">
+                          {formatWon(unitPrice)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBundleQtyByMenu((prev) => ({
+                            ...prev,
+                            [menu.id]: Math.max(0, (prev[menu.id] ?? 0) - 1),
+                          }))
+                        }
+                        className="w-7 h-7 rounded-lg bg-white border border-[#E8ECE4] text-xs font-bold text-[#1A1D1A] cursor-pointer"
+                      >
+                        -
+                      </button>
+                      <span className="w-5 text-center text-xs font-mono font-bold text-[#1A1D1A]">
+                        {qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBundleQtyByMenu((prev) => ({
+                            ...prev,
+                            [menu.id]: Math.min(
+                              menu.stock,
+                              (prev[menu.id] ?? 0) + 1
+                            ),
+                          }))
+                        }
+                        className="w-7 h-7 rounded-lg bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#687064]">
+                <span>선택 품목 ({bundleItems.length}개 매장)</span>
+                <span className="font-mono font-semibold text-[#1A1D1A]">
+                  {formatWon(bundleSubtotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-[#687064]">
+                <span>이웃 도보 통합 배달비 (1회 정액)</span>
+                <span className="font-mono font-semibold text-[#4E6E2A]">
+                  +1,500원
+                </span>
+              </div>
+              <div className="pt-2 border-t border-[#E8ECE4] flex items-center justify-between text-sm font-bold text-[#1A1D1A]">
+                <span>총 묶음 결제 예상액</span>
+                <span className="font-mono text-[#4E6E2A]">
+                  {formatWon(bundleSubtotal + (bundleItems.length > 0 ? 1500 : 0))}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={bundleNote}
+                onChange={(e) => setBundleNote(e.target.value)}
+                placeholder="배달 요청사항 (예: 문 앞 비대면 수령)"
+                className="flex-1 min-h-[42px] px-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-xs text-[#1A1D1A]"
+              />
+              <button
+                type="button"
+                disabled={bundleItems.length === 0}
+                onClick={() => {
+                  const res = onCreateMarketBundleOrder({
+                    items: bundleItems.map((i) => ({
+                      menuId: i.menu.id,
+                      quantity: i.quantity,
+                    })),
+                    customerNote: bundleNote.trim(),
+                  });
+                  if (!res.ok) {
+                    setBundleError(res.error ?? '묶음 주문에 실패했습니다.');
+                  } else {
+                    setBundleError(null);
+                  }
+                }}
+                className="min-h-[42px] px-5 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] text-white text-xs sm:text-sm font-bold rounded-xl cursor-pointer shrink-0"
+              >
+                한 바구니 묶음 주문하기
+              </button>
+            </div>
+
+            {bundleError && (
+              <p className="text-xs font-semibold text-red-700">{bundleError}</p>
+            )}
+          </div>
+        )}
+
         {activeTab === SuperAppTab.GROUP_BUY && (
           <div className="space-y-3.5">
             <div className="flex items-center justify-between px-1">

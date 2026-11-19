@@ -49,7 +49,11 @@ import {
   SuperAppTab,
   UserPreferences,
 } from './types/alle';
-import { evaluateRecommendations, parseConditionInput } from './utils/parser';
+import {
+  evaluateRecommendations,
+  getEffectiveMenuPrice,
+  parseConditionInput,
+} from './utils/parser';
 import { checkServerGeminiAvailable } from './utils/gemini';
 import {
   extractSharedState,
@@ -418,7 +422,11 @@ export default function App() {
   const handleQuickReorderToConfirm = (
     menuId: string,
     servings: number,
-    options?: { sharedDeliveryApplied?: boolean; reservationSlot?: string }
+    options?: {
+      sharedDeliveryApplied?: boolean;
+      reservationSlot?: string;
+      couponCode?: string;
+    }
   ) => {
     const targetMenu = appState.menus.find((m) => m.id === menuId);
     const targetStore = targetMenu
@@ -438,7 +446,7 @@ export default function App() {
       menuId,
       servings: Math.min(Math.max(1, servings), targetMenu.stock),
       selectedOptionIds: [],
-      couponCode: 'NONE',
+      couponCode: options?.couponCode ?? 'NONE',
       sharedDeliveryApplied: options?.sharedDeliveryApplied ?? false,
       reservationSlot: options?.reservationSlot ?? 'now',
     });
@@ -596,7 +604,8 @@ export default function App() {
 
     orderSubmitLockRef.current = true;
 
-    const menuSubtotal = targetMenu.pricePerPerson * payload.servings;
+    const effectiveUnitPrice = getEffectiveMenuPrice(targetMenu);
+    const menuSubtotal = effectiveUnitPrice * payload.servings;
     const selectedOpts = targetMenu.options.filter((o) =>
       payload.selectedOptionIds.includes(o.id)
     );
@@ -713,7 +722,8 @@ export default function App() {
     }
 
     orderSubmitLockRef.current = true;
-    const menuSubtotal = targetMenu.pricePerPerson * payload.servings;
+    const effectiveUnitPrice = getEffectiveMenuPrice(targetMenu);
+    const menuSubtotal = effectiveUnitPrice * payload.servings;
     const totalAmount = menuSubtotal + targetStore.deliveryFee;
     const nowStr = formatNowTime();
     const nextNumber = 101 + appState.orders.length;
@@ -1008,6 +1018,146 @@ export default function App() {
         m.id === menuId ? { ...m, isSoldOut: !m.isSoldOut } : m
       ),
     }));
+  };
+
+  const handleToggleMenuClosingSale = (
+    menuId: string,
+    discountPercent = 30
+  ) => {
+    setAppState((prev) => ({
+      ...prev,
+      menus: prev.menus.map((m) => {
+        if (m.id !== menuId) return m;
+        const nextDiscount =
+          m.closingDiscountPercent && m.closingDiscountPercent > 0
+            ? 0
+            : discountPercent;
+        return {
+          ...m,
+          closingDiscountPercent: nextDiscount,
+        };
+      }),
+    }));
+  };
+
+  const handleCreateMarketBundleOrder = (payload: {
+    items: Array<{ menuId: string; quantity: number }>;
+    customerNote: string;
+  }): { ok: boolean; error?: string } => {
+    if (orderSubmitLockRef.current) {
+      return { ok: false, error: '주문이 이미 처리 중입니다.' };
+    }
+    if (payload.items.length === 0) {
+      return { ok: false, error: '최소 1개 이상의 메뉴를 담아주세요.' };
+    }
+
+    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
+    const storeMap = new Map(appState.stores.map((s) => [s.id, s]));
+
+    let subtotal = 0;
+    const summaryLabels: string[] = [];
+    const storeNames = new Set<string>();
+    let leadMenu: MenuItem | null = null;
+    let leadStoreName = '';
+
+    for (const entry of payload.items) {
+      const m = menuMap.get(entry.menuId);
+      const st = m ? storeMap.get(m.storeId) : undefined;
+      if (!m || !st || !st.isOpen || m.isSoldOut || m.stock < entry.quantity) {
+        return {
+          ok: false,
+          error: `${m?.name ?? '선택 메뉴'}의 재고가 부족하거나 영업 중이 아닙니다.`,
+        };
+      }
+      if (!leadMenu) {
+        leadMenu = m;
+        leadStoreName = st.name;
+      }
+      storeNames.add(st.name);
+      subtotal += getEffectiveMenuPrice(m) * entry.quantity;
+      summaryLabels.push(`[${st.name}] ${m.name}×${entry.quantity}`);
+    }
+
+    if (!leadMenu) {
+      return { ok: false, error: '주문 항목을 확인할 수 없습니다.' };
+    }
+
+    orderSubmitLockRef.current = true;
+    const bundleDeliveryFee = 1500;
+    const totalAmount = subtotal + bundleDeliveryFee;
+    const nowStr = formatNowTime();
+    const nextNumber = 101 + appState.orders.length;
+    const newOrderId = `ord-mkt-${Date.now()}`;
+
+    const bundleOrder: Order = {
+      id: newOrderId,
+      orderCode: `MKT-${nextNumber}`,
+      storeId: leadMenu.storeId,
+      menuId: leadMenu.id,
+      menuName:
+        payload.items.length > 1
+          ? `${leadMenu.name} 외 ${payload.items.length - 1}건 (시장·골목 묶음)`
+          : leadMenu.name,
+      storeName:
+        storeNames.size > 1
+          ? `${leadStoreName} 외 ${storeNames.size - 1}곳 묶음`
+          : leadStoreName,
+      customerAlias: '이웃 고객',
+      addressAlias: activeLocation.areaName,
+      servings: payload.items.reduce((sum, item) => sum + item.quantity, 0),
+      selectedOptionIds: [],
+      selectedOptionNames: summaryLabels,
+      menuSubtotal: subtotal,
+      optionsSubtotal: 0,
+      deliveryFee: bundleDeliveryFee,
+      sharedDeliveryApplied: true,
+      paymentMethod: 'local_currency',
+      paymentMethodLabel: '대구로페이 / 골목 묶음',
+      couponCode: null,
+      couponDiscount: 0,
+      totalAmount,
+      status: OrderStatus.PENDING,
+      dispatchMode: DispatchMode.NEIGHBOR_WALK,
+      createdAt: nowStr,
+      updatedAt: nowStr,
+      stockDeducted: true,
+      stockRestored: false,
+      mockRefunded: false,
+      cancelRequested: false,
+      cancelRequestReason: null,
+      cancelRequestedAt: null,
+      customerNote: `${summaryLabels.join(' + ')}${
+        payload.customerNote ? ` / ${payload.customerNote}` : ''
+      }`,
+    };
+
+    const qtyByMenu = new Map(payload.items.map((i) => [i.menuId, i.quantity]));
+
+    setAppState((prev) => ({
+      ...prev,
+      menus: prev.menus.map((m) => {
+        const deduct = qtyByMenu.get(m.id);
+        if (!deduct) return m;
+        const nextStock = Math.max(0, m.stock - deduct);
+        return {
+          ...m,
+          stock: nextStock,
+          isSoldOut: nextStock === 0 ? true : m.isSoldOut,
+        };
+      }),
+      orders: [bundleOrder, ...prev.orders],
+    }));
+
+    setHighlightedOrderId(newOrderId);
+    setStep(ConsumerStep.STATUS);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`${bundleOrder.orderCode} 골목·시장 한 바구니 묶음 주문이 접수되었습니다.`);
+
+    window.setTimeout(() => {
+      orderSubmitLockRef.current = false;
+    }, 300);
+
+    return { ok: true };
   };
 
   const handleAdjustMenuStock = (menuId: string, delta: number) => {
@@ -1406,6 +1556,7 @@ export default function App() {
             onAdjustStoreExtraPrep={handleAdjustStoreExtraPrep}
             onSetStoreExtraPrep={handleSetStoreExtraPrep}
             onToggleMenuSoldOut={handleToggleMenuSoldOut}
+            onToggleMenuClosingSale={handleToggleMenuClosingSale}
             onAdjustMenuStock={handleAdjustMenuStock}
             onAddMenuFromLine={handleAddMenuFromLine}
             onBulkAddMenusFromSample={handleBulkAddMenusFromSample}
@@ -1556,18 +1707,23 @@ export default function App() {
             activeLocation={activeLocation}
             onJoinGroupBuy={handleJoinGroupBuy}
             onCreateB2BOrder={handleCreateB2BOrder}
+            onCreateMarketBundleOrder={handleCreateMarketBundleOrder}
             onCreateErrand={handleCreateErrand}
             onAdvanceErrand={handleAdvanceErrand}
           />
         ) : (
           <OrderStatusView
             orders={appState.orders}
+            stores={appState.stores}
             menus={appState.menus}
             highlightedOrderId={highlightedOrderId}
             onCancelBeforeCooking={handleCancelBeforeCooking}
             onRequestCancelAfterCooking={handleRequestCancelAfterCooking}
             onAttachEvidence={handleAttachEvidence}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
+            onUseRelayCoupon={(menuId) =>
+              handleQuickReorderToConfirm(menuId, 1, { couponCode: 'RELAY1000' })
+            }
             onGoToOwnerDemo={() => setRole(DemoRole.OWNER)}
             onNewOrder={() => setStep(ConsumerStep.HOME)}
           />

@@ -295,6 +295,12 @@ export const MOCK_COUPONS: MockCoupon[] = [
     discountAmount: 1000,
   },
   {
+    id: 'c-relay-1000',
+    code: 'RELAY1000',
+    label: '옆집 릴레이 골목상권 할인 1,000원',
+    discountAmount: 1000,
+  },
+  {
     id: 'c-local-1500',
     code: 'LOCAL1500',
     label: '대구로페이·지역화폐 직결제 할인 1,500원',
@@ -773,6 +779,7 @@ export const INITIAL_MENUS: MenuItem[] = [
     estimatedMinutes: 20,
     image: IMG_HAEJANG,
     aiReason: '아이·가족 동반 순한 국물 선호 + 매장 동일가 검증 + 20분 이내 빠른 도착',
+    closingDiscountPercent: 30,
   },
   {
     id: 'm3',
@@ -794,6 +801,7 @@ export const INITIAL_MENUS: MenuItem[] = [
     estimatedMinutes: 24,
     image: IMG_KIMCHI,
     aiReason: '대구 저녁 얼큰 국물 수요 1위 + 동인동 단골 재주문율 높음 + 2인 22,000원대 가성비',
+    closingDiscountPercent: 30,
   },
   {
     id: 'm4',

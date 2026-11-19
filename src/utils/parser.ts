@@ -559,7 +559,8 @@ export function evaluateRecommendations(
       reasons.push(`재고 부족 (남은 수량 ${menu.stock}개 < 요청 ${validServings}인분)`);
     }
 
-    const menuSubtotal = menu.pricePerPerson * validServings;
+    const effectiveUnitPrice = getEffectiveMenuPrice(menu);
+    const menuSubtotal = effectiveUnitPrice * validServings;
     const estimatedTotal = menuSubtotal + store.deliveryFee;
 
     if (condition.maxBudget !== null && estimatedTotal > condition.maxBudget) {
@@ -664,6 +665,12 @@ export function evaluateRecommendations(
     matches: scoredMatches.slice(0, 6).map((item) => item.match),
     excluded,
   };
+}
+
+export function getEffectiveMenuPrice(menu: Pick<MenuItem, 'pricePerPerson' | 'closingDiscountPercent'>): number {
+  const discount = menu.closingDiscountPercent ?? 0;
+  if (discount <= 0 || discount >= 100) return menu.pricePerPerson;
+  return Math.round((menu.pricePerPerson * (100 - discount)) / 100);
 }
 
 export function formatWon(amount: number): string {

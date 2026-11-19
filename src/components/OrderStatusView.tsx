@@ -18,6 +18,7 @@ import {
   MenuItem,
   Order,
   OrderStatus,
+  Store,
 } from '../types/alle';
 import { formatWon } from '../utils/parser';
 import { FoodImage } from './FoodImage';
@@ -25,6 +26,7 @@ import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
 interface OrderStatusViewProps {
   orders: Order[];
+  stores: Store[];
   menus: MenuItem[];
   highlightedOrderId: string | null;
   onCancelBeforeCooking: (orderId: string) => void;
@@ -34,6 +36,7 @@ interface OrderStatusViewProps {
     payload: Omit<EvidenceRecord, 'recordedAt'>
   ) => void;
   onQuickReorderToConfirm: (menuId: string, servings: number) => void;
+  onUseRelayCoupon?: (menuId: string) => void;
   onGoToOwnerDemo: () => void;
   onNewOrder: () => void;
 }
@@ -95,12 +98,14 @@ function getFaqAutoReply(order: Order, topic: 'eta' | 'note'): string {
 
 export function OrderStatusView({
   orders,
+  stores,
   menus,
   highlightedOrderId,
   onCancelBeforeCooking,
   onRequestCancelAfterCooking,
   onAttachEvidence,
   onQuickReorderToConfirm,
+  onUseRelayCoupon,
   onGoToOwnerDemo,
   onNewOrder,
 }: OrderStatusViewProps) {
@@ -118,6 +123,39 @@ export function OrderStatusView({
       ? parseOrderDateParts(latest.createdAt)
       : { year: 2026, month: 11, day: 13, dateKey: '2026-11-13' };
   }, [orders]);
+
+  const relayOffer = useMemo(() => {
+    const latest = orders.find((o) => o.status !== OrderStatus.CANCELLED);
+    if (!latest) return null;
+    const storeMap = new Map(stores.map((s) => [s.id, s]));
+    const currentStore = storeMap.get(latest.storeId);
+    const candidateMenus = menus.filter((m) => {
+      const st = storeMap.get(m.storeId);
+      return (
+        Boolean(st?.isOpen) &&
+        m.storeId !== latest.storeId &&
+        !m.isSoldOut &&
+        m.stock >= 1
+      );
+    });
+    if (candidateMenus.length === 0) return null;
+    const preferred =
+      candidateMenus.find((m) => {
+        const st = storeMap.get(m.storeId);
+        return (
+          st &&
+          currentStore &&
+          st.categoryGroup !== currentStore.categoryGroup
+        );
+      }) ?? candidateMenus[0];
+    const partnerStore = storeMap.get(preferred.storeId);
+    if (!partnerStore) return null;
+    return {
+      fromStoreName: latest.storeName,
+      partnerStore,
+      menu: preferred,
+    };
+  }, [orders, stores, menus]);
 
   const [calendarYear, setCalendarYear] = useState<number>(defaultOrderDate.year);
   const [calendarMonth, setCalendarMonth] = useState<number>(
@@ -524,6 +562,38 @@ export function OrderStatusView({
         </div>
       ) : (
         <div className="space-y-4">
+          {relayOffer && onUseRelayCoupon && (
+            <div className="p-4 sm:p-5 bg-[#EAF1E2] border border-[#82B440]/60 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden border border-[#D4E1C5] shrink-0">
+                  <FoodImage
+                    src={relayOffer.menu.image}
+                    alt={relayOffer.menu.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-xs font-bold text-[#3D5720]">
+                    🎁 옆집 릴레이 쿠폰 도착 · 1,000원 즉시 할인
+                  </p>
+                  <p className="text-sm font-bold text-[#1A1D1A] truncate">
+                    {relayOffer.partnerStore.name} · {relayOffer.menu.name}
+                  </p>
+                  <p className="text-xs text-[#3D5720]">
+                    {relayOffer.fromStoreName} 주문 감사로 반경 200m 동네 이웃 매장에서 사용 가능합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onUseRelayCoupon(relayOffer.menu.id)}
+                className="min-h-[40px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl shrink-0 cursor-pointer"
+              >
+                릴레이 1,000원 할인 주문
+              </button>
+            </div>
+          )}
+
           {visibleOrders.map((order) => {
             const currentIdx = getStepIndex(order.status);
             const isCancelled = order.status === OrderStatus.CANCELLED;

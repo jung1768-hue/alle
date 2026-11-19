@@ -61,6 +61,7 @@ interface OwnerDashboardViewProps {
   onAdjustStoreExtraPrep: (storeId: string, delta: number) => void;
   onSetStoreExtraPrep: (storeId: string, minutes: number) => void;
   onToggleMenuSoldOut: (menuId: string) => void;
+  onToggleMenuClosingSale: (menuId: string, discountPercent?: number) => void;
   onAdjustMenuStock: (menuId: string, delta: number) => void;
   onAddMenuFromLine: (
     storeId: string,
@@ -99,6 +100,7 @@ export function OwnerDashboardView({
   onAdjustStoreExtraPrep,
   onSetStoreExtraPrep,
   onToggleMenuSoldOut,
+  onToggleMenuClosingSale,
   onAdjustMenuStock,
   onAddMenuFromLine,
   onBulkAddMenusFromSample,
@@ -515,6 +517,21 @@ export function OwnerDashboardView({
       });
       return;
     }
+    if (cmd.includes('마감') && (cmd.includes('특가') || cmd.includes('할인') || cmd.includes('세일'))) {
+      const targetMenu = menus.find((m) => cmd.includes(m.name)) ?? menus[0];
+      if (!targetMenu) return;
+      const pctMatch = cmd.match(/(\d+)\s*%/);
+      const pct = pctMatch ? Math.min(50, Math.max(10, parseInt(pctMatch[1], 10))) : 30;
+      onToggleMenuClosingSale(targetMenu.id, pct);
+      setCommandFeedback(
+        `"${targetMenu.name}" 마감 ${
+          targetMenu.closingDiscountPercent ? '특가를 해제' : `${pct}% 특가를 시작`
+        }했습니다.`
+      );
+      setCommandInput('');
+      return;
+    }
+
     if (cmd.includes('품절')) {
       executeAction('sold_out');
       return;
@@ -1418,13 +1435,28 @@ export function OwnerDashboardView({
                               {out ? '품절' : `${menu.stock}개`}
                             </td>
                             <td className="py-3 pl-3 text-right whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => onAdjustMenuStock(menu.id, 5)}
-                                className="px-2.5 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-lg cursor-pointer"
-                              >
-                                +5 입고
-                              </button>
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onToggleMenuClosingSale(menu.id, 30)}
+                                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg cursor-pointer border ${
+                                    (menu.closingDiscountPercent ?? 0) > 0
+                                      ? 'bg-amber-600 border-amber-600 text-white'
+                                      : 'bg-[#FFFBEF] border-[#E8D595] text-amber-900 hover:bg-amber-100'
+                                  }`}
+                                >
+                                  {(menu.closingDiscountPercent ?? 0) > 0
+                                    ? `마감 -${menu.closingDiscountPercent}% ON`
+                                    : '마감 30%'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onAdjustMenuStock(menu.id, 5)}
+                                  className="px-2.5 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-lg cursor-pointer"
+                                >
+                                  +5 입고
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );

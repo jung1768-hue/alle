@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { MOCK_COUPONS, RESERVATION_SLOTS_15M } from '../data/seedData';
 import { MenuItem, PaymentMethod, Store } from '../types/alle';
-import { formatWon } from '../utils/parser';
+import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import { FoodImage } from './FoodImage';
 
 const PAYMENT_OPTIONS: Array<{
@@ -128,7 +128,8 @@ export function OrderConfirmationView({
   const isInsufficientStock = servings > menu.stock;
   const isBlocked = isStoreClosed || isMenuSoldOut || isInsufficientStock;
 
-  const menuSubtotal = Math.round(menu.pricePerPerson) * servings;
+  const effectiveUnitPrice = getEffectiveMenuPrice(menu);
+  const menuSubtotal = Math.round(effectiveUnitPrice) * servings;
   const selectedOptions = menu.options.filter((o) =>
     selectedOptionIds.includes(o.id)
   );

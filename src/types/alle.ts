@@ -27,6 +27,7 @@ export enum ConsumerStep {
 export enum SuperAppTab {
   GROUP_BUY = 'group_buy',
   B2B = 'b2b',
+  MARKET_BUNDLE = 'market_bundle',
   ERRAND = 'errand',
 }
 
@@ -80,6 +81,7 @@ export interface MenuItem {
   estimatedMinutes: number;
   image: string;
   aiReason?: string;
+  closingDiscountPercent?: number;
 }
 
 export interface Review {

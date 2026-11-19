@@ -31,7 +31,11 @@ import {
   SuperAppTab,
   UserPreferences,
 } from '../types/alle';
-import { evaluateRecommendations, formatWon } from '../utils/parser';
+import {
+  evaluateRecommendations,
+  formatWon,
+  getEffectiveMenuPrice,
+} from '../utils/parser';
 import { startKoreanVoiceInput } from '../utils/voice';
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
@@ -228,7 +232,33 @@ export function ConditionHome({
 
   const topPicks = autoRecommendations.matches.slice(0, 3);
 
+  const closingSaleItems = useMemo(() => {
+    const storeMap = new Map(stores.map((s) => [s.id, s]));
+    return menus
+      .filter((m) => {
+        const st = storeMap.get(m.storeId);
+        return (
+          Boolean(st?.isOpen) &&
+          !m.isSoldOut &&
+          m.stock > 0 &&
+          (m.closingDiscountPercent ?? 0) > 0
+        );
+      })
+      .slice(0, 4)
+      .map((m) => ({
+        menu: m,
+        store: storeMap.get(m.storeId)!,
+        discountedPrice: getEffectiveMenuPrice(m),
+      }));
+  }, [menus, stores]);
+
   const quickServices = [
+    {
+      id: 'market-bundle',
+      label: '전통시장·골목 한 바구니 묶음',
+      icon: Sparkles,
+      onClick: () => onOpenSuperApp(SuperAppTab.MARKET_BUNDLE),
+    },
     {
       id: 'group-buy',
       label: '이웃 공동구매 · 배달비 1/N',
@@ -478,7 +508,7 @@ export function ConditionHome({
       {/* 3. Compact Extension Pill Strip (Streamlined UX) */}
       <section
         aria-label="확장 서비스"
-        className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+        className="grid grid-cols-1 sm:grid-cols-2 gap-2"
       >
         {quickServices.map((svc) => {
           const Icon = svc.icon;
@@ -495,6 +525,70 @@ export function ConditionHome({
           );
         })}
       </section>
+
+      {/* 3-1. Closing Time-Sale Strip (Neighborhood Food Waste Reduction & Traffic Boost) */}
+      {closingSaleItems.length > 0 && (
+        <section
+          aria-label="동네 마감 특가"
+          className="bg-[#FFFBEF] border border-[#E8D595] rounded-3xl p-4 sm:p-5 space-y-3"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold">
+                마감 특가
+              </span>
+              <h2 className="text-sm sm:text-base font-bold text-[#1A1D1A]">
+                지금 픽업·배달 가능한 동네 잔여 특가
+              </h2>
+            </div>
+            <span className="text-xs text-amber-900 font-medium">
+              소상공인 식재료 낭비 Zero
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {closingSaleItems.map(({ menu, store, discountedPrice }) => (
+              <div
+                key={menu.id}
+                className="p-3 bg-white border border-[#E8ECE4] rounded-2xl flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                    <FoodImage
+                      src={menu.image}
+                      alt={menu.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#4E6E2A] truncate">
+                      {store.name} · 남은 {menu.stock}개
+                    </p>
+                    <p className="text-sm font-bold text-[#1A1D1A] truncate">
+                      {menu.name}
+                    </p>
+                    <p className="text-xs tabular-nums flex items-center gap-1.5">
+                      <span className="line-through text-[#687064]">
+                        {formatWon(menu.pricePerPerson)}
+                      </span>
+                      <strong className="text-amber-800 font-bold">
+                        {formatWon(discountedPrice)} (-{menu.closingDiscountPercent}%)
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onQuickReorderToConfirm(menu.id, 1)}
+                  className="min-h-[38px] px-3 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl shrink-0 cursor-pointer"
+                >
+                  특가 주문
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 4. 'AI가 추천하는 우리 동네 맛집' Cards */}
       <section className="space-y-4">
