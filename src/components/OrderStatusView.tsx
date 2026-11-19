@@ -11,7 +11,6 @@ import {
   Store as StoreIcon,
   Truck,
   XCircle,
-  Zap,
 } from 'lucide-react';
 import {
   DispatchMode,
@@ -188,13 +187,13 @@ export function OrderStatusView({
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-[#141812]">주문내역</h1>
+            <h1 className="text-2xl font-bold text-[#1A1D1A]">주문내역</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={onGoToOwnerDemo}
-              className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+              className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
               <StoreIcon className="w-4 h-4" />
               <span>점주 · 관리자</span>
@@ -202,7 +201,7 @@ export function OrderStatusView({
             <button
               type="button"
               onClick={onNewOrder}
-              className="min-h-[42px] px-4 py-2 border border-[#C5D8B5] bg-white hover:bg-[#E7EFE1] text-[#141812] text-xs sm:text-sm font-bold rounded-2xl whitespace-nowrap shrink-0 cursor-pointer"
+              className="min-h-[42px] px-4 py-2 border border-[#D4E1C5] bg-white hover:bg-[#EAF1E2] text-[#1A1D1A] text-xs sm:text-sm font-bold rounded-2xl whitespace-nowrap shrink-0 cursor-pointer"
             >
               새 주문하기
             </button>
@@ -212,7 +211,7 @@ export function OrderStatusView({
         <div
           role="tablist"
           aria-label="주문 현황 및 주문 기록"
-          className="grid grid-cols-2 p-1 bg-[#E9ECE4] border border-[#DDE3D7] rounded-2xl"
+          className="grid grid-cols-2 p-1 bg-white border border-[#E8ECE4] rounded-2xl shadow-sm"
         >
           <button
             type="button"
@@ -221,8 +220,8 @@ export function OrderStatusView({
             onClick={() => setTab('active')}
             className={`min-h-[44px] py-2 text-sm font-bold rounded-xl transition-colors cursor-pointer ${
               tab === 'active'
-                ? 'bg-white text-[#2E531A] shadow-2xs'
-                : 'text-[#374033] hover:text-[#141812]'
+                ? 'bg-[#EAF1E2] text-[#3D5720]'
+                : 'text-[#687064] hover:text-[#1A1D1A]'
             }`}
           >
             주문현황 ({activeOrders.length})
@@ -234,29 +233,29 @@ export function OrderStatusView({
             onClick={() => setTab('history')}
             className={`min-h-[44px] py-2 text-sm font-bold rounded-xl transition-colors cursor-pointer ${
               tab === 'history'
-                ? 'bg-white text-[#2E531A] shadow-2xs'
-                : 'text-[#374033] hover:text-[#141812]'
+                ? 'bg-[#EAF1E2] text-[#3D5720]'
+                : 'text-[#687064] hover:text-[#1A1D1A]'
             }`}
           >
-            주문기록 · 달력 ({historyOrders.length})
+            주문기록 ({historyOrders.length})
           </button>
         </div>
       </div>
 
       {/* History Sub-Mode Switcher: List vs Monthly/Yearly Food Calendar */}
       {tab === 'history' && (
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-[#DDE3D7] rounded-2xl px-4 py-2.5">
-          <span className="text-xs font-bold text-[#374033] tabular-nums">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-[#E8ECE4] rounded-2xl px-4 py-2.5">
+          <span className="text-xs font-bold text-[#555E52] tabular-nums">
             전체 {orders.length}건 · 완료/취소 {historyOrders.length}건
           </span>
-          <div className="inline-flex items-center p-1 bg-[#EFF2EC] border border-[#DDE3D7] rounded-xl">
+          <div className="inline-flex items-center p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
             <button
               type="button"
               onClick={() => setHistoryViewMode('list')}
               className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer ${
                 historyViewMode === 'list'
-                  ? 'bg-white text-[#2E531A] shadow-2xs'
-                  : 'text-[#4A5246]'
+                  ? 'bg-white text-[#4E6E2A] shadow-2xs'
+                  : 'text-[#687064]'
               }`}
             >
               <List className="w-3.5 h-3.5" />
@@ -267,8 +266,8 @@ export function OrderStatusView({
               onClick={() => setHistoryViewMode('calendar')}
               className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer ${
                 historyViewMode === 'calendar'
-                  ? 'bg-white text-[#2E531A] shadow-2xs'
-                  : 'text-[#4A5246]'
+                  ? 'bg-white text-[#4E6E2A] shadow-2xs'
+                  : 'text-[#687064]'
               }`}
             >
               <CalendarIcon className="w-3.5 h-3.5" />
@@ -281,16 +280,16 @@ export function OrderStatusView({
       {tab === 'history' && historyViewMode === 'calendar' ? (
         <div className="space-y-4">
           {/* Calendar Header Controls */}
-          <div className="bg-white border border-[#DDE3D7] rounded-3xl p-4 sm:p-5 space-y-4 shadow-[0_2px_10px_rgba(20,24,18,0.03)]">
+          <div className="bg-white border border-[#E8ECE4] rounded-3xl p-4 sm:p-5 space-y-4 shadow-[0_2px_10px_rgba(26,29,26,0.03)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex items-center p-1 bg-[#EFF2EC] border border-[#DDE3D7] rounded-xl">
+              <div className="inline-flex items-center p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
                 <button
                   type="button"
                   onClick={() => setCalendarScope('monthly')}
                   className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold cursor-pointer ${
                     calendarScope === 'monthly'
-                      ? 'bg-[#2E531A] text-white'
-                      : 'text-[#374033]'
+                      ? 'bg-[#4E6E2A] text-white'
+                      : 'text-[#555E52]'
                   }`}
                 >
                   월별
@@ -300,15 +299,15 @@ export function OrderStatusView({
                   onClick={() => setCalendarScope('yearly')}
                   className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold cursor-pointer ${
                     calendarScope === 'yearly'
-                      ? 'bg-[#2E531A] text-white'
-                      : 'text-[#374033]'
+                      ? 'bg-[#4E6E2A] text-white'
+                      : 'text-[#555E52]'
                   }`}
                 >
                   연간
                 </button>
               </div>
 
-              <div className="flex items-center gap-3 text-lg font-bold text-[#141812] tabular-nums">
+              <div className="flex items-center gap-3 text-lg font-bold text-[#1A1D1A] tabular-nums">
                 <button
                   type="button"
                   aria-label="이전 달"
@@ -320,7 +319,7 @@ export function OrderStatusView({
                       setCalendarMonth((m) => m - 1);
                     }
                   }}
-                  className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-[#F4F6F1] flex items-center justify-center cursor-pointer"
+                  className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -338,7 +337,7 @@ export function OrderStatusView({
                       setCalendarMonth((m) => m + 1);
                     }
                   }}
-                  className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-[#F4F6F1] flex items-center justify-center cursor-pointer"
+                  className="min-w-[36px] min-h-[36px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -352,7 +351,7 @@ export function OrderStatusView({
                   setSelectedDay(defaultOrderDate.day);
                   setCalendarScope('monthly');
                 }}
-                className="min-h-[36px] px-3 py-1 bg-[#E7EFE1] hover:bg-[#D8E6CD] text-[#1F3A11] text-xs font-bold rounded-xl cursor-pointer"
+                className="min-h-[36px] px-3 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl cursor-pointer"
               >
                 최근 주문일 이동
               </button>
@@ -375,12 +374,12 @@ export function OrderStatusView({
                       }}
                       className={`p-3 rounded-2xl border text-center cursor-pointer transition-colors ${
                         m === calendarMonth
-                          ? 'bg-[#E7EFE1] border-[#2E531A] font-bold'
-                          : 'bg-[#F4F6F1] border-[#DDE3D7] hover:bg-white'
+                          ? 'bg-[#EAF1E2] border-[#4E6E2A] font-bold'
+                          : 'bg-[#F7F8F5] border-[#E8ECE4] hover:bg-white'
                       }`}
                     >
-                      <div className="text-sm font-bold text-[#141812]">{m}월</div>
-                      <div className="text-xs font-semibold text-[#2E531A] tabular-nums mt-0.5">
+                      <div className="text-sm font-bold text-[#1A1D1A]">{m}월</div>
+                      <div className="text-xs font-semibold text-[#4E6E2A] tabular-nums mt-0.5">
                         {count}건 주문
                       </div>
                     </button>
@@ -389,7 +388,7 @@ export function OrderStatusView({
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-7 text-center text-xs font-bold text-[#4A5246]">
+                <div className="grid grid-cols-7 text-center text-xs font-bold text-[#687064]">
                   {['월', '화', '수', '목', '금', '토', '일'].map((w) => (
                     <div key={w} className="py-1">
                       {w}
@@ -400,6 +399,7 @@ export function OrderStatusView({
                   {Array.from({ length: daysInCalendarMonth }, (_, i) => i + 1).map(
                     (day) => {
                       const dayList = ordersByDay.get(day) ?? [];
+                      const hasOrders = dayList.length > 0;
                       const isSelected = day === selectedDay;
                       const firstMenu = dayList[0]
                         ? menuMap.get(dayList[0].menuId)
@@ -410,25 +410,29 @@ export function OrderStatusView({
                           key={day}
                           type="button"
                           onClick={() => setSelectedDay(day)}
-                          className={`min-h-[58px] sm:min-h-[72px] rounded-2xl p-1 flex flex-col items-center justify-between border transition-colors cursor-pointer ${
+                          className={`min-h-[60px] sm:min-h-[74px] rounded-2xl p-1 flex flex-col items-center justify-between transition-colors cursor-pointer ${
                             isSelected
-                              ? 'bg-[#E7EFE1] border-[#2E531A]'
-                              : 'bg-[#F4F6F1] border-[#E6EBE1] hover:bg-white'
+                              ? 'bg-[#EAF1E2] border-2 border-[#4E6E2A]'
+                              : hasOrders
+                                ? 'bg-white border-2 border-[#4E6E2A]/80 hover:bg-[#EAF1E2]/60'
+                                : 'bg-[#F7F8F5] border border-[#E8ECE4] hover:bg-white'
                           }`}
                         >
                           <span
                             className={`text-xs font-bold tabular-nums ${
-                              isSelected ? 'text-[#1F3A11]' : 'text-[#141812]'
+                              isSelected || hasOrders
+                                ? 'text-[#3D5720]'
+                                : 'text-[#687064]'
                             }`}
                           >
                             {day}
                           </span>
-                          {dayList.length > 0 && firstMenu ? (
-                            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-white shadow-2xs">
+                          {hasOrders && firstMenu ? (
+                            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-[#4E6E2A] shadow-2xs">
                               <FoodImage
                                 src={firstMenu.image}
                                 alt={firstMenu.name}
-                                className="w-full h-full"
+                                className="w-full h-full object-cover"
                               />
                             </div>
                           ) : (
@@ -444,18 +448,18 @@ export function OrderStatusView({
           </div>
 
           {/* Selected Day Orders Detail Card */}
-          <div className="bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-3.5 shadow-[0_2px_10px_rgba(20,24,18,0.03)]">
+          <div className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-3.5 shadow-[0_2px_10px_rgba(26,29,26,0.03)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#141812] tabular-nums">
+              <h2 className="text-lg font-bold text-[#1A1D1A] tabular-nums">
                 {calendarMonth}월 {selectedDay}일 주문 내역
               </h2>
-              <span className="text-xs font-bold text-[#2E531A] font-mono tabular-nums">
+              <span className="text-xs font-bold text-[#4E6E2A] font-mono tabular-nums">
                 총 {selectedDayOrders.length}건 · {formatWon(selectedDayTotal)}
               </span>
             </div>
 
             {selectedDayOrders.length === 0 ? (
-              <p className="py-5 text-center text-xs text-[#4A5246]">
+              <p className="py-5 text-center text-xs text-[#687064]">
                 선택한 날짜에 주문 기록이 없습니다. 음식 사진이 있는 날짜를 눌러보세요.
               </p>
             ) : (
@@ -468,10 +472,10 @@ export function OrderStatusView({
                   return (
                     <div
                       key={ord.id}
-                      className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-[#DDE3D7]">
+                        <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-[#E8ECE4]">
                           <FoodImage
                             src={menuObj?.image ?? ''}
                             alt={ord.menuName}
@@ -479,10 +483,10 @@ export function OrderStatusView({
                           />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-bold text-[#141812] truncate">
+                          <div className="text-sm font-bold text-[#1A1D1A] truncate">
                             {ord.storeName} · {ord.menuName} ({ord.servings}인)
                           </div>
-                          <div className="text-xs text-[#4A5246] font-mono tabular-nums">
+                          <div className="text-xs text-[#687064] font-mono tabular-nums">
                             {ord.createdAt} ·{' '}
                             {ord.status === OrderStatus.CANCELLED
                               ? '취소 완료'
@@ -491,7 +495,7 @@ export function OrderStatusView({
                         </div>
                       </div>
                       <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                        <span className="font-mono tabular-nums font-bold text-sm text-[#141812]">
+                        <span className="font-mono tabular-nums font-bold text-sm text-[#1A1D1A]">
                           {formatWon(ord.totalAmount)}
                         </span>
                         <button
@@ -500,10 +504,9 @@ export function OrderStatusView({
                           onClick={() =>
                             onQuickReorderToConfirm(ord.menuId, ord.servings)
                           }
-                          className="min-h-[38px] px-3.5 py-1.5 bg-[#2E531A] hover:bg-[#234113] disabled:bg-[#D4DBD0] disabled:text-[#4A5246] text-white text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                          className="min-h-[38px] px-3.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition-colors"
                         >
-                          <Zap className="w-3.5 h-3.5" />
-                          <span>{canReorder ? '재주문 확인' : '재고 없음'}</span>
+                          <span>{canReorder ? '⚡ 1초 결제' : '재고 없음'}</span>
                         </button>
                       </div>
                     </div>
@@ -514,7 +517,7 @@ export function OrderStatusView({
           </div>
         </div>
       ) : visibleOrders.length === 0 ? (
-        <div className="bg-white border border-[#DDE3D7] rounded-3xl p-8 text-center text-sm text-[#4A5246]">
+        <div className="bg-white border border-[#E8ECE4] rounded-3xl p-8 text-center text-sm text-[#687064]">
           {tab === 'active'
             ? '현재 진행 중인 주문이 없습니다.'
             : '완료되거나 취소된 주문 기록이 없습니다.'}
@@ -544,14 +547,14 @@ export function OrderStatusView({
             return (
               <article
                 key={order.id}
-                className={`bg-white rounded-3xl border p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(20,24,18,0.03)] ${
+                className={`bg-white rounded-3xl border p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)] ${
                   isHighlighted
-                    ? 'border-[#2E531A] ring-2 ring-[#2E531A]/15'
-                    : 'border-[#DDE3D7]'
+                    ? 'border-[#4E6E2A] ring-2 ring-[#4E6E2A]/15'
+                    : 'border-[#E8ECE4]'
                 }`}
               >
                 <div className="flex items-start gap-3.5">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-[#E6EBE1]">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-[#E8ECE4]">
                     <FoodImage
                       src={menuImage}
                       alt={order.menuName}
@@ -561,8 +564,8 @@ export function OrderStatusView({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="text-xs text-[#4A5246]">
-                          <span className="font-mono font-bold text-[#141812]">
+                        <div className="text-xs text-[#687064]">
+                          <span className="font-mono font-bold text-[#1A1D1A]">
                             {order.orderCode}
                           </span>
                           <span aria-hidden="true"> · </span>
@@ -572,22 +575,22 @@ export function OrderStatusView({
                           {order.isB2B && (
                             <>
                               <span aria-hidden="true"> · </span>
-                              <span className="font-bold text-[#2E531A]">
+                              <span className="font-bold text-[#4E6E2A]">
                                 B2B 오프피크
                               </span>
                             </>
                           )}
                         </div>
-                        <h2 className="text-base sm:text-lg font-bold text-[#141812] mt-0.5">
+                        <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A] mt-0.5">
                           {order.storeName}
                         </h2>
-                        <p className="text-sm font-medium text-[#374033]">
+                        <p className="text-sm font-medium text-[#555E52]">
                           {order.menuName} ({order.servings}인)
                         </p>
                       </div>
 
                       <div className="text-left sm:text-right shrink-0">
-                        <div className="text-lg font-bold text-[#141812] font-mono tabular-nums">
+                        <div className="text-lg font-bold text-[#1A1D1A] font-mono tabular-nums">
                           {formatWon(order.totalAmount)}
                         </div>
                         <div className="text-xs font-bold mt-0.5">
@@ -596,9 +599,9 @@ export function OrderStatusView({
                               취소 완료 {order.mockRefunded ? '· 모의 환불 완료' : ''}
                             </span>
                           ) : order.status === OrderStatus.COMPLETED ? (
-                            <span className="text-[#2E531A]">주문 완료</span>
+                            <span className="text-[#4E6E2A]">주문 완료</span>
                           ) : (
-                            <span className="text-[#2E531A]">
+                            <span className="text-[#4E6E2A]">
                               {STEPS[currentIdx]?.label ?? order.status}
                             </span>
                           )}
@@ -606,7 +609,7 @@ export function OrderStatusView({
                       </div>
                     </div>
 
-                    <div className="mt-1.5 text-xs text-[#4A5246] font-mono tabular-nums">
+                    <div className="mt-1.5 text-xs text-[#687064] font-mono tabular-nums">
                       {order.createdAt}
                       {order.paymentMethodLabel && ` · ${order.paymentMethodLabel}`}
                       {order.reservationSlot && ` · 도착 예약: ${order.reservationSlot}`}
@@ -618,37 +621,47 @@ export function OrderStatusView({
                   </div>
                 </div>
 
-                {/* Progress Stepper */}
+                {/* Progress Bar + Stepper */}
                 {!isCancelled ? (
-                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                    {STEPS.map((step, idx) => {
-                      const done = idx < currentIdx;
-                      const current = idx === currentIdx;
-                      return (
-                        <div
-                          key={step.status}
-                          className={`p-2 sm:p-2.5 rounded-xl border text-center transition-colors ${
-                            current
-                              ? 'bg-[#E7EFE1] border-[#2E531A] text-[#1F3A11] font-bold'
-                              : done
-                                ? 'bg-[#2E531A] border-[#2E531A] text-white font-semibold'
-                                : 'bg-[#F4F6F1] border-[#DDE3D7] text-[#4A5246]'
-                          }`}
-                        >
-                          <div className="text-[11px] sm:text-xs whitespace-nowrap truncate">
-                            {step.label}
+                  <div className="space-y-2.5">
+                    <div className="h-2 w-full bg-[#EAF1E2] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#82B440] rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.round(((currentIdx + 1) / STEPS.length) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                      {STEPS.map((step, idx) => {
+                        const done = idx < currentIdx;
+                        const current = idx === currentIdx;
+                        return (
+                          <div
+                            key={step.status}
+                            className={`p-2 sm:p-2.5 rounded-xl border text-center transition-colors ${
+                              current
+                                ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white font-bold shadow-xs'
+                                : done
+                                  ? 'bg-[#EAF1E2] border-[#82B440]/50 text-[#3D5720] font-semibold'
+                                  : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064]'
+                            }`}
+                          >
+                            <div className="text-[11px] sm:text-xs whitespace-nowrap truncate">
+                              {step.label}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl flex items-center gap-2.5 text-sm text-[#374033]">
+                  <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl flex items-center gap-2.5 text-sm text-[#555E52]">
                     <XCircle className="w-4 h-4 text-red-700 shrink-0" />
                     <span>
                       조리 전 취소가 확정되어 주문이 취소되었습니다.{' '}
                       {order.mockRefunded && (
-                        <strong className="font-bold text-[#141812]">
+                        <strong className="font-bold text-[#1A1D1A]">
                           모의 환불 완료
                         </strong>
                       )}
@@ -659,11 +672,11 @@ export function OrderStatusView({
 
                 {/* Dispatch Mode Display */}
                 {order.dispatchMode && !isCancelled && (
-                  <div className="px-3.5 py-2.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl flex items-center gap-2 text-xs text-[#374033]">
-                    <Truck className="w-4 h-4 text-[#2E531A] shrink-0" />
+                  <div className="px-3.5 py-2.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl flex items-center gap-2 text-xs text-[#555E52]">
+                    <Truck className="w-4 h-4 text-[#4E6E2A] shrink-0" />
                     <span>
                       배차 방식:{' '}
-                      <strong className="font-bold text-[#141812]">
+                      <strong className="font-bold text-[#1A1D1A]">
                         {order.dispatchMode === DispatchMode.AGENCY_RIDER
                           ? '전문 라이더'
                           : '이웃 도보 파트너'}
@@ -684,10 +697,10 @@ export function OrderStatusView({
 
                 {/* Repeated Customer FAQ Auto-Response Simulation */}
                 {!isCancelled && order.status !== OrderStatus.COMPLETED && (
-                  <div className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-2 text-xs">
+                  <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-bold text-[#141812] flex items-center gap-1.5">
-                        <MessageCircle className="w-3.5 h-3.5 text-[#2E531A]" />
+                      <span className="font-bold text-[#1A1D1A] flex items-center gap-1.5">
+                        <MessageCircle className="w-3.5 h-3.5 text-[#4E6E2A]" />
                         <span>빠른 문의 응답</span>
                       </span>
                       <div className="flex flex-wrap gap-1.5">
@@ -699,7 +712,7 @@ export function OrderStatusView({
                               [order.id]: getFaqAutoReply(order, 'eta'),
                             }))
                           }
-                          className="min-h-[32px] px-2.5 py-1 bg-white border border-[#C5D8B5] hover:bg-[#E7EFE1] rounded-lg font-bold text-[#1F3A11] cursor-pointer"
+                          className="min-h-[32px] px-2.5 py-1 bg-white border border-[#D4E1C5] hover:bg-[#EAF1E2] rounded-lg font-bold text-[#3D5720] cursor-pointer"
                         >
                           “배달 언제 오나요?”
                         </button>
@@ -711,14 +724,14 @@ export function OrderStatusView({
                               [order.id]: getFaqAutoReply(order, 'note'),
                             }))
                           }
-                          className="min-h-[32px] px-2.5 py-1 bg-white border border-[#C5D8B5] hover:bg-[#E7EFE1] rounded-lg font-bold text-[#1F3A11] cursor-pointer"
+                          className="min-h-[32px] px-2.5 py-1 bg-white border border-[#D4E1C5] hover:bg-[#EAF1E2] rounded-lg font-bold text-[#3D5720] cursor-pointer"
                         >
                           “수저/메모 전달됐나요?”
                         </button>
                       </div>
                     </div>
                     {faqRepliesByOrder[order.id] && (
-                      <p className="text-[#141812] bg-white border border-[#DDE3D7] rounded-xl px-3 py-2 font-medium">
+                      <p className="text-[#1A1D1A] bg-white border border-[#E8ECE4] rounded-xl px-3 py-2 font-medium">
                         {faqRepliesByOrder[order.id]}
                       </p>
                     )}
@@ -727,17 +740,17 @@ export function OrderStatusView({
 
                 {/* Recorded Post-Cooking Cancel Request & 4-Way Evidence Record (No AI Fault Judgement) */}
                 {order.cancelRequested && !isCancelled && (
-                  <div className="p-4 bg-[#FFFBEF] border border-[#E8D595] rounded-2xl space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between gap-2 font-bold text-amber-950">
+                  <div className="p-4 bg-[#F7F8F5] border border-[#D4E1C5] rounded-2xl space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between gap-2 font-bold text-[#3D5720]">
                       <span>조리 시작 후 취소 요청이 기록되었습니다</span>
-                      <span className="font-mono tabular-nums">
+                      <span className="font-mono tabular-nums text-[#687064]">
                         {order.cancelRequestedAt}
                       </span>
                     </div>
-                    <p className="text-[#141812] font-medium">
+                    <p className="text-[#1A1D1A] font-medium">
                       요청 사유: {order.cancelRequestReason}
                     </p>
-                    <p className="text-[#374033]">
+                    <p className="text-[#555E52]">
                       조리 시작 이후 요청은 기록만 남기며 재고·금액을 자동으로 바꾸지
                       않습니다. (AI 과실 판정 없음)
                     </p>
@@ -745,8 +758,8 @@ export function OrderStatusView({
                 )}
 
                 {order.evidenceRecord && (
-                  <div className="p-3.5 bg-[#E7EFE1] border border-[#C5D8B5] rounded-2xl space-y-1 text-xs">
-                    <div className="flex items-center justify-between gap-2 font-bold text-[#1F3A11]">
+                  <div className="p-3.5 bg-[#EAF1E2] border border-[#D4E1C5] rounded-2xl space-y-1 text-xs">
+                    <div className="flex items-center justify-between gap-2 font-bold text-[#3D5720]">
                       <span className="flex items-center gap-1.5">
                         <ClipboardCheck className="w-4 h-4" />
                         <span>안심 거래 증적 기록</span>
@@ -755,20 +768,20 @@ export function OrderStatusView({
                         {order.evidenceRecord.recordedAt}
                       </span>
                     </div>
-                    <p className="text-[#141812] font-medium">
+                    <p className="text-[#1A1D1A] font-medium">
                       점주 실링: {order.evidenceRecord.ownerSealingChecked ? '확인' : '미확인'} · 파트너 상태:{' '}
                       {order.evidenceRecord.courierConditionChecked ? '확인' : '미확인'} · {order.evidenceRecord.escrowStatus}
                     </p>
-                    <p className="text-[#374033]">
+                    <p className="text-[#555E52]">
                       메모: {order.evidenceRecord.customerMemoNote}
                     </p>
                   </div>
                 )}
 
                 {(order.status === OrderStatus.COMPLETED || isCancelled) && (
-                  <div className="pt-3 border-t border-[#E6EBE1] flex items-center justify-between gap-3">
-                    <span className="text-xs text-[#4A5246]">
-                      같은 메뉴 바로 다시 주문
+                  <div className="pt-3 border-t border-[#E8ECE4] flex items-center justify-between gap-3">
+                    <span className="text-xs text-[#687064]">
+                      이전 옵션 그대로 바로 다시 주문
                     </span>
                     <button
                       type="button"
@@ -776,22 +789,21 @@ export function OrderStatusView({
                       onClick={() =>
                         onQuickReorderToConfirm(order.menuId, order.servings)
                       }
-                      className="min-h-[40px] px-4 py-1.5 bg-[#E7EFE1] hover:bg-[#D8E6CD] disabled:bg-[#F4F6F1] disabled:text-[#4A5246] text-[#1F3A11] text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                      className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
                     >
-                      <Zap className="w-3.5 h-3.5" />
                       <span>
-                        {canReorder ? '같은 메뉴 재주문 확인' : '현재 재고 없음'}
+                        {canReorder ? '⚡ 1초 결제 재주문' : '현재 재고 없음'}
                       </span>
                     </button>
                   </div>
                 )}
 
                 {!isCancelled && order.status !== OrderStatus.COMPLETED && (
-                  <div className="pt-3 border-t border-[#E6EBE1] flex flex-wrap items-center justify-between gap-3">
+                  <div className="pt-3 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-3">
                     {isBeforeCooking && (
                       <>
-                        <span className="text-xs text-[#374033] flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-[#2E531A]" />
+                        <span className="text-xs text-[#555E52] flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
                           조리 시작 전이므로 즉시 취소할 수 있습니다.
                         </span>
                         <button
@@ -807,7 +819,7 @@ export function OrderStatusView({
                     {isAfterCooking && (
                       <div className="w-full space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-xs text-[#374033]">
+                          <span className="text-xs text-[#555E52]">
                             {order.cancelRequested
                               ? '취소 요청이 매장에 전달되었습니다.'
                               : '조리가 시작되어 취소 요청만 남길 수 있습니다.'}
@@ -820,7 +832,7 @@ export function OrderStatusView({
                                   setRequestingOrderId(order.id);
                                   setReasonDraft('');
                                 }}
-                                className="min-h-[40px] px-3.5 py-1.5 border border-[#C5D8B5] bg-[#E7EFE1] hover:bg-[#D8E6CD] text-[#1F3A11] text-xs font-bold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-3.5 py-1.5 border border-[#D4E1C5] bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl cursor-pointer"
                               >
                                 취소 요청 기록하기
                               </button>
@@ -833,7 +845,7 @@ export function OrderStatusView({
                                     prev === order.id ? null : order.id
                                   )
                                 }
-                                className="min-h-[40px] px-3.5 py-1.5 border border-[#C5D8B5] bg-white hover:bg-[#F4F6F1] text-[#141812] text-xs font-bold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-3.5 py-1.5 border border-[#D4E1C5] bg-white hover:bg-[#F7F8F5] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
                               >
                                 안심 증적 기록
                               </button>
@@ -842,8 +854,8 @@ export function OrderStatusView({
                         </div>
 
                         {requestingOrderId === order.id && (
-                          <div className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-2.5">
-                            <label className="block text-xs font-bold text-[#141812]">
+                          <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5">
+                            <label className="block text-xs font-bold text-[#1A1D1A]">
                               취소 요청 사유
                             </label>
                             <input
@@ -851,7 +863,7 @@ export function OrderStatusView({
                               value={reasonDraft}
                               onChange={(e) => setReasonDraft(e.target.value)}
                               placeholder="예: 수령 일정 변경으로 취소 요청드립니다."
-                              className="w-full min-h-[42px] px-3.5 bg-white border border-[#C5D8B5] rounded-xl text-sm text-[#141812]"
+                              className="w-full min-h-[42px] px-3.5 bg-white border border-[#D4E1C5] rounded-xl text-sm text-[#1A1D1A]"
                             />
                             <div className="flex items-center gap-2">
                               <button
@@ -863,14 +875,14 @@ export function OrderStatusView({
                                   setRequestingOrderId(null);
                                   setReasonDraft('');
                                 }}
-                                className="min-h-[40px] px-4 py-1.5 bg-[#2E531A] hover:bg-[#234113] text-white text-xs font-bold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl cursor-pointer"
                               >
                                 요청 기록 저장
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setRequestingOrderId(null)}
-                                className="min-h-[40px] px-3 py-1.5 border border-[#C5D8B5] bg-white text-[#374033] text-xs font-semibold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-3 py-1.5 border border-[#D4E1C5] bg-white text-[#555E52] text-xs font-semibold rounded-xl cursor-pointer"
                               >
                                 닫기
                               </button>
@@ -879,17 +891,17 @@ export function OrderStatusView({
                         )}
 
                         {evidenceOrderId === order.id && !order.evidenceRecord && (
-                          <div className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-2.5 text-xs">
-                            <div className="font-bold text-[#141812]">
+                          <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
+                            <div className="font-bold text-[#1A1D1A]">
                               수령 · 포장 상태 기록
                             </div>
-                            <div className="flex flex-wrap gap-3 text-[#141812]">
+                            <div className="flex flex-wrap gap-3 text-[#1A1D1A]">
                               <label className="flex items-center gap-1.5 cursor-pointer">
                                 <input
                                   type="checkbox"
                                   checked={ownerSealCheck}
                                   onChange={(e) => setOwnerSealCheck(e.target.checked)}
-                                  className="accent-[#2E531A]"
+                                  className="accent-[#4E6E2A]"
                                 />
                                 <span>1. 점주 실링/영수증 확인</span>
                               </label>
@@ -898,7 +910,7 @@ export function OrderStatusView({
                                   type="checkbox"
                                   checked={courierCheck}
                                   onChange={(e) => setCourierCheck(e.target.checked)}
-                                  className="accent-[#2E531A]"
+                                  className="accent-[#4E6E2A]"
                                 />
                                 <span>2. 파트너 이동 상태 확인</span>
                               </label>
@@ -907,7 +919,7 @@ export function OrderStatusView({
                               type="text"
                               value={customerEvidenceNote}
                               onChange={(e) => setCustomerEvidenceNote(e.target.value)}
-                              className="w-full min-h-[38px] px-3 bg-white border border-[#C5D8B5] rounded-xl text-[#141812]"
+                              className="w-full min-h-[38px] px-3 bg-white border border-[#D4E1C5] rounded-xl text-[#1A1D1A]"
                               placeholder="3. 고객 확인 메모 (예: 국물 용기 상태 확인 요청)"
                             />
                             <div className="flex items-center gap-2">
@@ -924,14 +936,14 @@ export function OrderStatusView({
                                   });
                                   setEvidenceOrderId(null);
                                 }}
-                                className="min-h-[38px] px-4 py-1.5 bg-[#2E531A] hover:bg-[#234113] text-white font-bold rounded-xl cursor-pointer"
+                                className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
                               >
                                 증적 기록 저장
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEvidenceOrderId(null)}
-                                className="min-h-[38px] px-3 py-1.5 border border-[#C5D8B5] bg-white text-[#374033] font-semibold rounded-xl cursor-pointer"
+                                className="min-h-[38px] px-3 py-1.5 border border-[#D4E1C5] bg-white text-[#555E52] font-semibold rounded-xl cursor-pointer"
                               >
                                 닫기
                               </button>

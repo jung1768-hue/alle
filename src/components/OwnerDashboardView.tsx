@@ -3,7 +3,8 @@ import {
   AlertCircle,
   BarChart3,
   CheckCircle2,
-  ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Flag,
   Lock,
   MessageSquare,
@@ -68,9 +69,9 @@ interface OwnerDashboardViewProps {
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   [OrderStatus.PENDING]: '접수 대기',
-  [OrderStatus.ACCEPTED]: '수락됨 (조리 전)',
+  [OrderStatus.ACCEPTED]: '수락됨',
   [OrderStatus.COOKING]: '조리 중',
-  [OrderStatus.PICKUP]: '픽업/배달 중',
+  [OrderStatus.PICKUP]: '픽업·배달 중',
   [OrderStatus.COMPLETED]: '완료',
   [OrderStatus.CANCELLED]: '취소됨',
 };
@@ -100,6 +101,9 @@ export function OwnerDashboardView({
     'orders' | 'dashboard' | 'ops' | 'crm'
   >('orders');
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'done'>('all');
+  const [showKpiBreakdown, setShowKpiBreakdown] = useState(false);
+  const [showKitchenVoice, setShowKitchenVoice] = useState(false);
+  const [showMenuTable, setShowMenuTable] = useState(false);
   const [dispatchChoiceByOrder, setDispatchChoiceByOrder] = useState<
     Record<string, DispatchMode>
   >({});
@@ -148,7 +152,6 @@ export function OwnerDashboardView({
       o.status !== OrderStatus.COMPLETED && o.status !== OrderStatus.CANCELLED
   ).length;
 
-  // Live Admin Analytics Data
   const analytics = useMemo(() => {
     const validOrders = orders.filter((o) => o.status !== OrderStatus.CANCELLED);
     const totalRevenue = validOrders.reduce((sum, o) => sum + o.totalAmount, 0);
@@ -244,7 +247,7 @@ export function OwnerDashboardView({
     const openStoresCount = stores.filter((s) => s.isOpen).length;
     const tagDemand = Array.from(tagDemandMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
+      .slice(0, 5);
     const maxTagQty = Math.max(1, ...tagDemand.map(([, q]) => q));
 
     const avgRating =
@@ -254,7 +257,6 @@ export function OwnerDashboardView({
           ).toFixed(1)
         : '-';
 
-    // Live session profit comparison delta layered onto 30-day Daegu seed baseline
     const liveSavedFeeDelta = Math.round(totalRevenue * 0.148);
     const totalSavedCommissionAndAdFee =
       INITIAL_OWNER_PROFIT_COMPARISON.savedCommissionAndAdFee +
@@ -337,9 +339,10 @@ export function OwnerDashboardView({
         setCommandFeedback('조리 중인 주문이 없습니다.');
         return;
       }
-      const mode = cmd.includes('대행사') || cmd.includes('라이더')
-        ? DispatchMode.AGENCY_RIDER
-        : DispatchMode.NEIGHBOR_WALK;
+      const mode =
+        cmd.includes('대행사') || cmd.includes('라이더')
+          ? DispatchMode.AGENCY_RIDER
+          : DispatchMode.NEIGHBOR_WALK;
       onAdvanceOrderStatus(cookingOrder.id, OrderStatus.PICKUP, mode);
       setCommandFeedback(
         `${cookingOrder.orderCode} (${
@@ -423,282 +426,316 @@ export function OwnerDashboardView({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Clean Admin / Owner Header */}
-      <div className="bg-[#141812] text-white rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Quiet Top Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold">점주 · 관리자 센터</h1>
-          <p className="text-xs sm:text-sm text-[#CBDCC0] mt-1">
-            실시간 주문 접수, 매장 운영 및 매출 데이터를 한 화면에서 관리하세요.
+          <p className="text-xs font-semibold text-[#4E6E2A]">
+            Alle 파트너 · 점주 OS
           </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] tracking-tight mt-0.5">
+            점주 수익 · 운영 센터
+          </h1>
         </div>
         <button
           type="button"
           onClick={onSwitchToConsumer}
-          className="min-h-[42px] px-4 py-2 bg-[#E7EFE1] text-[#141812] hover:bg-white text-xs sm:text-sm font-bold rounded-2xl whitespace-nowrap shrink-0 cursor-pointer"
+          className="min-h-[40px] px-4 py-2 bg-white hover:bg-[#F7F8F5] border border-[#E8ECE4] text-[#1A1D1A] text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer transition-colors"
         >
           고객 화면 보기
         </button>
       </div>
 
-      {/* Top Executive IR Card: Alle 입점 효과 요약 카드 */}
+      {/* Dominant 2-KPI Hero Card (1-Second IR Readability) */}
       <section
-        aria-label="Alle 입점 효과 요약"
-        className="bg-white border border-[#C5D8B5] rounded-3xl p-5 sm:p-6 shadow-[0_3px_14px_rgba(20,24,18,0.04)] space-y-4"
+        aria-label="이번 달 점주 핵심 성과"
+        className="os-card rounded-[32px] p-7 sm:p-10 space-y-7"
       >
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2E531A]">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#4E6E2A]">
               <Sparkles className="w-4 h-4 shrink-0" />
-              <span>Alle 입점 효과 요약 · {analytics.profitComparison.periodLabel}</span>
+              <span>{analytics.profitComparison.periodLabel} · 대구 입점 매장 기준</span>
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-[#141812]">
-              공공배달앱의 ‘주문 수 부족’을 AI 단골 자동 매칭으로 해결했습니다
+            <h2 className="text-lg sm:text-xl font-bold text-[#1A1D1A] tracking-tight text-balance">
+              광고비 부담은 없애고, AI 단골 매칭으로 순증 매출을 만들었습니다
             </h2>
           </div>
 
-          {ownerSection !== 'dashboard' && (
-            <button
-              type="button"
-              onClick={() => setOwnerSection('dashboard')}
-              className="min-h-[38px] px-3.5 py-1.5 bg-[#ECF3E2] hover:bg-[#DCE9C8] text-[#1F3A11] text-xs font-bold rounded-xl flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-            >
-              <span>매장별 상세 지표</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowKpiBreakdown((prev) => !prev)}
+            className="min-h-[36px] px-3.5 py-1.5 bg-[#F7F8F5] hover:bg-[#F0F3EC] border border-[#E8ECE4] text-[#555E52] text-xs font-semibold rounded-xl inline-flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+          >
+            <span>{showKpiBreakdown ? '산출 근거 접기' : '산출 근거 보기'}</span>
+            {showKpiBreakdown ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          <div className="p-4 sm:p-5 bg-[#F4F8F0] border border-[#CFE0C3] rounded-2xl space-y-2">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="font-bold text-[#2E531A]">
-                타사 배달앱 대비 절감한 광고·중개비
-              </span>
-              <span className="font-mono font-bold text-[#2E531A] tabular-nums">
-                수수료 14.8% → 0%
-              </span>
+        {/* Two Warm Sage KPI Highlight Boxes with Deep Olive Numbers */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div className="bg-[#EAF1E2] border border-[#DCE7CF] rounded-2xl p-5 sm:p-6 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs sm:text-sm font-bold text-[#3D5720]">
+                이번 달 절감된 광고·수수료
+              </p>
+              <span className="w-2 h-2 rounded-full bg-[#82B440] shrink-0" aria-hidden="true" />
             </div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141812]">
+            <div className="os-kpi text-4xl sm:text-[44px] font-bold text-[#4E6E2A] leading-none">
               +{formatWon(analytics.profitComparison.totalSavedCommissionAndAdFee)}
             </div>
-            <div className="text-xs text-[#374033] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1.5 border-t border-[#DCE7D4]">
-              <span>
-                상단 광고비 절감{' '}
-                <strong className="font-mono text-[#141812]">
-                  {formatWon(analytics.profitComparison.totalAdExposureFeeSaved)}
-                </strong>
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                중개 수수료 절감{' '}
-                <strong className="font-mono text-[#141812]">
-                  {formatWon(analytics.profitComparison.totalBrokerageFeeSaved)}
-                </strong>
-              </span>
-            </div>
+            <p className="text-xs text-[#4C6235] tabular-nums pt-1">
+              타사 수수료 14.8% → <strong className="text-[#1A1D1A]">Alle 0%</strong> · 상단 광고비 0원
+            </p>
           </div>
 
-          <div className="p-4 sm:p-5 bg-[#141812] text-white border border-[#242F20] rounded-2xl space-y-2">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="font-bold text-[#B8D98E]">
-                AI 단골 자동 매칭 순증 수익
-              </span>
-              <span className="font-mono font-bold text-[#B8D98E] tabular-nums">
-                재주문율 {analytics.profitComparison.repeatCustomerRatePercent}%
-              </span>
+          <div className="bg-[#EAF1E2] border border-[#DCE7CF] rounded-2xl p-5 sm:p-6 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs sm:text-sm font-bold text-[#3D5720]">
+                AI 매칭 순증 매출
+              </p>
+              <span className="w-2 h-2 rounded-full bg-[#82B440] shrink-0" aria-hidden="true" />
             </div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-white">
+            <div className="os-kpi text-4xl sm:text-[44px] font-bold text-[#4E6E2A] leading-none">
               +{formatWon(analytics.profitComparison.totalAiRegularIncrementalSales)}
             </div>
-            <div className="text-xs text-[#CBDCC0] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1.5 border-t border-white/15">
-              <span>
-                AI 자동 매칭 주문{' '}
-                <strong className="font-mono text-white">
-                  +{analytics.profitComparison.totalAiRegularMatchedOrders}건
-                </strong>
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                지자체 보조금 의존도{' '}
-                <strong className="font-mono text-[#B8D98E]">
-                  {analytics.profitComparison.subsidyDependencyRatioPercent}%
-                </strong>
-              </span>
-            </div>
+            <p className="text-xs text-[#4C6235] tabular-nums pt-1">
+              AI 단골 자동 매칭{' '}
+              <strong className="text-[#1A1D1A]">
+                +{analytics.profitComparison.totalAiRegularMatchedOrders}건
+              </strong>{' '}
+              · 재주문율{' '}
+              <strong className="text-[#3D5720]">
+                {analytics.profitComparison.repeatCustomerRatePercent}%
+              </strong>
+            </p>
           </div>
         </div>
+
+        {/* Collapsible Breakdown Drawer */}
+        {showKpiBreakdown && (
+          <div className="pt-6 border-t border-[#E8ECE4] grid grid-cols-1 sm:grid-cols-3 gap-5 text-xs">
+            <div className="space-y-1">
+              <span className="text-[#687064]">중개 수수료 절감액</span>
+              <div className="font-mono tabular-nums text-base font-bold text-[#4E6E2A]">
+                {formatWon(analytics.profitComparison.totalBrokerageFeeSaved)}
+              </div>
+              <p className="text-[#687064]">
+                {analytics.profitComparison.competitorPlatformLabel} 대비
+              </p>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[#687064]">상단·깃발 광고비 절감액</span>
+              <div className="font-mono tabular-nums text-base font-bold text-[#4E6E2A]">
+                {formatWon(analytics.profitComparison.totalAdExposureFeeSaved)}
+              </div>
+              <p className="text-[#687064]">노출 입찰 없는 AI 컨디션 매칭</p>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[#687064]">지자체 보조금 의존도</span>
+              <div className="font-mono tabular-nums text-base font-bold text-[#4E6E2A]">
+                {analytics.profitComparison.subsidyDependencyRatioPercent}%
+              </div>
+              <p className="text-[#687064]">B2B 식대 · 단골 패스 자생 순환</p>
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* Admin Section Switcher (4 Tabs including Data Dashboard) */}
+      {/* Clean Segmented Navigation Tabs */}
       <div
         role="tablist"
-        aria-label="관리자 메뉴"
-        className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-[#E9ECE4] border border-[#DDE3D7] rounded-2xl"
+        aria-label="점주 관리 탭"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1.5 bg-white border border-[#E8ECE4] rounded-2xl shadow-sm"
       >
         <button
           type="button"
           role="tab"
           aria-selected={ownerSection === 'orders'}
           onClick={() => setOwnerSection('orders')}
-          className={`min-h-[42px] px-2 py-1.5 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
             ownerSection === 'orders'
-              ? 'bg-white text-[#2E531A] shadow-2xs'
-              : 'text-[#374033] hover:text-[#141812]'
+              ? 'bg-[#EAF1E2] text-[#3D5720]'
+              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
           }`}
         >
-          주문 관리 ({pendingCount})
+          실시간 주문 ({pendingCount})
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={ownerSection === 'dashboard'}
           onClick={() => setOwnerSection('dashboard')}
-          className={`min-h-[42px] px-2 py-1.5 text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
             ownerSection === 'dashboard'
-              ? 'bg-white text-[#2E531A] shadow-2xs'
-              : 'text-[#374033] hover:text-[#141812]'
+              ? 'bg-[#EAF1E2] text-[#3D5720]'
+              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
           }`}
         >
           <BarChart3 className="w-4 h-4 shrink-0" />
-          <span>데이터 대시보드</span>
+          <span>매출 · 통계</span>
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={ownerSection === 'ops'}
           onClick={() => setOwnerSection('ops')}
-          className={`min-h-[42px] px-2 py-1.5 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
             ownerSection === 'ops'
-              ? 'bg-white text-[#2E531A] shadow-2xs'
-              : 'text-[#374033] hover:text-[#141812]'
+              ? 'bg-[#EAF1E2] text-[#3D5720]'
+              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
           }`}
         >
-          매장 · 메뉴 운영
+          매장 · 메뉴
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={ownerSection === 'crm'}
           onClick={() => setOwnerSection('crm')}
-          className={`min-h-[42px] px-2 py-1.5 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer ${
+          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
             ownerSection === 'crm'
-              ? 'bg-white text-[#2E531A] shadow-2xs'
-              : 'text-[#374033] hover:text-[#141812]'
+              ? 'bg-[#EAF1E2] text-[#3D5720]'
+              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
           }`}
         >
           리뷰 · 제보
         </button>
       </div>
 
-      {/* 1. Order Queue Tab */}
+      {/* 1. Real-Time Orders Tab */}
       {ownerSection === 'orders' && (
-        <div className="space-y-5">
-          {/* Kitchen Hands-Free Voice Command Bar */}
-          <section className="bg-[#E9F1E2] border border-[#C5D8B5] rounded-3xl p-4 sm:p-5 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Mic className="w-4 h-4 text-[#2E531A]" />
-                <h2 className="text-sm font-bold text-[#141812]">
-                  주방 빠른 명령
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={handleKitchenVoice}
-                className={`min-h-[34px] px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer ${
-                  isKitchenListening
-                    ? 'bg-red-600 text-white'
-                    : 'bg-white border border-[#C5D8B5] text-[#2E531A]'
-                }`}
-              >
-                {isKitchenListening ? (
-                  <>
-                    <MicOff className="w-3.5 h-3.5" />
-                    <span>듣는 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>음성 명령</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                runOwnerCommand(commandInput);
-              }}
-              className="flex flex-col sm:flex-row gap-2"
+        <div className="space-y-6">
+          {/* Collapsible Kitchen Voice Command Bar */}
+          <section className="os-card rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowKitchenVoice((prev) => !prev)}
+              aria-expanded={showKitchenVoice}
+              className="w-full min-h-[54px] px-5 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-[#F7F8F5] transition-colors cursor-pointer"
             >
-              <input
-                type="text"
-                value={commandInput}
-                onChange={(e) => setCommandInput(e.target.value)}
-                placeholder='예: "주문 수락", "조리 시작", "얼큰 소고기국밥 품절"'
-                className="flex-1 min-h-[42px] px-3.5 bg-white border border-[#C5D8B5] rounded-xl text-sm text-[#141812]"
-              />
-              <button
-                type="submit"
-                className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                실행
-              </button>
-            </form>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Mic className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+                <span className="text-sm font-semibold text-[#1A1D1A]">
+                  주방 핸즈프리 음성 · 빠른 명령
+                </span>
+                <span className="hidden sm:inline text-xs text-[#687064] truncate">
+                  · 주문 수락, 조리 시작, 품절 처리를 말로 실행
+                </span>
+              </div>
+              {showKitchenVoice ? (
+                <ChevronUp className="w-4 h-4 text-[#687064] shrink-0" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#687064] shrink-0" />
+              )}
+            </button>
 
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                '주문 수락',
-                '조리 시작',
-                '대행사 라이더 호출',
-                '완료 처리',
-                '얼큰 소고기국밥 품절',
-              ].map((presetCmd) => (
-                <button
-                  key={presetCmd}
-                  type="button"
-                  onClick={() => runOwnerCommand(presetCmd)}
-                  className="min-h-[32px] px-3 py-1 bg-white border border-[#C5D8B5] hover:bg-[#F4F6F1] text-xs font-semibold text-[#1F3A11] rounded-xl cursor-pointer"
-                >
-                  {presetCmd}
-                </button>
-              ))}
-            </div>
+            {showKitchenVoice && (
+              <div className="px-5 pb-5 pt-3 border-t border-[#E8ECE4] space-y-3 bg-[#F7F8F5]/60">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      runOwnerCommand(commandInput);
+                    }}
+                    className="flex-1 flex gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={commandInput}
+                      onChange={(e) => setCommandInput(e.target.value)}
+                      placeholder='예: "주문 수락", "조리 시작", "얼큰 소고기국밥 품절"'
+                      className="flex-1 min-h-[42px] px-3.5 bg-white border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
+                    />
+                    <button
+                      type="submit"
+                      className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      실행
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={handleKitchenVoice}
+                    className={`min-h-[42px] px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                      isKitchenListening
+                        ? 'bg-red-600 text-white'
+                        : 'bg-[#EAF1E2] text-[#4E6E2A] hover:bg-[#DCE7CF]'
+                    }`}
+                  >
+                    {isKitchenListening ? (
+                      <>
+                        <MicOff className="w-3.5 h-3.5" />
+                        <span>듣는 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3.5 h-3.5" />
+                        <span>음성 입력</span>
+                      </>
+                    )}
+                  </button>
+                </div>
 
-            {commandFeedback && (
-              <p className="text-xs font-bold text-[#2E531A]">
-                {commandFeedback}
-              </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    '주문 수락',
+                    '조리 시작',
+                    '대행사 라이더 호출',
+                    '완료 처리',
+                    '얼큰 소고기국밥 품절',
+                  ].map((presetCmd) => (
+                    <button
+                      key={presetCmd}
+                      type="button"
+                      onClick={() => runOwnerCommand(presetCmd)}
+                      className="min-h-[32px] px-3 py-1 bg-white border border-[#E8ECE4] hover:border-[#4E6E2A] text-xs font-medium text-[#3A4038] rounded-xl cursor-pointer transition-colors"
+                    >
+                      {presetCmd}
+                    </button>
+                  ))}
+                </div>
+
+                {commandFeedback && (
+                  <p className="text-xs font-semibold text-[#4E6E2A]">
+                    {commandFeedback}
+                  </p>
+                )}
+              </div>
             )}
           </section>
 
-          {/* Order Queue */}
+          {/* Order Queue Header & Filter */}
           <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-[#141812]">
-                주문 현황{' '}
-                <span className="text-sm font-medium text-[#4A5246] tabular-nums">
-                  · 대기 {pendingCount} · 진행 {activeCount}
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
+                  실시간 주문 내역
+                </h2>
+                <span className="text-xs text-[#687064] tabular-nums">
+                  대기 {pendingCount} · 진행 {activeCount}
                 </span>
-              </h2>
-              <div className="flex items-center gap-1 p-1 bg-[#E9ECE4] border border-[#DDE3D7] rounded-2xl">
+              </div>
+              <div className="flex items-center gap-1 p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
                 {(
                   [
                     { id: 'all', label: '전체' },
                     { id: 'active', label: '진행 중' },
-                    { id: 'done', label: '완료/취소' },
+                    { id: 'done', label: '완료·취소' },
                   ] as const
                 ).map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setFilterTab(tab.id)}
-                    className={`min-h-[34px] px-3 py-1 text-xs font-bold rounded-xl transition-colors cursor-pointer ${
+                    className={`min-h-[34px] px-3 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                       filterTab === tab.id
-                        ? 'bg-white text-[#2E531A] shadow-2xs'
-                        : 'text-[#374033] hover:text-[#141812]'
+                        ? 'bg-white text-[#4E6E2A] shadow-2xs'
+                        : 'text-[#687064] hover:text-[#1A1D1A]'
                     }`}
                   >
                     {tab.label}
@@ -708,7 +745,7 @@ export function OwnerDashboardView({
             </div>
 
             {filteredOrders.length === 0 ? (
-              <div className="bg-white border border-[#DDE3D7] rounded-3xl p-8 text-center text-sm text-[#4A5246]">
+              <div className="os-card rounded-3xl p-10 text-center text-sm text-[#687064]">
                 해당 상태의 주문이 없습니다.
               </div>
             ) : (
@@ -723,12 +760,12 @@ export function OwnerDashboardView({
                   return (
                     <article
                       key={order.id}
-                      className="bg-white border border-[#DDE3D7] rounded-3xl p-4 sm:p-5 space-y-4 shadow-[0_2px_10px_rgba(20,24,18,0.03)]"
+                      className="os-card rounded-3xl p-5 space-y-4"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#4A5246]">
-                            <span className="font-mono font-bold text-[#141812]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#687064]">
+                            <span className="font-mono font-semibold text-[#1A1D1A]">
                               {order.orderCode}
                             </span>
                             <span aria-hidden="true">·</span>
@@ -738,7 +775,7 @@ export function OwnerDashboardView({
                             {order.isB2B && (
                               <>
                                 <span aria-hidden="true">·</span>
-                                <span className="font-bold text-[#2E531A]">
+                                <span className="font-semibold text-[#4E6E2A]">
                                   B2B 단체
                                 </span>
                               </>
@@ -748,58 +785,58 @@ export function OwnerDashboardView({
                               {order.createdAt}
                             </span>
                           </div>
-                          <h3 className="text-base font-bold text-[#141812] mt-1">
+                          <h3 className="text-base font-bold text-[#1A1D1A]">
                             {order.storeName} · {order.menuName} ×{' '}
                             <span className="tabular-nums">{order.servings}인</span>
                           </h3>
                           {order.reservationSlot && (
-                            <p className="text-xs font-semibold text-[#2E531A] mt-0.5">
+                            <p className="text-xs font-semibold text-[#4E6E2A]">
                               예약 도착: {order.reservationSlot}
                             </p>
                           )}
                           {order.selectedOptionNames.length > 0 && (
-                            <p className="text-xs text-[#374033] mt-0.5">
+                            <p className="text-xs text-[#687064]">
                               옵션: {order.selectedOptionNames.join(', ')}
                             </p>
                           )}
                           {order.customerNote && (
-                            <p className="text-xs text-[#4A5246] mt-0.5">
-                              요청사항: {order.customerNote}
+                            <p className="text-xs text-[#687064]">
+                              요청: {order.customerNote}
                             </p>
                           )}
                         </div>
 
-                        <div className="sm:text-right shrink-0">
-                          <div className="text-base font-bold font-mono tabular-nums text-[#141812]">
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-bold font-mono tabular-nums text-[#1A1D1A]">
                             {formatWon(order.totalAmount)}
                           </div>
-                          <div className="text-xs font-bold mt-0.5 text-[#2E531A]">
+                          <div className="text-xs font-semibold mt-0.5 text-[#4E6E2A]">
                             {STATUS_LABELS[order.status]}
-                            {order.mockRefunded && ' · 환불 완료'}
+                            {order.mockRefunded && ' · 환불'}
                           </div>
                         </div>
                       </div>
 
                       {order.cancelRequested &&
                         order.status !== OrderStatus.CANCELLED && (
-                          <div className="p-3.5 bg-[#FFFBEF] border border-[#E8D595] rounded-2xl space-y-1 text-xs">
-                            <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                              <AlertCircle className="w-4 h-4 shrink-0" />
+                          <div className="p-3.5 bg-[#EAF1E2] border border-[#DCE7CF] rounded-2xl space-y-1 text-xs">
+                            <div className="flex items-center gap-1.5 font-semibold text-[#3D5720]">
+                              <AlertCircle className="w-4 h-4 text-[#4E6E2A] shrink-0" />
                               <span>
                                 조리 후 취소 요청 ({order.cancelRequestedAt})
                               </span>
                             </div>
-                            <p className="text-[#141812]">
+                            <p className="text-[#1A1D1A]">
                               사유: {order.cancelRequestReason}
                             </p>
                           </div>
                         )}
 
-                      <div className="pt-3 border-t border-[#EBEFEB] space-y-2.5">
+                      <div className="pt-3.5 border-t border-[#E8ECE4] space-y-3">
                         {order.status === OrderStatus.COOKING && (
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="font-semibold text-[#374033]">
-                              배차 선택:
+                            <span className="font-medium text-[#687064]">
+                              배차 방식
                             </span>
                             <button
                               type="button"
@@ -811,8 +848,8 @@ export function OwnerDashboardView({
                               }
                               className={`min-h-[32px] px-2.5 py-1 rounded-lg border font-semibold cursor-pointer ${
                                 chosenDispatch === DispatchMode.NEIGHBOR_WALK
-                                  ? 'bg-[#E7EFE1] border-[#6FA33A] text-[#1F3A11]'
-                                  : 'bg-white border-[#DDE3D7] text-[#374033]'
+                                  ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#4E6E2A]'
+                                  : 'bg-white border-[#E8ECE4] text-[#687064]'
                               }`}
                             >
                               이웃 도보
@@ -827,8 +864,8 @@ export function OwnerDashboardView({
                               }
                               className={`min-h-[32px] px-2.5 py-1 rounded-lg border font-semibold cursor-pointer ${
                                 chosenDispatch === DispatchMode.AGENCY_RIDER
-                                  ? 'bg-[#E7EFE1] border-[#6FA33A] text-[#1F3A11]'
-                                  : 'bg-white border-[#DDE3D7] text-[#374033]'
+                                  ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#4E6E2A]'
+                                  : 'bg-white border-[#E8ECE4] text-[#687064]'
                               }`}
                             >
                               전문 라이더
@@ -848,7 +885,7 @@ export function OwnerDashboardView({
                                       OrderStatus.ACCEPTED
                                     )
                                   }
-                                  className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer"
+                                  className="min-h-[40px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer transition-colors"
                                 >
                                   주문 수락
                                 </button>
@@ -856,7 +893,7 @@ export function OwnerDashboardView({
                                   type="button"
                                   disabled
                                   title="수락 전에는 완료할 수 없습니다"
-                                  className="min-h-[42px] px-3 py-2 bg-[#F4F6F1] text-[#8E968A] text-xs rounded-xl flex items-center gap-1 cursor-not-allowed"
+                                  className="min-h-[40px] px-3 py-2 bg-[#F7F8F5] text-[#919A8D] text-xs rounded-xl flex items-center gap-1 cursor-not-allowed"
                                 >
                                   <Lock className="w-3.5 h-3.5" />
                                   <span>완료 불가</span>
@@ -873,7 +910,7 @@ export function OwnerDashboardView({
                                     OrderStatus.COOKING
                                   )
                                 }
-                                className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer transition-colors"
                               >
                                 조리 시작
                               </button>
@@ -889,7 +926,7 @@ export function OwnerDashboardView({
                                     chosenDispatch
                                   )
                                 }
-                                className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer transition-colors"
                               >
                                 픽업 처리
                               </button>
@@ -904,21 +941,21 @@ export function OwnerDashboardView({
                                     OrderStatus.COMPLETED
                                   )
                                 }
-                                className="min-h-[42px] px-4 py-2 bg-[#141812] hover:bg-[#232B1F] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer"
+                                className="min-h-[40px] px-4 py-2 bg-[#1A1D1A] hover:bg-[#252A25] text-white text-xs sm:text-sm font-semibold rounded-xl cursor-pointer transition-colors"
                               >
                                 배달 완료
                               </button>
                             )}
 
                             {order.status === OrderStatus.COMPLETED && (
-                              <span className="text-xs font-bold text-[#2E531A] flex items-center gap-1.5">
+                              <span className="text-xs font-semibold text-[#4E6E2A] flex items-center gap-1.5">
                                 <CheckCircle2 className="w-4 h-4" />
                                 처리 완료
                               </span>
                             )}
 
                             {order.status === OrderStatus.CANCELLED && (
-                              <span className="text-xs font-medium text-[#374033]">
+                              <span className="text-xs font-medium text-[#687064]">
                                 취소 · 환불 완료
                                 {order.stockRestored ? ' · 재고 복구됨' : ''}
                               </span>
@@ -931,7 +968,7 @@ export function OwnerDashboardView({
                               onClick={() =>
                                 onCancelOrderBeforeCooking(order.id)
                               }
-                              className="min-h-[42px] px-3.5 py-2 border border-red-300 bg-white hover:bg-red-50 text-red-700 text-xs font-semibold rounded-xl cursor-pointer"
+                              className="min-h-[40px] px-3.5 py-2 border border-red-200 bg-white hover:bg-red-50 text-red-700 text-xs font-semibold rounded-xl cursor-pointer transition-colors"
                             >
                               조리 전 취소
                             </button>
@@ -947,144 +984,66 @@ export function OwnerDashboardView({
         </div>
       )}
 
-      {/* 2. Admin Data Dashboard Tab (NEW) */}
+      {/* 2. Analytics & Statistics Tab */}
       {ownerSection === 'dashboard' && (
         <div className="space-y-6">
-          {/* 4-Column KPI Strip */}
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-              <div className="text-xs font-semibold text-[#4A5246]">
-                누적 유효 매출
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-[#141812] font-mono tabular-nums mt-1">
+          {/* Unified 4-Metric Hairline Strip */}
+          <section className="os-card rounded-3xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-0 lg:divide-x lg:divide-[#E8ECE4]">
+            <div className="lg:pr-5 space-y-1">
+              <div className="text-xs text-[#687064]">세션 유효 매출</div>
+              <div className="os-kpi text-xl sm:text-2xl font-bold text-[#1A1D1A]">
                 {formatWon(analytics.totalRevenue)}
               </div>
-              <div className="text-xs font-semibold text-[#2E531A] mt-1 tabular-nums">
-                유효 주문 {analytics.totalCount}건 · 수수료 0원
+              <div className="text-xs text-[#4E6E2A] font-medium tabular-nums">
+                유효 {analytics.totalCount}건 · 수수료 0원
               </div>
             </div>
 
-            <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-              <div className="text-xs font-semibold text-[#4A5246]">
-                평균 객단가 (AOV)
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-[#141812] font-mono tabular-nums mt-1">
+            <div className="lg:px-5 space-y-1">
+              <div className="text-xs text-[#687064]">평균 객단가</div>
+              <div className="os-kpi text-xl sm:text-2xl font-bold text-[#1A1D1A]">
                 {formatWon(analytics.avgOrderValue)}
               </div>
-              <div className="text-xs text-[#4A5246] mt-1 tabular-nums">
+              <div className="text-xs text-[#687064] tabular-nums">
                 B2B 단체 {analytics.b2bCount}건 ({formatWon(analytics.b2bRevenue)})
               </div>
             </div>
 
-            <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-              <div className="text-xs font-semibold text-[#4A5246]">
-                주문 완료율
-              </div>
-              <div className="text-xl sm:text-2xl font-bold text-[#2E531A] font-mono tabular-nums mt-1">
+            <div className="lg:px-5 space-y-1">
+              <div className="text-xs text-[#687064]">주문 완료율</div>
+              <div className="os-kpi text-xl sm:text-2xl font-bold text-[#4E6E2A]">
                 {analytics.completionRate}%
               </div>
-              <div className="text-xs text-[#4A5246] mt-1 tabular-nums">
+              <div className="text-xs text-[#687064] tabular-nums">
                 완료 {analytics.completedCount} · 진행 {activeCount} · 취소{' '}
                 {analytics.cancelledCount}
               </div>
             </div>
 
-            <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-              <div className="text-xs font-semibold text-[#4A5246]">
-                운영 · 재고 알림
+            <div className="lg:pl-5 space-y-1">
+              <div className="text-xs text-[#687064]">매장 · 재고 상태</div>
+              <div className="os-kpi text-xl sm:text-2xl font-bold text-[#1A1D1A]">
+                {analytics.openStoresCount}/{stores.length}곳 영업
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-[#141812] font-mono tabular-nums mt-1">
-                {analytics.lowOrOutMenus.length}건
-              </div>
-              <div className="text-xs text-[#4A5246] mt-1 tabular-nums">
-                영업 중 {analytics.openStoresCount}/{stores.length}곳 · 평점{' '}
+              <div className="text-xs text-[#687064] tabular-nums">
+                재고 주의 {analytics.lowOrOutMenus.length}건 · 평점{' '}
                 {analytics.avgRating}
               </div>
             </div>
           </section>
 
-          {/* Owner Profit Comparison vs Competing Delivery Platforms (IR Impact) */}
-          <section className="bg-white border border-[#CFE0C3] rounded-3xl p-5 sm:p-6 space-y-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
-                <h2 className="text-base sm:text-lg font-bold text-[#141812]">
-                  점주 실질 수익 비교 · 타사 플랫폼 대비
+          {/* Store Revenue & Pipeline Split */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            <section className="lg:col-span-7 os-card rounded-3xl p-6 space-y-5">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-[#4E6E2A]" />
+                  <span>매장별 매출 · 수수료 절감</span>
                 </h2>
-                <p className="text-xs text-[#4A5246] mt-0.5">
-                  {analytics.profitComparison.periodLabel} ·{' '}
-                  {analytics.profitComparison.competitorPlatformLabel} 대비{' '}
-                  {analytics.profitComparison.alleCommissionRateLabel}
-                </p>
-              </div>
-              <span className="text-xs font-bold text-[#2E531A] tabular-nums">
-                보조금 의존도 {analytics.profitComparison.subsidyDependencyRatioPercent}% · 자생 순환
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 sm:p-5 bg-[#F4F8F0] border border-[#CFE0C3] rounded-2xl space-y-2">
-                <div className="text-xs font-bold text-[#2E531A]">
-                  타사 플랫폼 대비 절감된 광고·중개 수수료
-                </div>
-                <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141812]">
-                  +{formatWon(analytics.profitComparison.totalSavedCommissionAndAdFee)}
-                </div>
-                <div className="text-xs text-[#374033] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1 border-t border-[#DCE7D4]">
-                  <span>
-                    중개 수수료 절감{' '}
-                    <strong className="font-mono text-[#141812]">
-                      {formatWon(analytics.profitComparison.totalBrokerageFeeSaved)}
-                    </strong>
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span>
-                    상단·깃발 광고비 절감{' '}
-                    <strong className="font-mono text-[#141812]">
-                      {formatWon(analytics.profitComparison.totalAdExposureFeeSaved)}
-                    </strong>
-                  </span>
-                </div>
+                <span className="text-xs text-[#687064]">취소 제외</span>
               </div>
 
-              <div className="p-4 sm:p-5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-2">
-                <div className="text-xs font-bold text-[#2E531A]">
-                  AI 단골 매칭 순증 매출
-                </div>
-                <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141812]">
-                  +{formatWon(analytics.profitComparison.totalAiRegularIncrementalSales)}
-                </div>
-                <div className="text-xs text-[#374033] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1 border-t border-[#E4EAE0]">
-                  <span>
-                    AI 매칭 주문{' '}
-                    <strong className="font-mono text-[#141812]">
-                      {analytics.profitComparison.totalAiRegularMatchedOrders}건
-                    </strong>
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span>
-                    단골 재주문율{' '}
-                    <strong className="font-mono text-[#2E531A]">
-                      {analytics.profitComparison.repeatCustomerRatePercent}%
-                    </strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Store Revenue Comparison & Order Pipeline */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Store Revenue Bar Chart */}
-            <section className="lg:col-span-7 bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-[#141812] flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4 text-[#2E531A]" />
-                  <span>매장별 매출 · 수수료 절감 현황</span>
-                </h2>
-                <span className="text-xs text-[#4A5246]">취소 제외 집계</span>
-              </div>
-
-              <div className="space-y-3.5">
+              <div className="space-y-4">
                 {analytics.byStore.map(({ store, count, revenue }) => {
                   const pct = Math.round(
                     (revenue / analytics.maxStoreRevenue) * 100
@@ -1092,38 +1051,39 @@ export function OwnerDashboardView({
                   const storeProfit =
                     analytics.profitComparison.byStore[store.id];
                   return (
-                    <div key={store.id} className="space-y-1">
+                    <div key={store.id} className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-bold text-[#141812] truncate">
+                        <span className="font-semibold text-[#1A1D1A] truncate">
                           {store.name}
                           {!store.isOpen && (
                             <span className="text-red-700 ml-1.5">(영업중단)</span>
                           )}
                         </span>
-                        <span className="font-mono tabular-nums font-bold text-[#141812] shrink-0">
+                        <span className="font-mono tabular-nums font-bold text-[#1A1D1A] shrink-0">
                           {formatWon(revenue)} · {count}건
                         </span>
                       </div>
-                      <div className="h-2.5 bg-[#EFF2EC] rounded-full overflow-hidden">
+                      <div className="h-2 bg-[#EAF1E2] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-[#2E531A] rounded-full transition-all"
-                          style={{ width: `${Math.max(revenue > 0 ? 6 : 0, pct)}%` }}
+                          className="h-full bg-[#82B440] rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(revenue > 0 ? 6 : 0, pct)}%`,
+                          }}
                         />
                       </div>
                       {storeProfit && (
-                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-[#4A5246] tabular-nums">
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-[#687064] tabular-nums">
                           <span>
                             30일 수수료 절감{' '}
-                            <strong className="font-mono text-[#2E531A]">
+                            <strong className="font-mono text-[#4E6E2A]">
                               +{formatWon(storeProfit.savedCommissionAndAdFee)}
                             </strong>
                           </span>
                           <span>
                             AI 단골 순증{' '}
-                            <strong className="font-mono text-[#141812]">
+                            <strong className="font-mono text-[#1A1D1A]">
                               +{formatWon(storeProfit.aiRegularIncrementalSales)}
-                            </strong>{' '}
-                            ({storeProfit.aiRegularMatchedOrders}건)
+                            </strong>
                           </span>
                         </div>
                       )}
@@ -1133,22 +1093,21 @@ export function OwnerDashboardView({
               </div>
             </section>
 
-            {/* Pipeline Breakdown & Demand Tags */}
-            <section className="lg:col-span-5 bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-5">
+            <section className="lg:col-span-5 os-card rounded-3xl p-6 space-y-6">
               <div className="space-y-3">
-                <h2 className="text-base font-bold text-[#141812]">
-                  주문 단계별 분포
+                <h2 className="text-base font-bold text-[#1A1D1A]">
+                  주문 단계별 현황
                 </h2>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2.5">
                   {analytics.statusPipeline.map((st) => (
                     <div
                       key={st.status}
-                      className="p-2.5 bg-[#F4F6F1] border border-[#E6EBE1] rounded-xl"
+                      className="py-2.5 px-3 bg-[#F7F8F5] rounded-xl"
                     >
-                      <div className="text-[11px] font-semibold text-[#4A5246] truncate">
+                      <div className="text-[11px] text-[#687064] truncate">
                         {st.label}
                       </div>
-                      <div className="text-base font-bold font-mono tabular-nums text-[#141812] mt-0.5">
+                      <div className="text-base font-bold font-mono tabular-nums text-[#1A1D1A] mt-0.5">
                         {st.count}건
                       </div>
                     </div>
@@ -1156,28 +1115,28 @@ export function OwnerDashboardView({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#EBEFEB] space-y-2.5">
-                <h3 className="text-sm font-bold text-[#141812]">
-                  인기 맛·카테고리 수요
+              <div className="pt-5 border-t border-[#E8ECE4] space-y-3">
+                <h3 className="text-sm font-bold text-[#1A1D1A]">
+                  인기 취향 수요
                 </h3>
                 {analytics.tagDemand.length === 0 ? (
-                  <p className="text-xs text-[#4A5246]">주문 데이터가 없습니다.</p>
+                  <p className="text-xs text-[#687064]">주문 데이터가 없습니다.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {analytics.tagDemand.map(([tag, qty]) => {
                       const pct = Math.round((qty / analytics.maxTagQty) * 100);
                       return (
-                        <div key={tag} className="flex items-center gap-2 text-xs">
-                          <span className="w-16 font-semibold text-[#374033] shrink-0">
+                        <div key={tag} className="flex items-center gap-2.5 text-xs">
+                          <span className="w-16 font-medium text-[#555E52] shrink-0 truncate">
                             {tag}
                           </span>
-                          <div className="flex-1 h-2 bg-[#EFF2EC] rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-[#EAF1E2] rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-[#6FA33A] rounded-full"
+                              className="h-full bg-[#82B440] rounded-full"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <span className="w-10 text-right font-mono tabular-nums font-bold text-[#141812]">
+                          <span className="w-9 text-right font-mono tabular-nums font-semibold text-[#1A1D1A]">
                             {qty}인
                           </span>
                         </div>
@@ -1189,88 +1148,99 @@ export function OwnerDashboardView({
             </section>
           </div>
 
-          {/* Menu Performance & Stock Health Table */}
-          <section className="bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-base font-bold text-[#141812] flex items-center gap-1.5">
-                <PackageCheck className="w-4 h-4 text-[#2E531A]" />
-                <span>메뉴별 판매 · 재고 현황</span>
-              </h2>
-              <div className="flex items-center gap-3 text-xs text-[#4A5246] tabular-nums">
-                <span>스탬프 적립 {stampCount}회</span>
-                <span>·</span>
-                <span>가격 제보 {priceReports.length}건</span>
-                <span>·</span>
-                <span>취소 요청 {analytics.cancelRequestCount}건</span>
+          {/* Collapsible Menu Performance & Stock Table */}
+          <section className="os-card rounded-3xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowMenuTable((prev) => !prev)}
+              aria-expanded={showMenuTable}
+              className="w-full min-h-[58px] px-6 py-4 flex items-center justify-between gap-3 text-left hover:bg-[#F7F8F5] transition-colors cursor-pointer"
+            >
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                  <PackageCheck className="w-4 h-4 text-[#4E6E2A]" />
+                  <span>메뉴별 판매 · 재고 상세표</span>
+                </span>
+                <span className="text-xs text-[#687064] tabular-nums">
+                  스탬프 {stampCount}회 · 가격 제보 {priceReports.length}건 · 취소
+                  요청 {analytics.cancelRequestCount}건
+                </span>
               </div>
-            </div>
+              {showMenuTable ? (
+                <ChevronUp className="w-4 h-4 text-[#687064] shrink-0" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#687064] shrink-0" />
+              )}
+            </button>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-[#E6EBE1] text-[#4A5246]">
-                    <th className="py-2.5 pr-3 font-semibold">메뉴</th>
-                    <th className="py-2.5 px-3 font-semibold">매장</th>
-                    <th className="py-2.5 px-3 font-semibold text-right">
-                      판매량
-                    </th>
-                    <th className="py-2.5 px-3 font-semibold text-right">
-                      매출액
-                    </th>
-                    <th className="py-2.5 px-3 font-semibold text-right">
-                      재고
-                    </th>
-                    <th className="py-2.5 pl-3 font-semibold text-right">
-                      빠른 관리
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#EBEFEB]">
-                  {analytics.topMenus.map(
-                    ({ menu, storeName, servings, revenue }) => {
-                      const out = menu.isSoldOut || menu.stock <= 0;
-                      const low = !out && menu.stock <= 3;
-                      return (
-                        <tr key={menu.id} className="hover:bg-[#F4F6F1]/70">
-                          <td className="py-2.5 pr-3 font-bold text-[#141812]">
-                            {menu.name}
-                          </td>
-                          <td className="py-2.5 px-3 text-[#4A5246] whitespace-nowrap">
-                            {storeName}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#141812]">
-                            {servings}인
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-[#141812]">
-                            {formatWon(revenue)}
-                          </td>
-                          <td
-                            className={`py-2.5 px-3 text-right font-mono tabular-nums font-bold ${
-                              out
-                                ? 'text-red-700'
-                                : low
-                                  ? 'text-amber-800'
-                                  : 'text-[#2E531A]'
-                            }`}
-                          >
-                            {out ? '품절' : `${menu.stock}개`}
-                          </td>
-                          <td className="py-2.5 pl-3 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => onAdjustMenuStock(menu.id, 5)}
-                              className="px-2.5 py-1 bg-[#E7EFE1] hover:bg-[#D8E7CE] text-[#1F3A11] text-xs font-bold rounded-lg cursor-pointer"
+            {showMenuTable && (
+              <div className="px-6 pb-6 pt-2 border-t border-[#E8ECE4] overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-[#E8ECE4] text-[#687064]">
+                      <th className="py-2.5 pr-3 font-semibold">메뉴</th>
+                      <th className="py-2.5 px-3 font-semibold">매장</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">
+                        판매량
+                      </th>
+                      <th className="py-2.5 px-3 font-semibold text-right">
+                        매출액
+                      </th>
+                      <th className="py-2.5 px-3 font-semibold text-right">
+                        재고
+                      </th>
+                      <th className="py-2.5 pl-3 font-semibold text-right">
+                        관리
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E8ECE4]">
+                    {analytics.topMenus.map(
+                      ({ menu, storeName, servings, revenue }) => {
+                        const out = menu.isSoldOut || menu.stock <= 0;
+                        const low = !out && menu.stock <= 3;
+                        return (
+                          <tr key={menu.id} className="hover:bg-[#F7F8F5]">
+                            <td className="py-3 pr-3 font-semibold text-[#1A1D1A]">
+                              {menu.name}
+                            </td>
+                            <td className="py-3 px-3 text-[#687064] whitespace-nowrap">
+                              {storeName}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono tabular-nums text-[#1A1D1A]">
+                              {servings}인
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono tabular-nums font-semibold text-[#1A1D1A]">
+                              {formatWon(revenue)}
+                            </td>
+                            <td
+                              className={`py-3 px-3 text-right font-mono tabular-nums font-semibold ${
+                                out
+                                  ? 'text-red-700'
+                                  : low
+                                    ? 'text-[#687064]'
+                                    : 'text-[#4E6E2A]'
+                              }`}
                             >
-                              +5 입고
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-                </tbody>
-              </table>
-            </div>
+                              {out ? '품절' : `${menu.stock}개`}
+                            </td>
+                            <td className="py-3 pl-3 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => onAdjustMenuStock(menu.id, 5)}
+                                className="px-2.5 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-lg cursor-pointer"
+                              >
+                                +5 입고
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -1278,11 +1248,11 @@ export function OwnerDashboardView({
       {/* 3. Store & Menu Operations Tab */}
       {ownerSection === 'ops' && (
         <div className="space-y-6">
-          <section className="bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-3.5">
+          <section className="os-card rounded-3xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <PlusCircle className="w-4 h-4 text-[#2E531A]" />
-                <h2 className="text-base font-bold text-[#141812]">
+                <PlusCircle className="w-4 h-4 text-[#4E6E2A]" />
+                <h2 className="text-base font-bold text-[#1A1D1A]">
                   신규 메뉴 등록
                 </h2>
               </div>
@@ -1295,7 +1265,7 @@ export function OwnerDashboardView({
                   );
                   setMenuAddNotice(`추천 메뉴 ${count}종이 일괄 등록되었습니다.`);
                 }}
-                className="min-h-[36px] px-3 py-1 bg-[#E7EFE1] hover:bg-[#D8E7CE] text-[#1F3A11] text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                className="min-h-[36px] px-3.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
               >
                 <ScanText className="w-3.5 h-3.5" />
                 <span>메뉴판 일괄 등록</span>
@@ -1306,7 +1276,7 @@ export function OwnerDashboardView({
               <select
                 value={newMenuStoreId}
                 onChange={(e) => setNewMenuStoreId(e.target.value)}
-                className="min-h-[44px] px-3 bg-[#F4F6F1] border border-[#CBDCC0] rounded-xl text-sm text-[#141812]"
+                className="min-h-[44px] px-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
               >
                 {stores.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -1319,7 +1289,7 @@ export function OwnerDashboardView({
                 value={newMenuLine}
                 onChange={(e) => setNewMenuLine(e.target.value)}
                 placeholder="예: 차돌 된장찌개 10000원 얼큰한 국물 한식"
-                className="flex-1 min-h-[44px] px-3.5 border border-[#CBDCC0] rounded-xl text-sm text-[#141812]"
+                className="flex-1 min-h-[44px] px-3.5 border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
               />
               <button
                 type="button"
@@ -1327,18 +1297,19 @@ export function OwnerDashboardView({
                   const res = onAddMenuFromLine(newMenuStoreId, newMenuLine);
                   setMenuAddNotice(res.message);
                 }}
-                className="min-h-[44px] px-5 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[44px] px-5 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
               >
                 등록
               </button>
             </div>
 
             {menuAddNotice && (
-              <p className="text-xs font-bold text-[#2E531A]">{menuAddNotice}</p>
+              <p className="text-xs font-semibold text-[#4E6E2A]">
+                {menuAddNotice}
+              </p>
             )}
           </section>
 
-          {/* Store Availability & Menu Stock */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {stores.map((store) => {
               const storeMenus = menus.filter((m) => m.storeId === store.id);
@@ -1353,17 +1324,17 @@ export function OwnerDashboardView({
               return (
                 <div
                   key={store.id}
-                  className="bg-white border border-[#DDE3D7] rounded-3xl p-4 sm:p-5 space-y-3"
+                  className="os-card rounded-3xl p-5 space-y-4"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <StoreIcon className="w-4 h-4 text-[#2E531A] shrink-0" />
-                        <h3 className="text-sm font-bold text-[#141812] truncate">
+                        <StoreIcon className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+                        <h3 className="text-sm font-bold text-[#1A1D1A] truncate">
                           {store.name}
                         </h3>
                       </div>
-                      <p className="text-xs text-[#4A5246] mt-0.5 tabular-nums">
+                      <p className="text-xs text-[#687064] mt-0.5 tabular-nums">
                         {store.category} · 배달비 {formatWon(store.deliveryFee)}{' '}
                         · 조리대기 {activeKitchenCount}건
                       </p>
@@ -1373,20 +1344,20 @@ export function OwnerDashboardView({
                       role="switch"
                       aria-checked={store.isOpen}
                       onClick={() => onToggleStoreOpen(store.id)}
-                      className={`min-h-[38px] px-3 py-1 rounded-xl text-xs font-bold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                      className={`min-h-[36px] px-3 py-1 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                         store.isOpen
-                          ? 'bg-[#E7EFE1] border-[#6FA33A] text-[#1F3A11]'
-                          : 'bg-red-50 border-red-400 text-red-800'
+                          ? 'bg-[#EAF1E2] border-[#D4E1C5] text-[#4E6E2A]'
+                          : 'bg-red-50 border-red-300 text-red-700'
                       }`}
                     >
                       {store.isOpen ? '영업 중' : '영업 중단'}
                     </button>
                   </div>
 
-                  <div className="px-3 py-2 bg-[#F4F6F1] border border-[#DDE3D7] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="text-[#374033]">
+                  <div className="px-3.5 py-2.5 bg-[#F7F8F5] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-[#687064]">
                       추가 조리시간{' '}
-                      <strong className="font-mono tabular-nums text-[#141812]">
+                      <strong className="font-mono tabular-nums text-[#1A1D1A]">
                         +{store.extraPrepMinutes}분
                       </strong>
                     </span>
@@ -1396,28 +1367,28 @@ export function OwnerDashboardView({
                         onClick={() =>
                           onSetStoreExtraPrep(store.id, recommendedExtraMins)
                         }
-                        className="min-h-[30px] px-2.5 bg-[#E7EFE1] hover:bg-[#D8E7CE] text-[#1F3A11] rounded-lg font-bold cursor-pointer"
+                        className="min-h-[30px] px-2.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] rounded-lg font-semibold cursor-pointer"
                       >
                         자동 (+{recommendedExtraMins}분)
                       </button>
                       <button
                         type="button"
                         onClick={() => onAdjustStoreExtraPrep(store.id, -5)}
-                        className="min-w-[32px] min-h-[30px] px-2 bg-white border border-[#CBDCC0] rounded-lg font-semibold cursor-pointer"
+                        className="min-w-[32px] min-h-[30px] px-2 bg-white border border-[#E8ECE4] rounded-lg font-medium cursor-pointer"
                       >
                         -5분
                       </button>
                       <button
                         type="button"
                         onClick={() => onAdjustStoreExtraPrep(store.id, 5)}
-                        className="min-w-[32px] min-h-[30px] px-2 bg-white border border-[#CBDCC0] rounded-lg font-semibold cursor-pointer"
+                        className="min-w-[32px] min-h-[30px] px-2 bg-white border border-[#E8ECE4] rounded-lg font-medium cursor-pointer"
                       >
                         +5분
                       </button>
                     </div>
                   </div>
 
-                  <div className="border-t border-[#EBEFEB] pt-2.5 space-y-2.5">
+                  <div className="border-t border-[#E8ECE4] pt-3 space-y-2.5">
                     {storeMenus.map((menu) => {
                       const effectiveSoldOut =
                         menu.isSoldOut || menu.stock <= 0;
@@ -1430,13 +1401,13 @@ export function OwnerDashboardView({
                             <p
                               className={`font-semibold truncate ${
                                 effectiveSoldOut
-                                  ? 'text-[#8E968A] line-through'
-                                  : 'text-[#141812]'
+                                  ? 'text-[#919A8D] line-through'
+                                  : 'text-[#1A1D1A]'
                               }`}
                             >
                               {menu.name}
                             </p>
-                            <p className="text-[11px] text-[#4A5246] font-mono tabular-nums">
+                            <p className="text-[11px] text-[#687064] font-mono tabular-nums">
                               {formatWon(menu.pricePerPerson)} · 재고{' '}
                               {menu.stock}개
                             </p>
@@ -1447,7 +1418,7 @@ export function OwnerDashboardView({
                               type="button"
                               onClick={() => onAdjustMenuStock(menu.id, -1)}
                               aria-label={`${menu.name} 재고 감소`}
-                              className="min-w-[34px] min-h-[34px] border border-[#CBDCC0] rounded-lg bg-[#F4F6F1] hover:bg-[#E7EFE1] font-semibold cursor-pointer"
+                              className="min-w-[32px] min-h-[32px] border border-[#E8ECE4] rounded-lg bg-[#F7F8F5] hover:bg-[#EAF1E2] font-semibold cursor-pointer"
                             >
                               -
                             </button>
@@ -1455,7 +1426,7 @@ export function OwnerDashboardView({
                               type="button"
                               onClick={() => onAdjustMenuStock(menu.id, 1)}
                               aria-label={`${menu.name} 재고 증가`}
-                              className="min-w-[34px] min-h-[34px] border border-[#CBDCC0] rounded-lg bg-[#F4F6F1] hover:bg-[#E7EFE1] font-semibold cursor-pointer"
+                              className="min-w-[32px] min-h-[32px] border border-[#E8ECE4] rounded-lg bg-[#F7F8F5] hover:bg-[#EAF1E2] font-semibold cursor-pointer"
                             >
                               +
                             </button>
@@ -1464,10 +1435,10 @@ export function OwnerDashboardView({
                               role="switch"
                               aria-checked={!menu.isSoldOut}
                               onClick={() => onToggleMenuSoldOut(menu.id)}
-                              className={`min-h-[34px] px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
+                              className={`min-h-[32px] px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
                                 menu.isSoldOut
-                                  ? 'bg-red-50 border-red-300 text-red-700'
-                                  : 'bg-[#E7EFE1] border-[#6FA33A] text-[#1F3A11]'
+                                  ? 'bg-red-50 border-red-200 text-red-700'
+                                  : 'bg-[#EAF1E2] border-[#D4E1C5] text-[#4E6E2A]'
                               }`}
                             >
                               {menu.isSoldOut ? '품절' : '판매 중'}
@@ -1487,37 +1458,37 @@ export function OwnerDashboardView({
       {/* 4. Reviews & Price Reports Tab */}
       {ownerSection === 'crm' && (
         <div className="space-y-6">
-          <section className="bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[#141812]">
+          <section className="os-card rounded-3xl p-6 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-bold text-[#1A1D1A]">
                 가격 차이 제보 ({priceReports.length}건)
               </h2>
-              <span className="text-xs font-semibold text-[#2E531A] flex items-center gap-1">
+              <span className="text-xs font-semibold text-[#4E6E2A] flex items-center gap-1">
                 <QrCode className="w-3.5 h-3.5" />
-                단골 스탬프 {stampCount}회 적립됨
+                단골 스탬프 {stampCount}회 적립
               </span>
             </div>
             {priceReports.length === 0 ? (
-              <p className="text-xs text-[#4A5246]">
+              <p className="text-xs text-[#687064]">
                 접수된 가격 차이 제보가 없습니다.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="divide-y divide-[#E8ECE4]">
                 {priceReports.map((rep) => (
                   <div
                     key={rep.id}
-                    className="p-3.5 bg-[#FFFBEF] border border-[#E8D595] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs"
                   >
                     <div>
-                      <span className="font-bold text-[#141812]">
+                      <span className="font-semibold text-[#1A1D1A]">
                         {rep.storeName} · {rep.menuName}
                       </span>
-                      <span className="text-[#374033] ml-2">
+                      <span className="text-[#687064] ml-2">
                         앱 {formatWon(rep.appPrice)} / 매장{' '}
                         {formatWon(rep.storePrice)}
                       </span>
                     </div>
-                    <span className="font-mono tabular-nums text-[#4A5246]">
+                    <span className="font-mono tabular-nums text-[#687064]">
                       {rep.reportedAt}
                     </span>
                   </div>
@@ -1526,13 +1497,13 @@ export function OwnerDashboardView({
             )}
           </section>
 
-          <section className="bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-4">
-            <h2 className="text-base font-bold text-[#141812] flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-[#2E531A]" />
+          <section className="os-card rounded-3xl p-6 space-y-4">
+            <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-[#4E6E2A]" />
               <span>고객 리뷰 · 답글 관리</span>
             </h2>
 
-            <div className="space-y-3">
+            <div className="divide-y divide-[#E8ECE4]">
               {reviews.map((rev) => {
                 const menu = menus.find((m) => m.id === rev.menuId);
                 const existingReply = reviewReplies[rev.id];
@@ -1540,41 +1511,40 @@ export function OwnerDashboardView({
                 const isFlagged = Boolean(existingReply?.flaggedForReview);
 
                 return (
-                  <div
-                    key={rev.id}
-                    className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
-                      rev.isComplaint
-                        ? 'bg-[#FFFBEF] border-[#E8D595]'
-                        : 'bg-[#F4F6F1] border-[#DDE3D7]'
-                    }`}
-                  >
+                  <div key={rev.id} className="py-4 first:pt-1 last:pb-1 space-y-2.5 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-bold text-[#141812]">
+                      <span className="font-semibold text-[#1A1D1A]">
                         {menu?.name ?? rev.menuId} · {rev.author}
-                        {rev.isComplaint && ' · 개선 요청'}
-                        {isFlagged && ' · 확인 요청됨'}
+                        {rev.isComplaint && (
+                          <span className="text-[#687064] ml-1.5">· 개선 요청</span>
+                        )}
+                        {isFlagged && (
+                          <span className="text-[#4E6E2A] ml-1.5">· 확인 요청됨</span>
+                        )}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono tabular-nums text-[#4A5246]">
-                          ★ {rev.rating} · {rev.date}
+                        <span className="font-mono tabular-nums text-[#687064]">
+                          <span className="text-[#82B440]">★</span> {rev.rating} · {rev.date}
                         </span>
                         <button
                           type="button"
                           onClick={() =>
                             onToggleReviewFlag(rev.id, '사실확인 검토 요청')
                           }
-                          className={`min-h-[30px] px-2.5 py-0.5 rounded-lg border font-semibold flex items-center gap-1 cursor-pointer ${
+                          className={`min-h-[30px] px-2.5 py-0.5 rounded-lg border font-medium flex items-center gap-1 cursor-pointer ${
                             isFlagged
-                              ? 'bg-amber-100 border-amber-400 text-amber-900'
-                              : 'bg-white border-[#CBDCC0] text-[#374033]'
+                              ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
+                              : 'bg-white border-[#E8ECE4] text-[#687064]'
                           }`}
                         >
                           <Flag className="w-3 h-3" />
-                          <span>{isFlagged ? '확인 요청됨' : '확인 요청'}</span>
+                          <span>{isFlagged ? '요청됨' : '확인 요청'}</span>
                         </button>
                       </div>
                     </div>
-                    <p className="text-sm text-[#141812]">{rev.content}</p>
+                    <p className="text-sm text-[#1A1D1A] leading-relaxed">
+                      {rev.content}
+                    </p>
 
                     <div className="flex flex-col sm:flex-row gap-2 pt-1">
                       <input
@@ -1587,7 +1557,7 @@ export function OwnerDashboardView({
                           }))
                         }
                         placeholder="고객에게 남길 답글을 입력하세요"
-                        className="flex-1 min-h-[38px] px-3 bg-white border border-[#CBDCC0] rounded-xl text-xs text-[#141812]"
+                        className="flex-1 min-h-[38px] px-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-xs text-[#1A1D1A]"
                       />
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
@@ -1601,7 +1571,7 @@ export function OwnerDashboardView({
                               [rev.id]: template,
                             }));
                           }}
-                          className="min-h-[38px] px-3 py-1 bg-[#E7EFE1] hover:bg-[#D8E7CE] text-[#1F3A11] font-semibold rounded-xl cursor-pointer"
+                          className="min-h-[38px] px-3 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] font-semibold rounded-xl cursor-pointer"
                         >
                           초안
                         </button>
@@ -1613,7 +1583,7 @@ export function OwnerDashboardView({
                             setSavedReplyId(rev.id);
                             window.setTimeout(() => setSavedReplyId(null), 2000);
                           }}
-                          className="min-h-[38px] px-3.5 py-1 bg-[#2E531A] hover:bg-[#234113] text-white font-semibold rounded-xl cursor-pointer"
+                          className="min-h-[38px] px-3.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-semibold rounded-xl cursor-pointer"
                         >
                           {savedReplyId === rev.id ? '저장됨' : '등록'}
                         </button>

@@ -8,9 +8,9 @@ import {
   INITIAL_STORES,
   resolveBundledImage,
 } from '../data/seedData';
-import { AllePersistedState } from '../types/alle';
+import { AllePersistedState, MenuItem, Store } from '../types/alle';
 
-const STORAGE_KEY = 'alle_mvp_demo_state_v5_daegu';
+const STORAGE_KEY = 'alle_mvp_demo_state_v6_full_catalog';
 
 export type StorageMode = 'localStorage' | 'memory';
 
@@ -22,7 +22,7 @@ export function getDefaultState(): AllePersistedState {
     errands: structuredClone(INITIAL_ERRANDS),
     stampCount: 3,
     walletBalance: 35000,
-    wishlistIds: ['m1', 'm9'],
+    wishlistIds: ['m1', 'm15', 'm32'],
     preferences: structuredClone(INITIAL_PREFERENCES),
     lastConditionInput: EXAMPLE_CONDITION_QUERY,
     reviewReplies: {
@@ -85,29 +85,51 @@ export function loadDemoState(): {
       };
     }
 
-    const storeImageById = new Map(INITIAL_STORES.map((s) => [s.id, s.image]));
+    const storeSeedById = new Map(INITIAL_STORES.map((s) => [s.id, s]));
     const menuSeedById = new Map(INITIAL_MENUS.map((m) => [m.id, m]));
 
-    const migratedStores = parsed.stores.map((store) => ({
-      ...store,
-      image:
-        resolveBundledImage(store.image) ||
-        storeImageById.get(store.id) ||
-        store.image,
-    }));
+    const migratedStores: Store[] = parsed.stores.map((store) => {
+      const seedStore = storeSeedById.get(store.id);
+      return {
+        ...seedStore,
+        ...store,
+        categoryGroup: store.categoryGroup ?? seedStore?.categoryGroup,
+        minOrderAmount: store.minOrderAmount ?? seedStore?.minOrderAmount,
+        rating: store.rating ?? seedStore?.rating,
+        reviewCount: store.reviewCount ?? seedStore?.reviewCount,
+        image:
+          resolveBundledImage(store.image) ||
+          seedStore?.image ||
+          store.image,
+      };
+    });
 
-    const migratedMenus = parsed.menus.map((menu) => {
+    const existingStoreIds = new Set(migratedStores.map((s) => s.id));
+    for (const seedStore of INITIAL_STORES) {
+      if (!existingStoreIds.has(seedStore.id)) {
+        migratedStores.push(structuredClone(seedStore));
+      }
+    }
+
+    const migratedMenus: MenuItem[] = parsed.menus.map((menu) => {
       const seedMenu = menuSeedById.get(menu.id);
       return {
         ...menu,
         image:
           resolveBundledImage(menu.image) ||
           seedMenu?.image ||
-          storeImageById.get(menu.storeId) ||
+          storeSeedById.get(menu.storeId)?.image ||
           menu.image,
         aiReason: menu.aiReason ?? seedMenu?.aiReason,
       };
     });
+
+    const existingMenuIds = new Set(migratedMenus.map((m) => m.id));
+    for (const seedMenu of INITIAL_MENUS) {
+      if (!existingMenuIds.has(seedMenu.id)) {
+        migratedMenus.push(structuredClone(seedMenu));
+      }
+    }
 
     return {
       state: {

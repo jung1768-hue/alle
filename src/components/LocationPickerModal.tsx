@@ -78,23 +78,23 @@ export function LocationPickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#141812]/55 backdrop-blur-[2px] p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#1A1D1A]/55 backdrop-blur-[2px] p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label="내 등록 위치 변경"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-[#F4F6F1] rounded-t-3xl sm:rounded-3xl border border-[#DDE3D7] shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
+        className="w-full sm:max-w-md bg-[#F7F8F5] rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 bg-white border-b border-[#E5EAE0] flex items-center justify-between">
+        <div className="px-5 py-4 bg-white border-b border-[#E8ECE4] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-[#141812]">
+            <h2 className="text-base font-bold text-[#1A1D1A]">
               내 등록 위치 변경
             </h2>
-            <p className="text-xs text-[#4A5246] mt-0.5">
+            <p className="text-xs text-[#687064] mt-0.5">
               등록된 위치를 탭하면 배달지와 추천 상권이 즉시 전환됩니다.
             </p>
           </div>
@@ -102,7 +102,7 @@ export function LocationPickerModal({
             type="button"
             onClick={onClose}
             aria-label="위치 선택 닫기"
-            className="w-9 h-9 rounded-xl bg-[#F4F6F1] hover:bg-[#E7EFE1] text-[#374033] flex items-center justify-center cursor-pointer"
+            className="w-9 h-9 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#555E52] flex items-center justify-center cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -113,7 +113,7 @@ export function LocationPickerModal({
           {/* Saved Locations List */}
           <div className="space-y-2">
             <div className="flex items-center justify-between px-0.5">
-              <span className="text-xs font-bold text-[#374033]">
+              <span className="text-xs font-bold text-[#555E52]">
                 등록된 위치 ({locations.length})
               </span>
               <button
@@ -122,7 +122,7 @@ export function LocationPickerModal({
                   setShowAddForm((prev) => !prev);
                   setFormError(null);
                 }}
-                className="text-xs font-bold text-[#2E531A] hover:underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-[#4E6E2A] hover:underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{showAddForm ? '등록 닫기' : '새 위치 추가'}</span>
@@ -138,8 +138,8 @@ export function LocationPickerModal({
                     key={loc.id}
                     className={`rounded-2xl border transition-all flex items-center justify-between gap-2 p-3.5 ${
                       isSelected
-                        ? 'bg-[#EFF5E6] border-[#2E531A] shadow-[0_2px_10px_rgba(46,83,26,0.08)]'
-                        : 'bg-white border-[#DDE3D7] hover:border-[#A8C190]'
+                        ? 'bg-[#EAF1E2] border-[#4E6E2A] shadow-[0_2px_10px_rgba(78,110,42,0.08)]'
+                        : 'bg-white border-[#E8ECE4] hover:border-[#A8CC73]'
                     }`}
                   >
                     <button
@@ -153,28 +153,28 @@ export function LocationPickerModal({
                       <div
                         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                           isSelected
-                            ? 'bg-[#2E531A] text-white'
-                            : 'bg-[#EFF5E6] text-[#2E531A]'
+                            ? 'bg-[#4E6E2A] text-white'
+                            : 'bg-[#EAF1E2] text-[#4E6E2A]'
                         }`}
                       >
                         <TagIcon className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-sm font-bold text-[#141812]">
+                          <span className="text-sm font-bold text-[#1A1D1A]">
                             {loc.label}
                           </span>
                           {isSelected && (
-                            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#2E531A]">
+                            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#4E6E2A]">
                               <Check className="w-3.5 h-3.5" />
                               현재 위치
                             </span>
                           )}
                         </div>
-                        <p className="text-xs font-semibold text-[#2E531A] mt-0.5 truncate">
+                        <p className="text-xs font-semibold text-[#4E6E2A] mt-0.5 truncate">
                           {loc.areaName}
                         </p>
-                        <p className="text-[11px] text-[#4A5246] truncate">
+                        <p className="text-[11px] text-[#687064] truncate">
                           {loc.detailAddress}
                         </p>
                       </div>
@@ -185,7 +185,7 @@ export function LocationPickerModal({
                         type="button"
                         onClick={() => onDeleteLocation(loc.id)}
                         aria-label={`${loc.label} 위치 삭제`}
-                        className="p-2 text-[#717870] hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer"
+                        className="p-2 text-[#687064] hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -200,9 +200,9 @@ export function LocationPickerModal({
           {showAddForm && (
             <form
               onSubmit={handleSubmitNew}
-              className="bg-white border border-[#CBDCC0] rounded-2xl p-4 space-y-3"
+              className="bg-white border border-[#E8ECE4] rounded-2xl p-4 space-y-3"
             >
-              <div className="text-xs font-bold text-[#141812]">
+              <div className="text-xs font-bold text-[#1A1D1A]">
                 새 위치 등록
               </div>
 
@@ -227,8 +227,8 @@ export function LocationPickerModal({
                       onClick={() => setNewTag(tagKey)}
                       className={`min-h-[38px] px-2 py-1.5 rounded-xl border text-xs font-bold inline-flex items-center justify-center gap-1 cursor-pointer transition-colors ${
                         active
-                          ? 'bg-[#2E531A] text-white border-[#2E531A]'
-                          : 'bg-[#F4F6F1] text-[#374033] border-[#DDE3D7] hover:border-[#79A92C]'
+                          ? 'bg-[#4E6E2A] text-white border-[#4E6E2A]'
+                          : 'bg-[#F7F8F5] text-[#555E52] border-[#E8ECE4] hover:border-[#82B440]'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -240,7 +240,7 @@ export function LocationPickerModal({
 
               {/* Quick Daegu Area Presets */}
               <div>
-                <span className="block text-[11px] font-semibold text-[#4A5246] mb-1.5">
+                <span className="block text-[11px] font-semibold text-[#687064] mb-1.5">
                   대구 주요 지역 빠른 입력
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -257,8 +257,8 @@ export function LocationPickerModal({
                       }}
                       className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium cursor-pointer transition-colors ${
                         newAreaName === area
-                          ? 'bg-[#EFF5E6] border-[#2E531A] text-[#2E531A] font-bold'
-                          : 'bg-[#F7F8F5] border-[#DDE3D7] text-[#374033] hover:border-[#79A92C]'
+                          ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#4E6E2A] font-bold'
+                          : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
                       }`}
                     >
                       {area.replace(/^대구\s+/, '')}
@@ -269,7 +269,7 @@ export function LocationPickerModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[11px] font-bold text-[#374033] mb-1">
+                  <label className="block text-[11px] font-bold text-[#555E52] mb-1">
                     위치 별칭
                   </label>
                   <input
@@ -277,11 +277,11 @@ export function LocationPickerModal({
                     value={newLabel}
                     onChange={(e) => setNewLabel(e.target.value)}
                     placeholder="예: 헬스장, 부모님 댁"
-                    className="w-full min-h-[40px] px-3 border border-[#CBDCC0] rounded-xl text-xs bg-white text-[#141812]"
+                    className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-xs bg-white text-[#1A1D1A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-[#374033] mb-1">
+                  <label className="block text-[11px] font-bold text-[#555E52] mb-1">
                     지역명 (구/동) *
                   </label>
                   <input
@@ -292,13 +292,13 @@ export function LocationPickerModal({
                       setFormError(null);
                     }}
                     placeholder="예: 대구 중구 대봉동"
-                    className="w-full min-h-[40px] px-3 border border-[#CBDCC0] rounded-xl text-xs bg-white text-[#141812]"
+                    className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-xs bg-white text-[#1A1D1A]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-[#374033] mb-1">
+                <label className="block text-[11px] font-bold text-[#555E52] mb-1">
                   상세 수령지 표기
                 </label>
                 <input
@@ -306,13 +306,13 @@ export function LocationPickerModal({
                   value={newDetailAddress}
                   onChange={(e) => setNewDetailAddress(e.target.value)}
                   placeholder="예: 대봉동 수령지 B (1층 로비)"
-                  className="w-full min-h-[40px] px-3 border border-[#CBDCC0] rounded-xl text-xs bg-white text-[#141812]"
+                  className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-xs bg-white text-[#1A1D1A]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-bold rounded-xl cursor-pointer transition-colors"
+                className="w-full min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-xl cursor-pointer transition-colors"
               >
                 위치 등록하고 바로 적용
               </button>

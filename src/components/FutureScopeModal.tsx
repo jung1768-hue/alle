@@ -15,13 +15,13 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
       aria-modal="true"
       aria-labelledby="future-scope-title"
     >
-      <div className="w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl border border-[#DDE3D7] p-6 max-h-[88vh] overflow-y-auto space-y-5">
+      <div className="w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] p-6 max-h-[88vh] overflow-y-auto space-y-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 id="future-scope-title" className="text-lg font-bold text-[#141812]">
+            <h2 id="future-scope-title" className="text-lg font-bold text-[#1A1D1A]">
               alle 서비스 안내 및 상생 원칙
             </h2>
-            <p className="text-xs font-medium text-[#4A5246] mt-0.5">
+            <p className="text-xs font-medium text-[#687064] mt-0.5">
               매장 동일가격 · 중개수수료 0% · 개인정보 안심 보호
             </p>
           </div>
@@ -29,16 +29,16 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-[#DDE3D7] text-[#374033] hover:bg-[#F4F6F1] cursor-pointer"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-[#E8ECE4] text-[#555E52] hover:bg-[#F7F8F5] cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-3.5 text-xs sm:text-sm text-[#374033] leading-relaxed">
-          <div className="p-4 bg-[#E9F1E2] border border-[#CBDCC0] rounded-2xl space-y-1.5">
-            <h3 className="font-bold text-[#141812] flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[#2E531A]" />
+        <div className="space-y-3.5 text-xs sm:text-sm text-[#555E52] leading-relaxed">
+          <div className="p-4 bg-[#EAF1E2] border border-[#E8ECE4] rounded-2xl space-y-1.5">
+            <h3 className="font-bold text-[#1A1D1A] flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#4E6E2A]" />
               <span>투명한 주문 · 취소 원칙</span>
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-xs">
@@ -51,9 +51,9 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
             </ul>
           </div>
 
-          <div className="p-4 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-1.5">
-            <h3 className="font-bold text-[#141812] flex items-center gap-1.5">
-              <Wallet className="w-4 h-4 text-[#2E531A]" />
+          <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
+            <h3 className="font-bold text-[#1A1D1A] flex items-center gap-1.5">
+              <Wallet className="w-4 h-4 text-[#4E6E2A]" />
               <span>매장 동일가격 & 중개수수료 0%</span>
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-xs">
@@ -66,9 +66,9 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
             </ul>
           </div>
 
-          <div className="p-4 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-1.5">
-            <h3 className="font-bold text-[#141812] flex items-center gap-1.5">
-              <Lock className="w-4 h-4 text-[#2E531A]" />
+          <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
+            <h3 className="font-bold text-[#1A1D1A] flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-[#4E6E2A]" />
               <span>안심 가명 & 반경 20m 위치 보호</span>
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-xs">
@@ -78,9 +78,9 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
             </ul>
           </div>
 
-          <div className="p-4 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-1.5">
-            <h3 className="font-bold text-[#141812] flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-[#2E531A]" />
+          <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
+            <h3 className="font-bold text-[#1A1D1A] flex items-center gap-1.5">
+              <Cpu className="w-4 h-4 text-[#4E6E2A]" />
               <span>AI 음성 주문 & 하이퍼로컬 연결</span>
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-xs">
@@ -94,7 +94,7 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
         <button
           type="button"
           onClick={onClose}
-          className="w-full min-h-[46px] py-2.5 bg-[#2E531A] hover:bg-[#234113] text-white text-sm font-semibold rounded-2xl cursor-pointer"
+          className="w-full min-h-[46px] py-2.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold rounded-2xl cursor-pointer"
         >
           확인
         </button>

@@ -46,8 +46,12 @@ export interface Store {
   id: string;
   name: string;
   category: string;
+  categoryGroup?: string;
   isOpen: boolean;
   deliveryFee: number;
+  minOrderAmount?: number;
+  rating?: number;
+  reviewCount?: number;
   basePrepMinutes: number;
   extraPrepMinutes: number;
   areaLabel: string;

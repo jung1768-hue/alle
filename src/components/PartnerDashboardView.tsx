@@ -77,15 +77,15 @@ export function PartnerDashboardView({
   return (
     <div className="space-y-6">
       {/* Dark Botanical Partner Banner */}
-      <div className="bg-[#141812] text-white rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#2C3528]">
+      <div className="bg-[#1A1D1A] text-white rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#3A4038]">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[#C5E09B]">
+          <p className="text-xs font-semibold text-[#D4E1C5]">
             배달 파트너 센터
           </p>
           <h1 className="text-xl font-bold tracking-tight">
             이웃 도보 · 라이더 배차
           </h1>
-          <p className="text-xs sm:text-sm text-[#DDE6D5]">
+          <p className="text-xs sm:text-sm text-[#E8ECE4]">
             조리 중인 주문을 수락해 픽업·배달을 완료하세요.
           </p>
         </div>
@@ -94,14 +94,14 @@ export function PartnerDashboardView({
           <button
             type="button"
             onClick={onSwitchToConsumer}
-            className="min-h-[42px] px-4 py-2 bg-[#E7EFE1] hover:bg-white text-[#141812] text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
+            className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-white text-[#1A1D1A] text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
           >
             고객 홈
           </button>
           <button
             type="button"
             onClick={onSwitchToOwner}
-            className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#3A6822] text-white text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
+            className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
           >
             점주 · 관리자
           </button>
@@ -110,47 +110,47 @@ export function PartnerDashboardView({
 
       {/* Summary KPI Row (Honest Demo Aggregates) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-          <div className="text-xs font-semibold text-[#4A5246]">배달·픽업 대기</div>
-          <div className="text-2xl font-bold text-[#141812] font-mono tabular-nums mt-1">
+        <div className="bg-white border border-[#E8ECE4] rounded-2xl p-4">
+          <div className="text-xs font-semibold text-[#687064]">배달·픽업 대기</div>
+          <div className="text-2xl font-bold text-[#1A1D1A] font-mono tabular-nums mt-1">
             {deliveryQueue.length}건
           </div>
-          <div className="text-xs text-[#2E531A] font-medium mt-0.5">
+          <div className="text-xs text-[#4E6E2A] font-medium mt-0.5">
             조리 중 / 픽업 이동 주문
           </div>
         </div>
-        <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-          <div className="text-xs font-semibold text-[#4A5246]">생활 심부름 모집</div>
-          <div className="text-2xl font-bold text-[#141812] font-mono tabular-nums mt-1">
+        <div className="bg-white border border-[#E8ECE4] rounded-2xl p-4">
+          <div className="text-xs font-semibold text-[#687064]">생활 심부름 모집</div>
+          <div className="text-2xl font-bold text-[#1A1D1A] font-mono tabular-nums mt-1">
             {openErrands.length}건
           </div>
-          <div className="text-xs text-[#4A5246] mt-0.5">
+          <div className="text-xs text-[#687064] mt-0.5">
             금지 품목 필터 통과 요청
           </div>
         </div>
-        <div className="bg-white border border-[#DDE3D7] rounded-2xl p-4">
-          <div className="text-xs font-semibold text-[#4A5246]">완료 건수 · 정산 예정</div>
-          <div className="text-2xl font-bold text-[#2E531A] font-mono tabular-nums mt-1">
+        <div className="bg-white border border-[#E8ECE4] rounded-2xl p-4">
+          <div className="text-xs font-semibold text-[#687064]">완료 건수 · 정산 예정</div>
+          <div className="text-2xl font-bold text-[#4E6E2A] font-mono tabular-nums mt-1">
             {formatWon(estimatedMockReward)}
           </div>
-          <div className="text-xs text-[#4A5246] tabular-nums mt-0.5">
+          <div className="text-xs text-[#687064] tabular-nums mt-0.5">
             완료 {completedDeliveries.length}건 · 건당 2,000원
           </div>
         </div>
       </div>
 
       {/* Geofencing Privacy Safeguard Banner */}
-      <div className="bg-[#E9F1E2] border border-[#C5D8B5] rounded-2xl px-4 py-3 flex items-center gap-2.5 text-xs text-[#1F3A11] font-medium">
-        <ShieldCheck className="w-4 h-4 text-[#2E531A] shrink-0" />
+      <div className="bg-[#EAF1E2] border border-[#D4E1C5] rounded-2xl px-4 py-3 flex items-center gap-2.5 text-xs text-[#3D5720] font-medium">
+        <ShieldCheck className="w-4 h-4 text-[#4E6E2A] shrink-0" />
         <span>반경 20m 안심 위치 마스킹이 적용되어 출발지 및 거주지 상세 위치는 비공개로 보호됩니다.</span>
       </div>
 
       {/* Track Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-[#141812]">
+        <h2 className="text-lg font-bold text-[#1A1D1A]">
           배송 콜 목록
         </h2>
-        <div className="inline-flex items-center p-1 bg-[#E9ECE4] border border-[#DDE3D7] rounded-xl">
+        <div className="inline-flex items-center p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
           {(
             [
               { id: 'all', label: '전체' },
@@ -164,8 +164,8 @@ export function PartnerDashboardView({
               onClick={() => setTrackFilter(t.id)}
               className={`min-h-[36px] px-3 py-1 text-xs font-bold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
                 trackFilter === t.id
-                  ? 'bg-white text-[#2E531A] shadow-2xs'
-                  : 'text-[#4A5246] hover:text-[#141812]'
+                  ? 'bg-white text-[#4E6E2A] shadow-2xs'
+                  : 'text-[#687064] hover:text-[#1A1D1A]'
               }`}
             >
               {t.label}
@@ -176,7 +176,7 @@ export function PartnerDashboardView({
 
       {/* Delivery Orders */}
       {deliveryQueue.length === 0 ? (
-        <div className="bg-white border border-[#DDE3D7] rounded-3xl p-8 text-center text-sm text-[#4A5246]">
+        <div className="bg-white border border-[#E8ECE4] rounded-3xl p-8 text-center text-sm text-[#687064]">
           현재 수락·조리·픽업 진행 중인 주문이 없습니다. 점주 화면에서 주문을 수락·조리
           시작으로 넘겨보세요.
         </div>
@@ -190,12 +190,12 @@ export function PartnerDashboardView({
             return (
               <article
                 key={order.id}
-                className="bg-white border border-[#DDE3D7] rounded-3xl p-5 space-y-4 shadow-[0_2px_10px_rgba(20,24,18,0.03)]"
+                className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-[0_2px_10px_rgba(26,29,26,0.03)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs font-medium text-[#4A5246]">
-                      <span className="font-mono font-bold text-[#141812]">
+                    <div className="text-xs font-medium text-[#687064]">
+                      <span className="font-mono font-bold text-[#1A1D1A]">
                         {order.orderCode}
                       </span>
                       <span aria-hidden="true"> · </span>
@@ -203,11 +203,11 @@ export function PartnerDashboardView({
                         {order.storeName} → {order.addressAlias}
                       </span>
                     </div>
-                    <h3 className="text-base font-bold text-[#141812] mt-1">
+                    <h3 className="text-base font-bold text-[#1A1D1A] mt-1">
                       {order.menuName} ({order.servings}인)
                     </h3>
-                    <p className="text-xs text-[#374033] mt-0.5 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#2E531A]" />
+                    <p className="text-xs text-[#555E52] mt-0.5 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#4E6E2A]" />
                       <span>
                         {order.dispatchMode === DispatchMode.AGENCY_RIDER
                           ? '전문 라이더 배차'
@@ -216,10 +216,10 @@ export function PartnerDashboardView({
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-bold text-[#2E531A] font-mono tabular-nums">
+                    <div className="text-sm font-bold text-[#4E6E2A] font-mono tabular-nums">
                       배달비 2,000원
                     </div>
-                    <div className="text-xs text-[#4A5246] mt-0.5">
+                    <div className="text-xs text-[#687064] mt-0.5">
                       {isAcceptedOnly
                         ? '점주 조리 시작 대기'
                         : isCooking
@@ -239,9 +239,9 @@ export function PartnerDashboardView({
                   />
                 )}
 
-                <div className="pt-3 border-t border-[#E6EBE1] flex flex-wrap items-center justify-between gap-2">
+                <div className="pt-3 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2">
                   {isAcceptedOnly && (
-                    <span className="text-xs font-medium text-[#4A5246] flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-[#687064] flex items-center gap-1.5">
                       <Lock className="w-3.5 h-3.5" />
                       점주가 ‘조리 시작’을 누른 후 픽업할 수 있습니다.
                     </span>
@@ -258,7 +258,7 @@ export function PartnerDashboardView({
                             DispatchMode.NEIGHBOR_WALK
                           )
                         }
-                        className="flex-1 min-h-[44px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 min-h-[44px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <Footprints className="w-4 h-4" />
                         <span>이웃 도보 픽업 수락</span>
@@ -272,7 +272,7 @@ export function PartnerDashboardView({
                             DispatchMode.AGENCY_RIDER
                           )
                         }
-                        className="flex-1 min-h-[44px] px-4 py-2 bg-[#E7EFE1] hover:bg-[#D8E6CD] text-[#1F3A11] text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 min-h-[44px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <Bike className="w-4 h-4" />
                         <span>전문 라이더 픽업</span>
@@ -286,9 +286,9 @@ export function PartnerDashboardView({
                       onClick={() =>
                         onAdvanceOrderStatus(order.id, OrderStatus.COMPLETED)
                       }
-                      className="w-full min-h-[44px] px-4 py-2 bg-[#141812] hover:bg-[#232B1F] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full min-h-[44px] px-4 py-2 bg-[#1A1D1A] hover:bg-[#252A25] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <CheckCircle2 className="w-4 h-4 text-[#8BC34A]" />
+                      <CheckCircle2 className="w-4 h-4 text-[#82B440]" />
                       <span>수령지 20m 도달 · 배달 완료 처리</span>
                     </button>
                   )}
@@ -301,12 +301,12 @@ export function PartnerDashboardView({
 
       {/* Partner Errand Tasks */}
       <section className="space-y-3 pt-2">
-        <h2 className="text-lg font-bold text-[#141812] flex items-center gap-2">
-          <Truck className="w-5 h-5 text-[#2E531A]" />
+        <h2 className="text-lg font-bold text-[#1A1D1A] flex items-center gap-2">
+          <Truck className="w-5 h-5 text-[#4E6E2A]" />
           <span>이웃 생활 심부름 파트너 수락 대기 ({openErrands.length}건)</span>
         </h2>
         {openErrands.length === 0 ? (
-          <div className="bg-white border border-[#DDE3D7] rounded-2xl p-6 text-center text-xs text-[#4A5246]">
+          <div className="bg-white border border-[#E8ECE4] rounded-2xl p-6 text-center text-xs text-[#687064]">
             현재 대기 중인 생활 심부름 요청이 없습니다.
           </div>
         ) : (
@@ -314,23 +314,23 @@ export function PartnerDashboardView({
             {openErrands.map((err) => (
               <div
                 key={err.id}
-                className="bg-white border border-[#DDE3D7] rounded-2xl p-4 flex items-center justify-between gap-3"
+                className="bg-white border border-[#E8ECE4] rounded-2xl p-4 flex items-center justify-between gap-3"
               >
                 <div className="min-w-0">
-                  <div className="text-xs text-[#4A5246]">
+                  <div className="text-xs text-[#687064]">
                     {err.category} · {err.pickupAlias} → {err.dropoffAlias}
                   </div>
-                  <div className="text-sm font-bold text-[#141812] truncate mt-0.5">
+                  <div className="text-sm font-bold text-[#1A1D1A] truncate mt-0.5">
                     {err.title}
                   </div>
-                  <div className="text-xs font-bold text-[#2E531A] font-mono tabular-nums mt-1">
+                  <div className="text-xs font-bold text-[#4E6E2A] font-mono tabular-nums mt-1">
                     심부름 보수 {formatWon(err.errandFee)} · 에스크로 예치됨
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onAdvanceErrand(err.id, ErrandStatus.MATCHED)}
-                  className="min-h-[42px] px-4 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-xs font-bold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
+                  className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   심부름 수락
                 </button>

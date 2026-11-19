@@ -50,13 +50,13 @@ export function LiveDeliveryMapCard({
         : `${addressAlias} 인근 도착`;
 
   return (
-    <div className="p-4 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-3">
+    <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#141812]">
-          <Navigation className="w-3.5 h-3.5 text-[#2E531A]" />
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#1A1D1A]">
+          <Navigation className="w-3.5 h-3.5 text-[#4E6E2A]" />
           <span>배달 경로 ({orderCode})</span>
         </div>
-        <span className="text-[11px] font-bold text-[#2E531A]">
+        <span className="text-[11px] font-bold text-[#4E6E2A]">
           {dispatchMode === DispatchMode.AGENCY_RIDER
             ? '전문 라이더'
             : '이웃 도보 파트너'}
@@ -64,40 +64,40 @@ export function LiveDeliveryMapCard({
       </div>
 
       {/* Prominent AI Dispatch & On-Time Reliability Status Banner */}
-      <div className="px-3.5 py-2.5 bg-[#141812] text-white rounded-xl flex flex-wrap items-center justify-between gap-2">
+      <div className="px-3.5 py-2.5 bg-[#EAF1E2] border border-[#DCE7CF] text-[#3D5720] rounded-xl flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs font-bold">
-          <Sparkles className="w-3.5 h-3.5 text-[#B8D98E] shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
           <span>AI 라이더 최적 동선 매칭 완료</span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#B8D98E] font-mono tabular-nums">
-          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A] font-mono tabular-nums">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
           <span>정시 도착 신뢰도 98%</span>
         </div>
       </div>
 
-      <div className="bg-white border border-[#CBDCC0] rounded-xl p-2.5 overflow-hidden">
+      <div className="bg-white border border-[#E8ECE4] rounded-xl p-2.5 overflow-hidden">
         <svg
           viewBox="0 0 320 112"
           className="w-full h-28 block"
           role="img"
           aria-label="배달 경로 지도"
         >
-          <rect x="8" y="10" width="76" height="36" rx="6" fill="#E9F1E2" />
-          <rect x="96" y="10" width="90" height="28" rx="6" fill="#E9F1E2" />
-          <rect x="200" y="10" width="110" height="34" rx="6" fill="#E9F1E2" />
-          <rect x="96" y="66" width="110" height="36" rx="6" fill="#E9F1E2" />
+          <rect x="8" y="10" width="76" height="36" rx="6" fill="#EAF1E2" />
+          <rect x="96" y="10" width="90" height="28" rx="6" fill="#EAF1E2" />
+          <rect x="200" y="10" width="110" height="34" rx="6" fill="#EAF1E2" />
+          <rect x="96" y="66" width="110" height="36" rx="6" fill="#EAF1E2" />
 
           <path
             d="M 48 78 Q 112 78 140 52 T 268 62"
             fill="none"
-            stroke="#CBDCC0"
+            stroke="#E8ECE4"
             strokeWidth="8"
             strokeLinecap="round"
           />
           <path
             d="M 48 78 Q 112 78 140 52 T 268 62"
             fill="none"
-            stroke="#2E531A"
+            stroke="#4E6E2A"
             strokeWidth="3"
             strokeDasharray="6 5"
             strokeLinecap="round"
@@ -107,47 +107,47 @@ export function LiveDeliveryMapCard({
             cx="268"
             cy="62"
             r="22"
-            fill="#E7EFE1"
+            fill="#EAF1E2"
             fillOpacity="0.9"
-            stroke="#6FA33A"
+            stroke="#82B440"
             strokeWidth="1.5"
             strokeDasharray="3 3"
           />
 
-          <circle cx="48" cy="78" r="8" fill="#141812" />
+          <circle cx="48" cy="78" r="8" fill="#1A1D1A" />
           <text
             x="48"
             y="100"
             textAnchor="middle"
             fontSize="9"
             fontWeight="700"
-            fill="#141812"
+            fill="#1A1D1A"
           >
             매장
           </text>
 
-          <circle cx="268" cy="62" r="8" fill="#2E531A" />
+          <circle cx="268" cy="62" r="8" fill="#4E6E2A" />
           <text
             x="268"
             y="96"
             textAnchor="middle"
             fontSize="9"
             fontWeight="700"
-            fill="#1F3A11"
+            fill="#3D5720"
           >
             {addressAlias}
           </text>
 
           <g transform={`translate(${avatarX}, ${avatarY})`}>
-            <circle r="11" fill="#8BC34A" fillOpacity="0.35" />
-            <circle r="7" fill="#2E531A" stroke="#FFFFFF" strokeWidth="2" />
+            <circle r="11" fill="#82B440" fillOpacity="0.35" />
+            <circle r="7" fill="#4E6E2A" stroke="#FFFFFF" strokeWidth="2" />
           </g>
         </svg>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-bold text-[#141812] flex items-center gap-1">
-          <MapPin className="w-3.5 h-3.5 text-[#2E531A]" />
+        <span className="font-bold text-[#1A1D1A] flex items-center gap-1">
+          <MapPin className="w-3.5 h-3.5 text-[#4E6E2A]" />
           {stageLabel}
         </span>
         <div className="flex items-center gap-1">
@@ -162,8 +162,8 @@ export function LiveDeliveryMapCard({
               onClick={() => setPreviewStep(btn.idx)}
               className={`min-h-[28px] px-2.5 py-0.5 rounded-lg border text-[11px] font-semibold cursor-pointer ${
                 effectiveStep === btn.idx
-                  ? 'bg-[#2E531A] border-[#2E531A] text-white'
-                  : 'bg-white border-[#CBDCC0] text-[#374033]'
+                  ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                  : 'bg-white border-[#E8ECE4] text-[#555E52]'
               }`}
             >
               {btn.label}
@@ -172,8 +172,8 @@ export function LiveDeliveryMapCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 text-[11px] text-[#4A5246]">
-        <ShieldCheck className="w-3.5 h-3.5 text-[#2E531A] shrink-0" />
+      <div className="flex items-center gap-1.5 text-[11px] text-[#687064]">
+        <ShieldCheck className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
         <span>안심 경로 안내 · 반경 20m 위치 보호 적용</span>
       </div>
     </div>

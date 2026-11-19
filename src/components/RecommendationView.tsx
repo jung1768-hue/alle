@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Sparkles,
   Store as StoreIcon,
+  Zap,
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
 import {
@@ -155,29 +156,29 @@ export function RecommendationView({
   return (
     <div className="space-y-6">
       {/* Compact Header & Condition */}
-      <div className="bg-white border border-[#DDE3D7] rounded-3xl p-4 sm:p-5 shadow-[0_2px_12px_rgba(20,24,18,0.03)] space-y-3">
+      <div className="bg-white border border-[#E8ECE4] rounded-3xl p-4 sm:p-5 shadow-[0_2px_12px_rgba(26,29,26,0.03)] space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             onClick={onBackToHome}
-            className="min-h-[40px] px-3.5 py-1.5 border border-[#CBDCC0] bg-white hover:bg-[#F4F6F1] text-[#141812] text-xs sm:text-sm font-semibold rounded-xl flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            className="min-h-[40px] px-3.5 py-1.5 border border-[#E8ECE4] bg-white hover:bg-[#F7F8F5] text-[#1A1D1A] text-xs sm:text-sm font-semibold rounded-xl flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>조건 변경</span>
           </button>
 
-          <div className="px-4 py-1.5 bg-[#2E531A] text-white text-xs sm:text-sm font-semibold rounded-2xl tabular-nums">
+          <div className="px-4 py-1.5 bg-[#4E6E2A] text-white text-xs sm:text-sm font-semibold rounded-2xl tabular-nums">
             {conditionSummaryText}
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <AlleBotIllustration size="sm" />
-          <div className="bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm text-[#141812]">
+          <div className="bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm text-[#1A1D1A]">
             {matches.length > 0 ? (
               <span>
                 조건에 맞는{' '}
-                <strong className="font-bold text-[#2E531A]">
+                <strong className="font-bold text-[#4E6E2A]">
                   {matches.length}개 메뉴
                 </strong>
                 를 찾았습니다.
@@ -191,15 +192,15 @@ export function RecommendationView({
 
       {/* 0-Result State */}
       {matches.length === 0 ? (
-        <div className="bg-white border border-[#DDE3D7] rounded-3xl p-6 sm:p-10 text-center space-y-5">
-          <div className="mx-auto w-12 h-12 rounded-2xl bg-[#E9F1E2] flex items-center justify-center text-[#2E531A]">
+        <div className="bg-white border border-[#E8ECE4] rounded-3xl p-6 sm:p-10 text-center space-y-5">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-[#EAF1E2] flex items-center justify-center text-[#4E6E2A]">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div className="max-w-md mx-auto space-y-1.5">
-            <h2 className="text-lg font-bold text-[#141812]">
+            <h2 className="text-lg font-bold text-[#1A1D1A]">
               일치하는 메뉴가 없습니다
             </h2>
-            <p className="text-sm text-[#374033]">
+            <p className="text-sm text-[#555E52]">
               예산이나 배달 시간 조건을 조금 넓혀 다시 검색해 보세요.
             </p>
           </div>
@@ -212,7 +213,7 @@ export function RecommendationView({
                     maxBudget: condition.maxBudget! + 10000,
                   })
                 }
-                className="min-h-[42px] px-4 py-2 bg-[#E7EFE1] hover:bg-[#D8E7CE] text-[#1F3A11] text-sm font-semibold rounded-xl cursor-pointer"
+                className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm font-semibold rounded-xl cursor-pointer"
               >
                 예산 +10,000원
               </button>
@@ -225,7 +226,7 @@ export function RecommendationView({
                     maxMinutes: condition.maxMinutes! + 15,
                   })
                 }
-                className="min-h-[42px] px-4 py-2 bg-[#E7EFE1] hover:bg-[#D8E7CE] text-[#1F3A11] text-sm font-semibold rounded-xl cursor-pointer"
+                className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm font-semibold rounded-xl cursor-pointer"
               >
                 시간 +15분
               </button>
@@ -241,7 +242,7 @@ export function RecommendationView({
                   needsConfirmation: false,
                 })
               }
-              className="min-h-[42px] px-5 py-2 bg-[#2E531A] hover:bg-[#234113] text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[42px] px-5 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               <span>기본 추천 보기</span>
@@ -274,8 +275,8 @@ export function RecommendationView({
                   }}
                   className={`w-full text-left bg-white rounded-3xl border overflow-hidden transition-all cursor-pointer ${
                     isSelected
-                      ? 'border-[#2E531A] ring-2 ring-[#2E531A]/15 shadow-[0_4px_16px_rgba(46,83,26,0.08)]'
-                      : 'border-[#DDE3D7] hover:border-[#2E531A]/40'
+                      ? 'border-[#4E6E2A] ring-2 ring-[#4E6E2A]/15 shadow-[0_4px_16px_rgba(78,110,42,0.08)]'
+                      : 'border-[#E8ECE4] hover:border-[#4E6E2A]/40'
                   }`}
                 >
                   {/* Top Explainable AI Reason Highlight Strip */}
@@ -283,8 +284,8 @@ export function RecommendationView({
                     <div
                       className={`px-4 py-2 border-b flex items-center gap-1.5 text-[11px] sm:text-xs font-bold ${
                         isSelected
-                          ? 'bg-[#2E531A] border-[#2E531A] text-white'
-                          : 'bg-[#ECF3E2] border-[#DCE7CE] text-[#1F3A11]'
+                          ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                          : 'bg-[#EAF1E2] border-[#DCE7CF] text-[#3D5720]'
                       }`}
                     >
                       <Sparkles className="w-3.5 h-3.5 shrink-0" />
@@ -294,29 +295,27 @@ export function RecommendationView({
                     </div>
                   )}
 
-                  <div className="p-4 flex gap-3.5">
-                    <div className="w-24 h-20 sm:w-28 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-[#EBEFEB]">
+                  <div className="p-4 flex items-center gap-3.5">
+                    <div className="w-18 h-18 rounded-2xl overflow-hidden shrink-0 border border-[#E8ECE4]">
                       <FoodImage
                         src={item.menu.image}
                         alt={item.menu.name}
                         className="w-full h-full"
                       />
                     </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
                       <div>
-                        <div className="text-xs font-medium text-[#4A5246] truncate">
+                        <div className="text-xs font-medium text-[#687064] truncate">
                           {item.store.name}
                           <span aria-hidden="true"> · </span>
                           <span className="tabular-nums">
                             약 {item.effectiveMinutes}분
                           </span>
                         </div>
-                        <h2 className="text-base font-bold text-[#141812] mt-0.5 truncate">
+                        <h2 className="text-base font-bold text-[#1A1D1A] mt-0.5 truncate">
                           {item.menu.name}
                         </h2>
-                        <p className="text-xs text-[#374033] mt-0.5 truncate">
-                          {item.menu.tags.slice(0, 3).join(' · ')}
-                          <span aria-hidden="true"> · </span>
+                        <p className="text-xs text-[#687064] mt-0.5 truncate">
                           <span
                             className={`tabular-nums ${
                               lowStock ? 'text-amber-800 font-semibold' : ''
@@ -326,27 +325,22 @@ export function RecommendationView({
                               ? `마감 임박 (${item.menu.stock}개)`
                               : `재고 ${item.menu.stock}개`}
                           </span>
+                          <span aria-hidden="true"> · </span>
+                          <span>
+                            {item.isSameStorePrice ? '매장 동일가' : '배달 포함'}
+                          </span>
                         </p>
                       </div>
 
-                      <div className="mt-2.5 flex items-center justify-between gap-2">
-                        <div>
-                          <span className="text-base font-bold text-[#141812] font-mono tabular-nums">
-                            {formatWon(item.estimatedTotal)}
-                          </span>
-                          <span className="block text-[11px] font-medium text-[#374033] tabular-nums">
-                            {item.isSameStorePrice
-                              ? '매장 동일 가격'
-                              : item.menu.storePrice === null
-                                ? '가격자료 미입력'
-                                : `매장가 ${formatWon(item.menu.storePrice)}`}
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="os-kpi text-lg font-bold text-[#1A1D1A]">
+                          {formatWon(item.estimatedTotal)}
+                        </span>
                         <span
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 ${
+                          className={`px-3 py-1 rounded-full text-[11px] font-semibold shrink-0 ${
                             isSelected
-                              ? 'bg-[#2E531A] text-white'
-                              : 'bg-[#E7EFE1] text-[#1F3A11]'
+                              ? 'bg-[#4E6E2A] text-white'
+                              : 'bg-[#F0F3EC] text-[#555E52]'
                           }`}
                         >
                           {isSelected ? '선택됨' : '보기'}
@@ -359,105 +353,110 @@ export function RecommendationView({
             })}
           </div>
 
-          {/* Right: Selected Detail */}
+          {/* Right: Selected Detail (AI Reason Hero + Compact Square Thumbnail) */}
           {activeMatch && (
             <div
               ref={detailPanelRef}
-              className="lg:col-span-7 bg-white border border-[#DDE3D7] rounded-3xl overflow-hidden shadow-[0_2px_14px_rgba(20,24,18,0.04)] scroll-mt-16"
+              className="lg:col-span-7 os-card rounded-3xl overflow-hidden scroll-mt-20"
             >
-              {(activeMatch.aiReason || activeMatch.menu.aiReason) && (
-                <div className="px-5 py-3 bg-[#141812] text-white flex items-center gap-2.5">
-                  <Sparkles className="w-4 h-4 text-[#A9D17B] shrink-0" />
-                  <div className="min-w-0 text-xs sm:text-sm font-semibold leading-snug">
-                    <span className="text-[#A9D17B] font-bold mr-1.5">
-                      AI 추천 정답
+              <div className="p-6 sm:p-7 space-y-6">
+                {/* Visual Hero #1: Prominent Explainable AI Reason Box */}
+                <div className="p-5 rounded-2xl bg-[#EAF1E2] border border-[#D4E1C5] space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A]">
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <span>AI가 이 메뉴를 정답으로 고른 이유</span>
                     </span>
-                    <span>
-                      {activeMatch.aiReason ?? activeMatch.menu.aiReason}
+                    <span className="text-[11px] font-mono font-semibold text-[#3D5720] tabular-nums">
+                      예상 도착 {activeMatch.effectiveMinutes}분
                     </span>
                   </div>
-                </div>
-              )}
-
-              <div className="p-4 sm:p-5 pb-0">
-                <div className="aspect-4/3 sm:aspect-16/9 max-h-[280px] w-full rounded-2xl overflow-hidden border border-[#EBEFEB]">
-                  <FoodImage
-                    src={activeMatch.menu.image}
-                    alt={activeMatch.menu.name}
-                    className="w-full h-full"
-                  />
-                </div>
-              </div>
-
-              <div className="p-5 sm:p-6 space-y-6">
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#141812]">
-                      {activeMatch.menu.name}
-                    </h2>
-                    {onToggleWishlist && (
-                      <button
-                        type="button"
-                        onClick={() => onToggleWishlist(activeMatch.menu.id)}
-                        aria-label={`${activeMatch.menu.name} 찜하기`}
-                        className="min-w-[40px] min-h-[40px] px-3 rounded-xl border border-[#DDE3D7] bg-white hover:bg-[#F4F6F1] flex items-center gap-1.5 text-xs font-bold text-[#141812] shrink-0 cursor-pointer"
-                      >
-                        <Heart
-                          className={`w-4 h-4 ${
-                            wishlistIds.includes(activeMatch.menu.id)
-                              ? 'fill-red-500 text-red-500'
-                              : 'text-[#4A5246]'
-                          }`}
-                        />
-                        <span>
-                          {wishlistIds.includes(activeMatch.menu.id) ? '찜됨' : '찜'}
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-[#374033] mt-1">
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      <Clock className="w-3.5 h-3.5 text-[#2E531A]" />
-                      예상 {activeMatch.effectiveMinutes}분
-                      {activeMatch.store.extraPrepMinutes > 0 &&
-                        ` (+${activeMatch.store.extraPrepMinutes}분)`}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span
-                      className={`tabular-nums ${
-                        activeMatch.menu.stock <= 3
-                          ? 'text-amber-800 font-semibold'
-                          : ''
-                      }`}
-                    >
-                      남은 수량 {activeMatch.menu.stock}개
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>{activeMatch.menu.servingSpec}</span>
-                  </div>
-                  <p className="text-sm text-[#374033] mt-2 leading-relaxed">
-                    {activeMatch.menu.description}
+                  <p className="text-sm sm:text-base font-bold text-[#1A1D1A] leading-relaxed">
+                    {activeMatch.aiReason ??
+                      activeMatch.menu.aiReason ??
+                      `현재 위치 기준 약 ${activeMatch.effectiveMinutes}분 내 빠른 배달과 매장 동일 가격이 검증된 메뉴입니다.`}
                   </p>
+                </div>
 
-                  <div className="mt-3.5 py-2.5 px-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl flex items-center justify-between gap-2 text-xs">
-                    <span className="flex items-center gap-2 font-bold text-[#141812]">
-                      <StoreIcon className="w-4 h-4 text-[#2E531A]" />
-                      {activeMatch.store.name}
-                    </span>
-                    <span className="font-medium text-[#4A5246]">
-                      {activeMatch.store.areaLabel}
-                    </span>
+                {/* Compact Square Thumbnail + Menu Metadata */}
+                <div className="flex items-start gap-4 sm:gap-5">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 border border-[#E8ECE4]">
+                    <FoodImage
+                      src={activeMatch.menu.image}
+                      alt={activeMatch.menu.name}
+                      className="w-full h-full"
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#687064]">
+                          <StoreIcon className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+                          <span className="truncate">
+                            {activeMatch.store.name} · {activeMatch.store.areaLabel}
+                          </span>
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] mt-0.5 tracking-tight">
+                          {activeMatch.menu.name}
+                        </h2>
+                      </div>
+                      {onToggleWishlist && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleWishlist(activeMatch.menu.id)}
+                          aria-label={`${activeMatch.menu.name} 찜하기`}
+                          className="min-w-[38px] min-h-[38px] px-2.5 rounded-xl border border-[#E8ECE4] bg-white hover:bg-[#F7F8F5] flex items-center gap-1 text-xs font-semibold text-[#555E52] shrink-0 cursor-pointer"
+                        >
+                          <Heart
+                            className={`w-4 h-4 ${
+                              wishlistIds.includes(activeMatch.menu.id)
+                                ? 'fill-red-500 text-red-500'
+                                : 'text-[#919A8D]'
+                            }`}
+                          />
+                          <span>
+                            {wishlistIds.includes(activeMatch.menu.id) ? '찜됨' : '찜'}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-medium text-[#687064]">
+                      <span className="inline-flex items-center gap-1 tabular-nums text-[#1A1D1A] font-semibold">
+                        <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                        약 {activeMatch.effectiveMinutes}분
+                        {activeMatch.store.extraPrepMinutes > 0 &&
+                          ` (+${activeMatch.store.extraPrepMinutes}분)`}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span
+                        className={`tabular-nums ${
+                          activeMatch.menu.stock <= 3
+                            ? 'text-amber-700 font-semibold'
+                            : ''
+                        }`}
+                      >
+                        남은 수량 {activeMatch.menu.stock}개
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>{activeMatch.menu.servingSpec}</span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-[#687064] leading-relaxed">
+                      {activeMatch.menu.description}
+                    </p>
                   </div>
                 </div>
 
                 {/* Price Comparison */}
-                <div className="p-4 sm:p-5 bg-[#E9F1E2] border border-[#CBDCC0] rounded-2xl space-y-3">
+                <div className="p-4 sm:p-5 bg-[#EAF1E2] border border-[#E8ECE4] rounded-2xl space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-bold text-[#141812]">
+                    <h3 className="text-sm font-bold text-[#1A1D1A]">
                       가격 상세 ({activeMatch.servings}인)
                     </h3>
                     {activeMatch.isSameStorePrice ? (
-                      <span className="text-xs font-bold text-[#2E531A]">
+                      <span className="text-xs font-bold text-[#4E6E2A]">
                         매장 동일 가격 · {activeMatch.menu.comparisonDate}
                       </span>
                     ) : activeMatch.menu.storePrice === null ? (
@@ -465,14 +464,14 @@ export function RecommendationView({
                         가격자료 미입력
                       </span>
                     ) : (
-                      <span className="text-xs font-semibold text-[#374033]">
+                      <span className="text-xs font-semibold text-[#555E52]">
                         매장가 대비 차이 있음 ({activeMatch.menu.comparisonDate})
                       </span>
                     )}
                   </div>
 
                   <dl className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between text-[#374033]">
+                    <div className="flex items-center justify-between text-[#555E52]">
                       <dt>매장가 (1인)</dt>
                       <dd className="font-mono tabular-nums font-medium">
                         {activeMatch.menu.storePrice !== null
@@ -482,7 +481,7 @@ export function RecommendationView({
                           : '가격자료 미입력'}
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between text-[#141812]">
+                    <div className="flex items-center justify-between text-[#1A1D1A]">
                       <dt>
                         메뉴 금액 ({formatWon(activeMatch.menu.pricePerPerson)} ×{' '}
                         {activeMatch.servings})
@@ -491,27 +490,27 @@ export function RecommendationView({
                         {formatWon(activeMatch.menuSubtotal)}
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between text-[#374033]">
+                    <div className="flex items-center justify-between text-[#555E52]">
                       <dt>추가 옵션</dt>
                       <dd className="font-mono tabular-nums">
                         +{formatWon(optionsSubtotal)}
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between text-[#374033]">
+                    <div className="flex items-center justify-between text-[#555E52]">
                       <dt>배달비</dt>
                       <dd className="font-mono tabular-nums">
                         +{formatWon(activeMatch.deliveryFee)}
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between text-[#2E531A]">
+                    <div className="flex items-center justify-between text-[#4E6E2A]">
                       <dt>쿠폰 할인</dt>
                       <dd className="font-mono tabular-nums font-bold">
                         -{formatWon(effectiveCouponDiscount)}
                       </dd>
                     </div>
-                    <div className="pt-2.5 border-t border-[#CBDCC0] flex items-center justify-between text-base font-bold text-[#141812]">
+                    <div className="pt-2.5 border-t border-[#E8ECE4] flex items-center justify-between text-base font-bold text-[#1A1D1A]">
                       <dt>예상 결제 금액</dt>
-                      <dd className="font-mono tabular-nums text-lg text-[#2E531A]">
+                      <dd className="font-mono tabular-nums text-lg text-[#4E6E2A]">
                         {formatWon(finalEstimatedTotal)}
                       </dd>
                     </div>
@@ -520,7 +519,7 @@ export function RecommendationView({
                   {activeMatch.menu.storePrice !== null &&
                     activeMatch.menu.pricePerPerson !==
                       activeMatch.menu.storePrice && (
-                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#DCE5CF]/70">
+                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#E8ECE4]/70">
                         <span className="text-xs text-amber-900">
                           매장가보다{' '}
                           {formatWon(
@@ -540,7 +539,7 @@ export function RecommendationView({
                               storePrice: activeMatch.menu.storePrice!,
                             })
                           }
-                          className="min-h-[34px] px-3 py-1 bg-white border border-[#CBDCC0] hover:bg-[#E9F1E2] text-xs font-semibold text-[#1F3A11] rounded-xl flex items-center gap-1 cursor-pointer"
+                          className="min-h-[34px] px-3 py-1 bg-white border border-[#E8ECE4] hover:bg-[#EAF1E2] text-xs font-semibold text-[#3D5720] rounded-xl flex items-center gap-1 cursor-pointer"
                         >
                           <Flag className="w-3.5 h-3.5" />
                           <span>가격 차이 제보</span>
@@ -561,9 +560,9 @@ export function RecommendationView({
 
                 {/* Optional Add-ons */}
                 <div className="space-y-2.5">
-                  <h3 className="text-sm font-bold text-[#141812]">추가 옵션</h3>
+                  <h3 className="text-sm font-bold text-[#1A1D1A]">추가 옵션</h3>
                   {activeMatch.menu.options.length === 0 ? (
-                    <p className="text-xs text-[#4A5246]">
+                    <p className="text-xs text-[#687064]">
                       선택 가능한 추가 옵션이 없습니다.
                     </p>
                   ) : (
@@ -575,8 +574,8 @@ export function RecommendationView({
                             key={opt.id}
                             className={`min-h-[46px] px-4 py-2 rounded-2xl border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
                               checked
-                                ? 'bg-[#E9F1E2] border-[#6FA33A] text-[#141812]'
-                                : 'bg-white border-[#DDE3D7] text-[#141812] hover:border-[#2E531A]/40'
+                                ? 'bg-[#EAF1E2] border-[#82B440] text-[#1A1D1A]'
+                                : 'bg-white border-[#E8ECE4] text-[#1A1D1A] hover:border-[#4E6E2A]/40'
                             }`}
                           >
                             <span className="flex items-center gap-3 text-sm font-medium">
@@ -586,11 +585,11 @@ export function RecommendationView({
                                 onChange={() =>
                                   toggleOption(activeMatch.menu.id, opt.id)
                                 }
-                                className="w-4 h-4 accent-[#2E531A] rounded"
+                                className="w-4 h-4 accent-[#4E6E2A] rounded"
                               />
                               <span>{opt.name}</span>
                             </span>
-                            <span className="text-sm font-mono tabular-nums font-bold text-[#2E531A] shrink-0">
+                            <span className="text-sm font-mono tabular-nums font-bold text-[#4E6E2A] shrink-0">
                               +{formatWon(opt.priceDelta)}
                             </span>
                           </label>
@@ -604,7 +603,7 @@ export function RecommendationView({
                 <div className="space-y-2">
                   <label
                     htmlFor="recommend-coupon"
-                    className="block text-sm font-bold text-[#141812]"
+                    className="block text-sm font-bold text-[#1A1D1A]"
                   >
                     할인 쿠폰
                   </label>
@@ -612,7 +611,7 @@ export function RecommendationView({
                     id="recommend-coupon"
                     value={selectedCouponCode}
                     onChange={(e) => setSelectedCouponCode(e.target.value)}
-                    className="w-full min-h-[46px] px-3.5 bg-white border border-[#CBDCC0] rounded-2xl text-sm text-[#141812]"
+                    className="w-full min-h-[46px] px-3.5 bg-white border border-[#E8ECE4] rounded-2xl text-sm text-[#1A1D1A]"
                   >
                     {MOCK_COUPONS.map((c) => (
                       <option key={c.id} value={c.code}>
@@ -623,16 +622,16 @@ export function RecommendationView({
                 </div>
 
                 {/* Honest Review Summary */}
-                <div className="pt-5 border-t border-[#EBEFEB] space-y-4">
+                <div className="pt-5 border-t border-[#E8ECE4] space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-bold text-[#141812]">
+                    <h3 className="text-sm font-bold text-[#1A1D1A]">
                       리뷰 요약 ({activeReviews.length}건)
                     </h3>
                     {activeReviews.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setShowOriginalReviews((prev) => !prev)}
-                        className="min-h-[38px] px-3.5 py-1.5 border border-[#CBDCC0] bg-[#E9F1E2] hover:bg-[#E7EFE1] text-xs font-semibold text-[#1F3A11] rounded-xl flex items-center gap-1.5 cursor-pointer"
+                        className="min-h-[38px] px-3.5 py-1.5 border border-[#E8ECE4] bg-[#EAF1E2] hover:bg-[#EAF1E2] text-xs font-semibold text-[#3D5720] rounded-xl flex items-center gap-1.5 cursor-pointer"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
                         <span>
@@ -645,40 +644,40 @@ export function RecommendationView({
                   </div>
 
                   {activeReviews.length === 0 ? (
-                    <p className="text-xs font-medium text-[#4A5246] p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl">
+                    <p className="text-xs font-medium text-[#687064] p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl">
                       등록된 리뷰가 없습니다.
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-1.5">
-                        <span className="block text-xs font-bold text-[#141812]">
+                      <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
+                        <span className="block text-xs font-bold text-[#1A1D1A]">
                           좋은 점
                         </span>
                         {reviewTagSummary.pros.length > 0 ? (
-                          <ul className="space-y-1 text-xs text-[#374033]">
+                          <ul className="space-y-1 text-xs text-[#555E52]">
                             {reviewTagSummary.pros.map(([tag, count]) => (
                               <li
                                 key={tag}
                                 className="flex items-center justify-between"
                               >
                                 <span>{tag}</span>
-                                <span className="font-mono tabular-nums font-bold text-[#2E531A]">
+                                <span className="font-mono tabular-nums font-bold text-[#4E6E2A]">
                                   {count}
                                 </span>
                               </li>
                             ))}
                           </ul>
                         ) : (
-                          <p className="text-xs text-[#4A5246]">없음</p>
+                          <p className="text-xs text-[#687064]">없음</p>
                         )}
                       </div>
 
-                      <div className="p-3.5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-1.5">
-                        <span className="block text-xs font-bold text-[#141812]">
+                      <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
+                        <span className="block text-xs font-bold text-[#1A1D1A]">
                           아쉬운 점
                         </span>
                         {reviewTagSummary.cons.length > 0 ? (
-                          <ul className="space-y-1 text-xs text-[#374033]">
+                          <ul className="space-y-1 text-xs text-[#555E52]">
                             {reviewTagSummary.cons.map(([tag, count]) => (
                               <li
                                 key={tag}
@@ -692,7 +691,7 @@ export function RecommendationView({
                             ))}
                           </ul>
                         ) : (
-                          <p className="text-xs text-[#4A5246]">없음</p>
+                          <p className="text-xs text-[#687064]">없음</p>
                         )}
                       </div>
                     </div>
@@ -708,22 +707,22 @@ export function RecommendationView({
                             className={`p-3.5 rounded-2xl border text-xs space-y-2 ${
                               review.isComplaint
                                 ? 'bg-[#FFFBEF] border-[#E8D595]'
-                                : 'bg-white border-[#DDE3D7]'
+                                : 'bg-white border-[#E8ECE4]'
                             }`}
                           >
-                            <div className="flex flex-wrap items-center justify-between gap-2 text-[#4A5246]">
-                              <span className="font-bold text-[#141812]">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-[#687064]">
+                              <span className="font-bold text-[#1A1D1A]">
                                 {review.author}
                               </span>
                               <span className="font-mono tabular-nums">
-                                ★ {review.rating} · {review.date}
+                                <span className="text-[#82B440]">★</span> {review.rating} · {review.date}
                               </span>
                             </div>
-                            <p className="text-sm text-[#141812] leading-relaxed">
+                            <p className="text-sm text-[#1A1D1A] leading-relaxed">
                               {review.content}
                             </p>
                             {ownerReply && (
-                              <div className="p-3 bg-[#E9F1E2] border border-[#CBDCC0] rounded-xl text-xs text-[#1F3A11] space-y-1">
+                              <div className="p-3 bg-[#EAF1E2] border border-[#E8ECE4] rounded-xl text-xs text-[#3D5720] space-y-1">
                                 <div className="flex flex-wrap items-center justify-between gap-1 font-bold">
                                   <span>사장님 답글 ({ownerReply.updatedAt})</span>
                                   {ownerReply.flaggedForReview && (
@@ -742,8 +741,8 @@ export function RecommendationView({
                   )}
                 </div>
 
-                {/* Primary CTA */}
-                <div className="pt-2">
+                {/* Large Unmistakable One-Tap Primary CTA */}
+                <div className="pt-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -754,9 +753,10 @@ export function RecommendationView({
                         couponCode: selectedCouponCode,
                       })
                     }
-                    className="w-full min-h-[50px] py-3 px-6 bg-[#2E531A] hover:bg-[#234113] active:scale-[0.99] text-white font-semibold text-base rounded-2xl transition-colors cursor-pointer shadow-xs"
+                    className="w-full min-h-[58px] py-4 px-6 bg-[#4E6E2A] hover:bg-[#3F5A21] active:scale-[0.99] text-white font-bold text-base sm:text-lg rounded-2xl transition-all cursor-pointer shadow-[0_14px_30px_-8px_rgba(78,110,42,0.48)] inline-flex items-center justify-center gap-2.5"
                   >
-                    주문 확인 · {formatWon(finalEstimatedTotal)}
+                    <Zap className="w-5 h-5 shrink-0" />
+                    <span>원탭 바로 주문 · {formatWon(finalEstimatedTotal)}</span>
                   </button>
                 </div>
               </div>
@@ -767,11 +767,11 @@ export function RecommendationView({
 
       {/* Excluded Items Disclosure */}
       {excluded.length > 0 && (
-        <div className="bg-white border border-[#DDE3D7] rounded-2xl overflow-hidden">
+        <div className="bg-white border border-[#E8ECE4] rounded-2xl overflow-hidden">
           <button
             type="button"
             onClick={() => setShowExcluded((prev) => !prev)}
-            className="w-full min-h-[46px] px-5 py-3 flex items-center justify-between text-left text-xs sm:text-sm font-bold text-[#374033] hover:bg-[#F4F6F1] cursor-pointer"
+            className="w-full min-h-[46px] px-5 py-3 flex items-center justify-between text-left text-xs sm:text-sm font-bold text-[#555E52] hover:bg-[#F7F8F5] cursor-pointer"
           >
             <span>제외된 메뉴 ({excluded.length}개)</span>
             {showExcluded ? (
@@ -781,15 +781,15 @@ export function RecommendationView({
             )}
           </button>
           {showExcluded && (
-            <div className="border-t border-[#EBEFEB] divide-y divide-[#EBEFEB]">
+            <div className="border-t border-[#E8ECE4] divide-y divide-[#E8ECE4]">
               {excluded.map((ex) => (
                 <div
                   key={ex.menu.id}
                   className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                 >
                   <div>
-                    <span className="font-bold text-[#141812]">{ex.menu.name}</span>
-                    <span className="text-[#4A5246] ml-2">
+                    <span className="font-bold text-[#1A1D1A]">{ex.menu.name}</span>
+                    <span className="text-[#687064] ml-2">
                       {ex.store.name} · {formatWon(ex.menu.pricePerPerson)} ·{' '}
                       {ex.menu.estimatedMinutes + (ex.store.extraPrepMinutes ?? 0)}분
                     </span>

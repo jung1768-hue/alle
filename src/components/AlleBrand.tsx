@@ -1,28 +1,18 @@
+export const ALLE_ICON_SRC = '/assets/aistudio/IMG_8626_97d5135f.PNG';
+
 interface AlleLogoProps {
   className?: string;
 }
 
 export function AlleLogo({ className = '' }: AlleLogoProps) {
   return (
-    <span className={`inline-flex items-center gap-2 select-none ${className}`}>
-      <svg
-        width="28"
-        height="22"
-        viewBox="0 0 28 22"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-        className="shrink-0"
-      >
-        <path
-          d="M4.5 9.5C6.2 15.2 10.6 18 15.2 18C19.8 18 23.8 14.8 25 8.5"
-          stroke="#5D8C32"
-          strokeWidth="3.8"
-          strokeLinecap="round"
-        />
-        <circle cx="24.2" cy="4.2" r="2.2" fill="#8BC34A" />
-      </svg>
-      <span className="font-display text-[22px] font-bold tracking-tight text-[#141812] leading-none">
+    <span className={`inline-flex items-center gap-1.5 select-none ${className}`}>
+      <img
+        src={ALLE_ICON_SRC}
+        alt="alle 아이콘"
+        className="w-8 h-8 object-contain mix-blend-multiply -mt-1 shrink-0"
+      />
+      <span className="font-display text-[24px] font-extrabold tracking-[-0.045em] text-[#1A1D1A] leading-none">
         alle
       </span>
     </span>
@@ -30,7 +20,7 @@ export function AlleLogo({ className = '' }: AlleLogoProps) {
 }
 
 export function AlleBotIllustration({ size = 'md' }: { size?: 'sm' | 'md' }) {
-  const dimensions = size === 'sm' ? 'w-11 h-11' : 'w-20 h-20 sm:w-24 sm:h-24';
+  const dimensions = size === 'sm' ? 'w-11 h-11' : 'w-20 h-20 sm:w-22 sm:h-22';
   return (
     <svg
       viewBox="0 0 100 100"
@@ -39,53 +29,57 @@ export function AlleBotIllustration({ size = 'md' }: { size?: 'sm' | 'md' }) {
       aria-hidden="true"
       className={`${dimensions} shrink-0`}
     >
-      {/* Soft shadow */}
-      <ellipse cx="50" cy="90" rx="26" ry="5" fill="#CBDCC0" />
       {/* Antenna */}
       <line
         x1="50"
         y1="14"
         x2="50"
         y2="27"
-        stroke="#5D8C32"
+        stroke="#82B440"
         strokeWidth="4"
         strokeLinecap="round"
       />
-      <circle cx="50" cy="12" r="5" fill="#8BC34A" />
-      {/* Side earpieces */}
-      <rect x="10" y="46" width="11" height="22" rx="5.5" fill="#5D8C32" />
-      <rect x="79" y="46" width="11" height="22" rx="5.5" fill="#5D8C32" />
-      {/* Head body */}
+      <circle cx="50" cy="13" r="5" fill="#82B440" />
+      {/* Spark lines */}
+      <path
+        d="M64 16L68 12M68 23L73 21"
+        stroke="#4E6E2A"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      {/* Side ear pods */}
+      <rect x="13" y="45" width="9" height="18" rx="4.5" fill="#82B440" />
+      <rect x="78" y="45" width="9" height="18" rx="4.5" fill="#82B440" />
+      {/* Soft white rounded head */}
       <rect
-        x="17"
+        x="20"
         y="26"
-        width="66"
-        height="56"
-        rx="24"
+        width="60"
+        height="52"
+        rx="22"
         fill="#FFFFFF"
-        stroke="#D3DFC9"
+        stroke="#E8ECE4"
         strokeWidth="2"
       />
-      {/* Dark visor */}
-      <rect x="26" y="37" width="48" height="34" rx="14" fill="#141812" />
-      {/* Happy curved eyes */}
+      {/* Deep charcoal face visor */}
+      <rect x="28" y="36" width="44" height="32" rx="14" fill="#1A1D1A" />
+      {/* Happy fresh lime eyes & smile */}
       <path
-        d="M36 52C37.5 48.5 42.5 48.5 44 52"
-        stroke="#8BC34A"
-        strokeWidth="3.2"
+        d="M36 50C37.5 46.8 40.5 46.8 42 50"
+        stroke="#82B440"
+        strokeWidth="3"
         strokeLinecap="round"
       />
       <path
-        d="M56 52C57.5 48.5 62.5 48.5 64 52"
-        stroke="#8BC34A"
-        strokeWidth="3.2"
+        d="M58 50C59.5 46.8 62.5 46.8 64 50"
+        stroke="#82B440"
+        strokeWidth="3"
         strokeLinecap="round"
       />
-      {/* Smile */}
       <path
-        d="M44 60C46.5 63 53.5 63 56 60"
-        stroke="#8BC34A"
-        strokeWidth="2.6"
+        d="M44.5 55.5C46.5 58.5 53.5 58.5 55.5 55.5"
+        stroke="#82B440"
+        strokeWidth="3"
         strokeLinecap="round"
       />
     </svg>
