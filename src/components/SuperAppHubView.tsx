@@ -105,11 +105,18 @@ export function SuperAppHubView({
   const [b2bNote, setB2bNote] = useState<string>('오피스 A 로비 앞 수령');
   const [b2bError, setB2bError] = useState<string | null>(null);
 
-  // Traditional Market / Alley Multi-Store Bundle state
+  // Traditional Market / Alley Multi-Store Bundle state (prioritize 전통시장 / 0원 최소주문 점포)
   const marketBundleCatalog = useMemo(() => {
+    const sorted = [...availableMenus].sort((a, b) => {
+      const sa = storeMap.get(a.storeId);
+      const sb = storeMap.get(b.storeId);
+      const aMarket = sa?.name.includes('시장') || sa?.minOrderAmount === 0 ? 1 : 0;
+      const bMarket = sb?.name.includes('시장') || sb?.minOrderAmount === 0 ? 1 : 0;
+      return bMarket - aMarket;
+    });
     const seenStores = new Set<string>();
     const picked: Array<{ menu: MenuItem; store: Store; unitPrice: number }> = [];
-    for (const m of availableMenus) {
+    for (const m of sorted) {
       const st = storeMap.get(m.storeId);
       if (!st || seenStores.has(st.id)) continue;
       seenStores.add(st.id);

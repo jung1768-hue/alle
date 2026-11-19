@@ -549,7 +549,17 @@ export function AiChatOrderView({
     let aiSource: 'gemini' | 'rule' = 'rule';
     let aiConversationalReply: string | undefined;
 
-    if (hasGeminiApiKey() && !/초기화|처음부터|새로/.test(trimmed)) {
+    // On-device-first fast path: respond immediately (<5ms) when local parser understands clearly.
+    // Only escalate to cloud AI when the request is complex or unrecognized.
+    const needsCloudFallback =
+      merged.needsConfirmation ||
+      (merged.tags.length === 0 && trimmed.length >= 6);
+
+    if (
+      needsCloudFallback &&
+      hasGeminiApiKey() &&
+      !/초기화|처음부터|새로/.test(trimmed)
+    ) {
       setIsAnalyzing(true);
       const aiResult = await parseConditionWithAI(trimmed, activeCondition);
       setIsAnalyzing(false);
