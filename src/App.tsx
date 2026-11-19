@@ -5,10 +5,12 @@ import {
   HelpCircle,
   Home,
   MessageSquare,
+  Presentation,
   RotateCcw,
   Store as StoreIcon,
   Truck,
   User,
+  X,
 } from 'lucide-react';
 import { AiChatOrderView } from './components/AiChatOrderView';
 import { AlleLogo } from './components/AlleBrand';
@@ -35,6 +37,7 @@ import {
   Order,
   OrderStatus,
   ParsedCondition,
+  PaymentMethod,
   PriceReport,
   SuperAppTab,
   UserPreferences,
@@ -101,6 +104,7 @@ function buildMenuFromRawLine(
     comparisonDate: formatNowTime().slice(0, 10),
     estimatedMinutes: basePrepMinutes + 8,
     image: storeImage,
+    aiReason: `매장 신규 등록 메뉴 · 약 ${basePrepMinutes + 8}분 내 빠른 조리 + 매장 동일가 검증`,
   };
 }
 
@@ -135,6 +139,7 @@ export default function App() {
     couponCode: string;
     sharedDeliveryApplied?: boolean;
     reservationSlot?: string;
+    paymentMethod?: PaymentMethod;
   } | null>(null);
 
   const [highlightedOrderId, setHighlightedOrderId] = useState<string | null>(
@@ -144,6 +149,7 @@ export default function App() {
     string | undefined
   >(undefined);
   const [showFutureModal, setShowFutureModal] = useState<boolean>(false);
+  const [showDemoSwitcher, setShowDemoSwitcher] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const orderSubmitLockRef = useRef<boolean>(false);
@@ -371,6 +377,8 @@ export default function App() {
     customerAlias: string;
     addressAlias: string;
     customerNote: string;
+    paymentMethod?: PaymentMethod;
+    paymentMethodLabel?: string;
   }): { ok: boolean; error?: string } => {
     if (orderSubmitLockRef.current) {
       return { ok: false, error: '주문이 이미 처리 중입니다.' };
@@ -438,6 +446,10 @@ export default function App() {
       deliveryFee: effectiveDeliveryFee,
       sharedDeliveryApplied: payload.sharedDeliveryApplied,
       reservationSlot: payload.reservationSlot,
+      isB2B: payload.paymentMethod === 'b2b_meal_point',
+      paymentMethod: payload.paymentMethod ?? 'local_currency',
+      paymentMethodLabel:
+        payload.paymentMethodLabel ?? '대구로페이 / 지역화폐',
       couponCode: payload.couponCode === 'NONE' ? null : payload.couponCode,
       couponDiscount: cappedCoupon,
       totalAmount,
@@ -455,6 +467,10 @@ export default function App() {
 
     setAppState((prev) => ({
       ...prev,
+      stampCount:
+        payload.paymentMethod === 'alle_regular_pass'
+          ? prev.stampCount + 1
+          : prev.stampCount,
       menus: prev.menus.map((m) => {
         if (m.id !== targetMenu.id) return m;
         const nextStock = Math.max(0, m.stock - payload.servings);
@@ -949,6 +965,58 @@ export default function App() {
     showToast('초기 상태로 되돌렸습니다.');
   };
 
+  const handleJumpDemoScene = (
+    scene: 'customer_home' | 'customer_chat' | 'b2b_checkout' | 'owner_dashboard' | 'superapp_hub'
+  ) => {
+    if (scene === 'customer_home') {
+      setAiChatInitialPrompt(undefined);
+      setRole(DemoRole.CONSUMER);
+      setStep(ConsumerStep.HOME);
+      showToast('① 컨디션 홈 · Zero-UI 추천 화면');
+    } else if (scene === 'customer_chat') {
+      setAiChatInitialPrompt('어제 야근해서 얼큰한 국물 2인분 30분 이내로 추천해줘');
+      setRole(DemoRole.CONSUMER);
+      setStep(ConsumerStep.AI_CHAT);
+      showToast('① AI 10초 음성·채팅 주문 시연');
+    } else if (scene === 'b2b_checkout') {
+      const targetMenu =
+        appState.menus.find((m) => {
+          const st = appState.stores.find((s) => s.id === m.storeId);
+          return m.id === 'm1' && st?.isOpen && !m.isSoldOut && m.stock >= 1;
+        }) ??
+        appState.menus.find((m) => {
+          const st = appState.stores.find((s) => s.id === m.storeId);
+          return Boolean(st?.isOpen && !m.isSoldOut && m.stock >= 1);
+        }) ??
+        appState.menus[0];
+
+      if (targetMenu) {
+        setConfirmDraft({
+          menuId: targetMenu.id,
+          servings: Math.min(2, Math.max(1, targetMenu.stock)),
+          selectedOptionIds: [],
+          couponCode: 'NONE',
+          sharedDeliveryApplied: false,
+          reservationSlot: 'now',
+          paymentMethod: 'b2b_meal_point',
+        });
+        setRole(DemoRole.CONSUMER);
+        setStep(ConsumerStep.CONFIRM);
+        showToast('② B2B 기업 식대 · AI 추천 근거 확인 결제');
+      }
+    } else if (scene === 'owner_dashboard') {
+      setRole(DemoRole.OWNER);
+      showToast('③ 점주 실시간 주문 접수 · 순수익 비교 대시보드');
+    } else if (scene === 'superapp_hub') {
+      setRole(DemoRole.CONSUMER);
+      setSuperAppTab(SuperAppTab.GROUP_BUY);
+      setStep(ConsumerStep.SUPERAPP);
+      showToast('④ 음식-이동 크로스 도메인 슈퍼앱 허브');
+    }
+    setShowDemoSwitcher(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const confirmMenu = confirmDraft
     ? appState.menus.find((m) => m.id === confirmDraft.menuId)
     : undefined;
@@ -1272,6 +1340,7 @@ export default function App() {
           confirmMenu &&
           confirmStore ? (
           <OrderConfirmationView
+            key={`${confirmDraft.menuId}-${confirmDraft.paymentMethod ?? 'local_currency'}`}
             menu={confirmMenu}
             store={confirmStore}
             initialServings={confirmDraft.servings}
@@ -1279,6 +1348,7 @@ export default function App() {
             initialCouponCode={confirmDraft.couponCode}
             initialSharedDelivery={confirmDraft.sharedDeliveryApplied}
             initialReservationSlot={confirmDraft.reservationSlot}
+            initialPaymentMethod={confirmDraft.paymentMethod}
             stampCount={appState.stampCount}
             defaultNote={appState.preferences.memoNote}
             onBack={() => setStep(ConsumerStep.RECOMMEND)}
@@ -1302,11 +1372,26 @@ export default function App() {
             preferences={appState.preferences}
             wishlistCount={appState.wishlistIds.length}
             orderCount={appState.orders.length}
+            regularMenuId={appState.orders[0]?.menuId ?? 'm1'}
+            regularMenuName={appState.orders[0]?.menuName ?? '얼큰 소고기국밥'}
+            regularStoreName={
+              appState.orders[0]?.storeName ?? '수성 범어 소고기국밥'
+            }
+            regularServings={appState.orders[0]?.servings ?? 2}
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onEarnStamp={handleEarnStamp}
             onChangeRole={setRole}
             onShareDemoSummary={handleShareDemoSummary}
             onGoToHomePrefs={() => setStep(ConsumerStep.HOME)}
+            onQuickReorderToConfirm={(menuId, servings) =>
+              handleQuickReorderToConfirm(menuId, servings)
+            }
+            onOpenAiChat={(prompt) => {
+              setAiChatInitialPrompt(prompt);
+              setRole(DemoRole.CONSUMER);
+              setStep(ConsumerStep.AI_CHAT);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         ) : step === ConsumerStep.SUPERAPP ? (
           <SuperAppHubView
@@ -1315,6 +1400,7 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             errands={appState.errands}
+            latestOrder={appState.orders[0]}
             onJoinGroupBuy={handleJoinGroupBuy}
             onCreateB2BOrder={handleCreateB2BOrder}
             onCreateErrand={handleCreateErrand}
@@ -1439,6 +1525,131 @@ export default function App() {
           <span className="text-[11px] leading-none">MY</span>
         </button>
       </nav>
+
+      {/* Subtle Presenter Demo Mode Quick Switcher */}
+      <div className="fixed bottom-20 right-3 md:bottom-4 md:right-4 z-50 flex flex-col items-end gap-2">
+        {showDemoSwitcher && (
+          <div
+            role="dialog"
+            aria-label="IR 발표자용 시연 퀵 스위처"
+            className="w-[304px] sm:w-[336px] bg-[#141812]/95 backdrop-blur-md text-white border border-white/15 rounded-2xl shadow-2xl p-3 space-y-2"
+          >
+            <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#C7F08F]">
+                <Presentation className="w-3.5 h-3.5 text-[#8BC34A]" />
+                <span>IR 발표자 퀵 스위처</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDemoSwitcher(false)}
+                aria-label="시연 퀵 스위처 닫기"
+                className="p-1 text-white/60 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <div
+                className={`rounded-xl border transition-colors p-2 ${
+                  role === DemoRole.CONSUMER &&
+                  (step === ConsumerStep.HOME || step === ConsumerStep.AI_CHAT)
+                    ? 'bg-[#8BC34A]/18 border-[#8BC34A]/50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleJumpDemoScene('customer_home')}
+                    className="flex-1 text-left cursor-pointer"
+                  >
+                    <p className="text-xs font-bold text-white">
+                      ① [고객] 컨디션 홈 & AI 10초 주문
+                    </p>
+                    <p className="text-[10px] text-[#B9CCB0] mt-0.5">
+                      비가격 효용 배지 · 원탭 Zero-UI 진입
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleJumpDemoScene('customer_chat')}
+                    className="px-2 py-1 bg-[#8BC34A] hover:bg-[#9BD15B] text-[#141812] text-[10px] font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    AI 채팅 →
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleJumpDemoScene('b2b_checkout')}
+                className={`w-full text-left rounded-xl border transition-colors p-2 cursor-pointer ${
+                  role === DemoRole.CONSUMER && step === ConsumerStep.CONFIRM
+                    ? 'bg-[#8BC34A]/18 border-[#8BC34A]/50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <p className="text-xs font-bold text-white">
+                  ② [결제] B2B 식대 & 추천 근거 확인 결제
+                </p>
+                <p className="text-[10px] text-[#B9CCB0] mt-0.5">
+                  Explainable AI 근거 · 자생형 법인 식대 결제
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleJumpDemoScene('owner_dashboard')}
+                className={`w-full text-left rounded-xl border transition-colors p-2 cursor-pointer ${
+                  role === DemoRole.OWNER
+                    ? 'bg-[#8BC34A]/18 border-[#8BC34A]/50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <p className="text-xs font-bold text-white">
+                  ③ [점주] 실시간 주문 접수 · 순수익 대시보드
+                </p>
+                <p className="text-[10px] text-[#B9CCB0] mt-0.5">
+                  입점 효과 요약 · 광고비 절감 & AI 단골 순증 매출
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleJumpDemoScene('superapp_hub')}
+                className={`w-full text-left rounded-xl border transition-colors p-2 cursor-pointer ${
+                  role === DemoRole.CONSUMER && step === ConsumerStep.SUPERAPP
+                    ? 'bg-[#8BC34A]/18 border-[#8BC34A]/50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <p className="text-xs font-bold text-white">
+                  ④ [확장] 음식-이동 연결 슈퍼앱 허브
+                </p>
+                <p className="text-[10px] text-[#B9CCB0] mt-0.5">
+                  단일 AI 에이전트 식사 후 호출 택시 원클릭 연계
+                </p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setShowDemoSwitcher((prev) => !prev)}
+          aria-expanded={showDemoSwitcher}
+          aria-label="Demo Mode 발표자 시연 전환 열기"
+          className={`min-h-[32px] px-3 py-1.5 rounded-full text-[11px] font-semibold backdrop-blur-md border shadow-sm inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+            showDemoSwitcher
+              ? 'bg-[#141812]/95 text-[#C7F08F] border-[#8BC34A]/50'
+              : 'bg-[#141812]/55 hover:bg-[#141812]/85 text-white/85 hover:text-white border-white/15'
+          }`}
+        >
+          <Presentation className="w-3.5 h-3.5 text-[#8BC34A]" />
+          <span>Demo Mode</span>
+        </button>
+      </div>
 
       <FutureScopeModal
         isOpen={showFutureModal}

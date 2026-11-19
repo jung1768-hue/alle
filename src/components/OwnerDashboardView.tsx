@@ -3,6 +3,7 @@ import {
   AlertCircle,
   BarChart3,
   CheckCircle2,
+  ChevronRight,
   Flag,
   Lock,
   MessageSquare,
@@ -12,10 +13,14 @@ import {
   PlusCircle,
   QrCode,
   ScanText,
+  Sparkles,
   Store as StoreIcon,
   TrendingUp,
 } from 'lucide-react';
-import { PAPER_MENU_OCR_SAMPLE } from '../data/seedData';
+import {
+  INITIAL_OWNER_PROFIT_COMPARISON,
+  PAPER_MENU_OCR_SAMPLE,
+} from '../data/seedData';
 import {
   DispatchMode,
   MenuItem,
@@ -106,7 +111,7 @@ export function OwnerDashboardView({
 
   const [newMenuStoreId, setNewMenuStoreId] = useState(stores[0]?.id ?? 's1');
   const [newMenuLine, setNewMenuLine] = useState(
-    '차돌 된장찌개 10000원 얼큰한 국물 한식'
+    '대구식 차돌 된장찌개 10000원 얼큰한 국물 한식'
   );
   const [menuAddNotice, setMenuAddNotice] = useState<string | null>(null);
 
@@ -249,6 +254,23 @@ export function OwnerDashboardView({
           ).toFixed(1)
         : '-';
 
+    // Live session profit comparison delta layered onto 30-day Daegu seed baseline
+    const liveSavedFeeDelta = Math.round(totalRevenue * 0.148);
+    const totalSavedCommissionAndAdFee =
+      INITIAL_OWNER_PROFIT_COMPARISON.savedCommissionAndAdFee +
+      liveSavedFeeDelta;
+    const totalBrokerageFeeSaved =
+      INITIAL_OWNER_PROFIT_COMPARISON.savedBreakdown.brokerageFeeSaved +
+      liveSavedFeeDelta;
+    const totalAdExposureFeeSaved =
+      INITIAL_OWNER_PROFIT_COMPARISON.savedBreakdown.adExposureFeeSaved;
+
+    const totalAiRegularIncrementalSales =
+      INITIAL_OWNER_PROFIT_COMPARISON.aiRegularIncrementalSales + totalRevenue;
+    const totalAiRegularMatchedOrders =
+      INITIAL_OWNER_PROFIT_COMPARISON.aiRegularMatchedOrders +
+      validOrders.length;
+
     return {
       totalCount: validOrders.length,
       totalRevenue,
@@ -268,6 +290,14 @@ export function OwnerDashboardView({
       tagDemand,
       maxTagQty,
       avgRating,
+      profitComparison: {
+        ...INITIAL_OWNER_PROFIT_COMPARISON,
+        totalSavedCommissionAndAdFee,
+        totalBrokerageFeeSaved,
+        totalAdExposureFeeSaved,
+        totalAiRegularIncrementalSales,
+        totalAiRegularMatchedOrders,
+      },
     };
   }, [orders, stores, menus, reviews]);
 
@@ -336,7 +366,7 @@ export function OwnerDashboardView({
       const targetMenu = menus.find((m) => cmd.includes(m.name));
       if (!targetMenu) {
         setCommandFeedback(
-          '메뉴명을 함께 말씀해 주세요. 예: "얼큰 소고기 해장국 품절"'
+          '메뉴명을 함께 말씀해 주세요. 예: "얼큰 소고기국밥 품절"'
         );
         return;
       }
@@ -352,7 +382,7 @@ export function OwnerDashboardView({
       const targetStore = stores.find((s) => cmd.includes(s.name));
       if (!targetStore) {
         setCommandFeedback(
-          '매장명을 함께 입력해 주세요. 예: "종로 해장국집 영업 중단"'
+          '매장명을 함께 입력해 주세요. 예: "수성 범어 소고기국밥 영업 중단"'
         );
         return;
       }
@@ -410,6 +440,95 @@ export function OwnerDashboardView({
           고객 화면 보기
         </button>
       </div>
+
+      {/* Top Executive IR Card: Alle 입점 효과 요약 카드 */}
+      <section
+        aria-label="Alle 입점 효과 요약"
+        className="bg-white border border-[#C5D8B5] rounded-3xl p-5 sm:p-6 shadow-[0_3px_14px_rgba(20,24,18,0.04)] space-y-4"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2E531A]">
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <span>Alle 입점 효과 요약 · {analytics.profitComparison.periodLabel}</span>
+            </div>
+            <h2 className="text-base sm:text-lg font-bold text-[#141812]">
+              공공배달앱의 ‘주문 수 부족’을 AI 단골 자동 매칭으로 해결했습니다
+            </h2>
+          </div>
+
+          {ownerSection !== 'dashboard' && (
+            <button
+              type="button"
+              onClick={() => setOwnerSection('dashboard')}
+              className="min-h-[38px] px-3.5 py-1.5 bg-[#ECF3E2] hover:bg-[#DCE9C8] text-[#1F3A11] text-xs font-bold rounded-xl flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            >
+              <span>매장별 상세 지표</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="p-4 sm:p-5 bg-[#F4F8F0] border border-[#CFE0C3] rounded-2xl space-y-2">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-bold text-[#2E531A]">
+                타사 배달앱 대비 절감한 광고·중개비
+              </span>
+              <span className="font-mono font-bold text-[#2E531A] tabular-nums">
+                수수료 14.8% → 0%
+              </span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141812]">
+              +{formatWon(analytics.profitComparison.totalSavedCommissionAndAdFee)}
+            </div>
+            <div className="text-xs text-[#374033] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1.5 border-t border-[#DCE7D4]">
+              <span>
+                상단 광고비 절감{' '}
+                <strong className="font-mono text-[#141812]">
+                  {formatWon(analytics.profitComparison.totalAdExposureFeeSaved)}
+                </strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                중개 수수료 절감{' '}
+                <strong className="font-mono text-[#141812]">
+                  {formatWon(analytics.profitComparison.totalBrokerageFeeSaved)}
+                </strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 bg-[#141812] text-white border border-[#242F20] rounded-2xl space-y-2">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-bold text-[#B8D98E]">
+                AI 단골 자동 매칭 순증 수익
+              </span>
+              <span className="font-mono font-bold text-[#B8D98E] tabular-nums">
+                재주문율 {analytics.profitComparison.repeatCustomerRatePercent}%
+              </span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-white">
+              +{formatWon(analytics.profitComparison.totalAiRegularIncrementalSales)}
+            </div>
+            <div className="text-xs text-[#CBDCC0] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1.5 border-t border-white/15">
+              <span>
+                AI 자동 매칭 주문{' '}
+                <strong className="font-mono text-white">
+                  +{analytics.profitComparison.totalAiRegularMatchedOrders}건
+                </strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                지자체 보조금 의존도{' '}
+                <strong className="font-mono text-[#B8D98E]">
+                  {analytics.profitComparison.subsidyDependencyRatioPercent}%
+                </strong>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Admin Section Switcher (4 Tabs including Data Dashboard) */}
       <div
@@ -518,7 +637,7 @@ export function OwnerDashboardView({
                 type="text"
                 value={commandInput}
                 onChange={(e) => setCommandInput(e.target.value)}
-                placeholder='예: "주문 수락", "조리 시작", "얼큰 소고기 해장국 품절"'
+                placeholder='예: "주문 수락", "조리 시작", "얼큰 소고기국밥 품절"'
                 className="flex-1 min-h-[42px] px-3.5 bg-white border border-[#C5D8B5] rounded-xl text-sm text-[#141812]"
               />
               <button
@@ -535,7 +654,7 @@ export function OwnerDashboardView({
                 '조리 시작',
                 '대행사 라이더 호출',
                 '완료 처리',
-                '얼큰 소고기 해장국 품절',
+                '얼큰 소고기국밥 품절',
               ].map((presetCmd) => (
                 <button
                   key={presetCmd}
@@ -884,6 +1003,75 @@ export function OwnerDashboardView({
             </div>
           </section>
 
+          {/* Owner Profit Comparison vs Competing Delivery Platforms (IR Impact) */}
+          <section className="bg-white border border-[#CFE0C3] rounded-3xl p-5 sm:p-6 space-y-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-[#141812]">
+                  점주 실질 수익 비교 · 타사 플랫폼 대비
+                </h2>
+                <p className="text-xs text-[#4A5246] mt-0.5">
+                  {analytics.profitComparison.periodLabel} ·{' '}
+                  {analytics.profitComparison.competitorPlatformLabel} 대비{' '}
+                  {analytics.profitComparison.alleCommissionRateLabel}
+                </p>
+              </div>
+              <span className="text-xs font-bold text-[#2E531A] tabular-nums">
+                보조금 의존도 {analytics.profitComparison.subsidyDependencyRatioPercent}% · 자생 순환
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 sm:p-5 bg-[#F4F8F0] border border-[#CFE0C3] rounded-2xl space-y-2">
+                <div className="text-xs font-bold text-[#2E531A]">
+                  타사 플랫폼 대비 절감된 광고·중개 수수료
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141812]">
+                  +{formatWon(analytics.profitComparison.totalSavedCommissionAndAdFee)}
+                </div>
+                <div className="text-xs text-[#374033] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1 border-t border-[#DCE7D4]">
+                  <span>
+                    중개 수수료 절감{' '}
+                    <strong className="font-mono text-[#141812]">
+                      {formatWon(analytics.profitComparison.totalBrokerageFeeSaved)}
+                    </strong>
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    상단·깃발 광고비 절감{' '}
+                    <strong className="font-mono text-[#141812]">
+                      {formatWon(analytics.profitComparison.totalAdExposureFeeSaved)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 bg-[#F4F6F1] border border-[#DDE3D7] rounded-2xl space-y-2">
+                <div className="text-xs font-bold text-[#2E531A]">
+                  AI 단골 매칭 순증 매출
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141812]">
+                  +{formatWon(analytics.profitComparison.totalAiRegularIncrementalSales)}
+                </div>
+                <div className="text-xs text-[#374033] flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums pt-1 border-t border-[#E4EAE0]">
+                  <span>
+                    AI 매칭 주문{' '}
+                    <strong className="font-mono text-[#141812]">
+                      {analytics.profitComparison.totalAiRegularMatchedOrders}건
+                    </strong>
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    단골 재주문율{' '}
+                    <strong className="font-mono text-[#2E531A]">
+                      {analytics.profitComparison.repeatCustomerRatePercent}%
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Store Revenue Comparison & Order Pipeline */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Store Revenue Bar Chart */}
@@ -891,19 +1079,21 @@ export function OwnerDashboardView({
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-bold text-[#141812] flex items-center gap-1.5">
                   <TrendingUp className="w-4 h-4 text-[#2E531A]" />
-                  <span>매장별 매출 현황</span>
+                  <span>매장별 매출 · 수수료 절감 현황</span>
                 </h2>
                 <span className="text-xs text-[#4A5246]">취소 제외 집계</span>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {analytics.byStore.map(({ store, count, revenue }) => {
                   const pct = Math.round(
                     (revenue / analytics.maxStoreRevenue) * 100
                   );
+                  const storeProfit =
+                    analytics.profitComparison.byStore[store.id];
                   return (
                     <div key={store.id} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center justify-between gap-2 text-xs">
                         <span className="font-bold text-[#141812] truncate">
                           {store.name}
                           {!store.isOpen && (
@@ -920,6 +1110,23 @@ export function OwnerDashboardView({
                           style={{ width: `${Math.max(revenue > 0 ? 6 : 0, pct)}%` }}
                         />
                       </div>
+                      {storeProfit && (
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-[#4A5246] tabular-nums">
+                          <span>
+                            30일 수수료 절감{' '}
+                            <strong className="font-mono text-[#2E531A]">
+                              +{formatWon(storeProfit.savedCommissionAndAdFee)}
+                            </strong>
+                          </span>
+                          <span>
+                            AI 단골 순증{' '}
+                            <strong className="font-mono text-[#141812]">
+                              +{formatWon(storeProfit.aiRegularIncrementalSales)}
+                            </strong>{' '}
+                            ({storeProfit.aiRegularMatchedOrders}건)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

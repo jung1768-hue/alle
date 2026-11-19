@@ -8,7 +8,7 @@ import {
 
 const TAG_SYNONYMS: Array<{ patterns: string[]; tag: string }> = [
   { patterns: ['얼큰한', '얼큰', '칼칼한', '칼칼', '매콤한', '매콤', '매운'], tag: '얼큰한' },
-  { patterns: ['국물', '탕', '찌개', '해장국', '국밥', '전골'], tag: '국물' },
+  { patterns: ['국물', '탕', '찌개', '해장국', '국밥', '소고기국밥', '따로국밥', '전골'], tag: '국물' },
   { patterns: ['담백한', '담백', '깔끔한', '곰탕'], tag: '담백한' },
   { patterns: ['순한맛', '순한', '안매운', '안맵게', '순하게'], tag: '순한맛' },
   { patterns: ['바삭한', '바삭', '튀김'], tag: '바삭한' },
@@ -19,9 +19,9 @@ const TAG_SYNONYMS: Array<{ patterns: string[]; tag: string }> = [
   { patterns: ['중식'], tag: '중식' },
   { patterns: ['일식'], tag: '일식' },
   { patterns: ['해물', '해산물', '낙지', '알곤이'], tag: '해물' },
-  { patterns: ['고기', '소고기', '돼지', '제육', '차돌', '갈비'], tag: '고기' },
-  { patterns: ['찌개', '순두부', '김치찌개'], tag: '찌개' },
-  { patterns: ['해장', '해장국'], tag: '해장' },
+  { patterns: ['고기', '소고기', '돼지', '제육', '차돌', '갈비', '찜갈비'], tag: '고기' },
+  { patterns: ['찌개', '순두부', '순두부찌개', '김치찌개'], tag: '찌개' },
+  { patterns: ['해장', '해장국', '국밥'], tag: '해장' },
 ];
 
 const STOPWORDS = new Set([
@@ -228,6 +228,12 @@ export function evaluateRecommendations(
       menu.comparisonDate !== null &&
       menu.storePrice === menu.pricePerPerson;
 
+    const aiReason =
+      menu.aiReason ||
+      `${store.areaLabel.split(' · ')[0]} 실시간 조리 가능 + 약 ${effectiveMinutes}분 빠른 도착${
+        isSameStorePrice ? ' + 매장 동일가 검증' : ''
+      }`;
+
     matches.push({
       menu,
       store,
@@ -238,6 +244,7 @@ export function evaluateRecommendations(
       effectiveMinutes,
       matchedTags,
       isSameStorePrice,
+      aiReason,
     });
   }
 

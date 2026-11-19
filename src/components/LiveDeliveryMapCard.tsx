@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { MapPin, Navigation, ShieldCheck } from 'lucide-react';
+import {
+  CheckCircle2,
+  MapPin,
+  Navigation,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { DispatchMode, OrderStatus } from '../types/alle';
 
 interface LiveDeliveryMapCardProps {
@@ -55,6 +61,18 @@ export function LiveDeliveryMapCard({
             ? '전문 라이더'
             : '이웃 도보 파트너'}
         </span>
+      </div>
+
+      {/* Prominent AI Dispatch & On-Time Reliability Status Banner */}
+      <div className="px-3.5 py-2.5 bg-[#141812] text-white rounded-xl flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs font-bold">
+          <Sparkles className="w-3.5 h-3.5 text-[#B8D98E] shrink-0" />
+          <span>AI 라이더 최적 동선 매칭 완료</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#B8D98E] font-mono tabular-nums">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          <span>정시 도착 신뢰도 98%</span>
+        </div>
       </div>
 
       <div className="bg-white border border-[#CBDCC0] rounded-xl p-2.5 overflow-hidden">

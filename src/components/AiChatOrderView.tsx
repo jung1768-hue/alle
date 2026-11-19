@@ -11,6 +11,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
 import { MenuItem, ParsedCondition, Store } from '../types/alle';
 import {
@@ -21,6 +22,71 @@ import {
 import { startKoreanVoiceInput } from '../utils/voice';
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
+
+interface IntentChip {
+  id: string;
+  label: string;
+  tone: 'primary' | 'secondary' | 'accent';
+}
+
+function buildIntentChips(
+  condition: ParsedCondition,
+  hasWishlistOrRegular: boolean
+): IntentChip[] {
+  const chips: IntentChip[] = [];
+
+  // Combine taste + dish tags naturally (e.g. 얼큰한 + 국물 -> #얼큰한국물)
+  const remainingTags = [...condition.tags];
+  if (remainingTags.includes('얼큰한') && remainingTags.includes('국물')) {
+    chips.push({ id: 'tag-spicy-soup', label: '#얼큰한국물', tone: 'primary' });
+    remainingTags.splice(remainingTags.indexOf('얼큰한'), 1);
+    remainingTags.splice(remainingTags.indexOf('국물'), 1);
+  } else if (remainingTags.includes('담백한') && remainingTags.includes('국물')) {
+    chips.push({ id: 'tag-mild-soup', label: '#담백한국물', tone: 'primary' });
+    remainingTags.splice(remainingTags.indexOf('담백한'), 1);
+    remainingTags.splice(remainingTags.indexOf('국물'), 1);
+  } else if (remainingTags.includes('바삭한') && remainingTags.includes('돈까스')) {
+    chips.push({ id: 'tag-crispy-katsu', label: '#바삭돈가스', tone: 'primary' });
+    remainingTags.splice(remainingTags.indexOf('바삭한'), 1);
+    remainingTags.splice(remainingTags.indexOf('돈까스'), 1);
+  }
+
+  for (const tag of remainingTags.slice(0, 3)) {
+    chips.push({ id: `tag-${tag}`, label: `#${tag}`, tone: 'primary' });
+  }
+
+  if (condition.maxMinutes !== null) {
+    chips.push({
+      id: `min-${condition.maxMinutes}`,
+      label: `#${condition.maxMinutes}분이내`,
+      tone: 'accent',
+    });
+  }
+
+  if (condition.maxBudget !== null) {
+    chips.push({
+      id: `budget-${condition.maxBudget}`,
+      label: `#${condition.maxBudget.toLocaleString('ko-KR')}원이하`,
+      tone: 'secondary',
+    });
+  }
+
+  chips.push({
+    id: `servings-${condition.servings}`,
+    label: condition.servings === 1 ? '#혼밥1인' : `#성인${condition.servings}명`,
+    tone: 'secondary',
+  });
+
+  if (hasWishlistOrRegular) {
+    chips.push({
+      id: 'ctx-regular-store',
+      label: '#단골매장',
+      tone: 'accent',
+    });
+  }
+
+  return chips;
+}
 
 interface ChatMessage {
   id: string;
@@ -185,6 +251,19 @@ export function AiChatOrderView({
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+
+  // Live intent preview updates as the user types or speaks
+  const liveIntentCondition = useMemo(() => {
+    if (input.trim().length > 0) {
+      return mergeConversationalCondition(activeCondition, input);
+    }
+    return activeCondition;
+  }, [activeCondition, input]);
+
+  const liveIntentChips = useMemo(
+    () => buildIntentChips(liveIntentCondition, wishlistIds.length > 0),
+    [liveIntentCondition, wishlistIds.length]
+  );
 
   useEffect(() => {
     bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -592,6 +671,11 @@ export function AiChatOrderView({
                               {servings}인 총 {formatWon(total)} · 약{' '}
                               {item.estimatedMinutes + (store.extraPrepMinutes ?? 0)}분
                             </div>
+                            {item.aiReason && (
+                              <p className="text-[11px] font-medium text-[#2E531A] leading-snug line-clamp-2 pt-1">
+                                {item.aiReason}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -810,6 +894,52 @@ export function AiChatOrderView({
         )}
 
         <div ref={bottomAnchorRef} />
+      </div>
+
+      {/* Real-Time AI Intent Extraction Chip Bar */}
+      <div
+        aria-live="polite"
+        className="px-4 sm:px-5 py-2.5 bg-[#F4F8F0] border-t border-[#D7E4CC] space-y-1.5"
+      >
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="font-bold text-[#2E531A] flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {isListening
+                ? '음성 의도 실시간 분석 중...'
+                : input.trim().length > 0
+                  ? '입력 문장에서 AI 의도 키워드 추출 중'
+                  : 'AI 실시간 추출 의도 키워드'}
+            </span>
+          </span>
+          <span className="font-mono tabular-nums font-semibold text-[#4A5246]">
+            {liveIntentChips.length}개 조건 인식
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 min-h-[28px]">
+          <AnimatePresence mode="popLayout">
+            {liveIntentChips.map((chip) => (
+              <motion.span
+                key={chip.id}
+                layout
+                initial={{ opacity: 0, scale: 0.85, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold tracking-tight whitespace-nowrap tabular-nums ${
+                  chip.tone === 'primary'
+                    ? 'bg-[#2E531A] text-white'
+                    : chip.tone === 'accent'
+                      ? 'bg-[#DCE9C8] text-[#1F3A11] border border-[#BED4A2]'
+                      : 'bg-white text-[#141812] border border-[#D4E2C4]'
+                }`}
+              >
+                {chip.label}
+              </motion.span>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Counselor Input Bar */}

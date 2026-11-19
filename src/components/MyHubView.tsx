@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import {
+  CalendarClock,
   Check,
   QrCode,
   Share2,
   ShieldCheck,
+  Sparkles,
   Ticket,
   UserCheck,
   Wallet,
   X,
+  Zap,
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
 import { DemoRole, UserPreferences } from '../types/alle';
@@ -20,11 +23,17 @@ interface MyHubViewProps {
   preferences: UserPreferences;
   wishlistCount: number;
   orderCount: number;
+  regularMenuId?: string;
+  regularMenuName?: string;
+  regularStoreName?: string;
+  regularServings?: number;
   onTopupWalletConfirmed: (amount: number) => void;
   onEarnStamp: () => void;
   onChangeRole: (nextRole: DemoRole) => void;
   onShareDemoSummary: () => void;
   onGoToHomePrefs: () => void;
+  onQuickReorderToConfirm?: (menuId: string, servings: number) => void;
+  onOpenAiChat?: (initialPrompt?: string) => void;
 }
 
 export function MyHubView({
@@ -34,15 +43,23 @@ export function MyHubView({
   preferences,
   wishlistCount,
   orderCount,
+  regularMenuId = 'm1',
+  regularMenuName = '얼큰 소고기국밥',
+  regularStoreName = '수성 범어 소고기국밥',
+  regularServings = 2,
   onTopupWalletConfirmed,
   onEarnStamp,
   onChangeRole,
   onShareDemoSummary,
   onGoToHomePrefs,
+  onQuickReorderToConfirm,
+  onOpenAiChat,
 }: MyHubViewProps) {
   const [confirmTopupAmount, setConfirmTopupAmount] = useState<number | null>(
     null
   );
+  const [fridayRoutineEnabled, setFridayRoutineEnabled] =
+    useState<boolean>(true);
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -51,7 +68,7 @@ export function MyHubView({
           <h1 className="text-2xl font-bold text-[#141812]">MY 올이</h1>
         </div>
         <span className="text-xs font-bold text-[#2E531A]">
-          고객 A · 수령지 A
+          고객 A · 대구 수성구 범어동
         </span>
       </div>
 
@@ -99,6 +116,117 @@ export function MyHubView({
             <Share2 className="w-4 h-4" />
             <span>내 요약 공유하기</span>
           </button>
+        </div>
+      </section>
+
+      {/* 나의 Zero-Click 단골 루틴 (Retention Without Subsidy Coupons) */}
+      <section
+        aria-label="나의 Zero-Click 단골 루틴"
+        className="bg-white border border-[#C5D8B5] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(20,24,18,0.03)]"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-[#141812] flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-[#2E531A]" />
+              <span>나의 Zero-Click 단골 루틴</span>
+            </h2>
+            <p className="text-xs text-[#4A5246] mt-0.5">
+              할인 쿠폰 없이도 생활 패턴 기반 자동 제안으로 3초 재주문을 유지합니다
+            </p>
+          </div>
+          <span className="text-xs font-bold text-[#2E531A] tabular-nums">
+            쿠폰 무의존 리텐션
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card 1: 매주 금요일 퇴근길 자동 제안 */}
+          <div className="p-4 bg-[#F4F8F0] border border-[#CFE0C3] rounded-2xl flex flex-col justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#2E531A]">
+                  <CalendarClock className="w-4 h-4 shrink-0" />
+                  <span>금요일 18:30 자동 알림</span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={fridayRoutineEnabled}
+                  onClick={() => setFridayRoutineEnabled((prev) => !prev)}
+                  className={`min-h-[28px] px-2.5 py-0.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                    fridayRoutineEnabled
+                      ? 'bg-[#2E531A] border-[#2E531A] text-white'
+                      : 'bg-white border-[#CBDCC0] text-[#4A5246]'
+                  }`}
+                >
+                  {fridayRoutineEnabled ? '자동 ON' : '꺼짐'}
+                </button>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#141812]">
+                  매주 금요일 퇴근길 자동 제안
+                </h3>
+                <p className="text-xs text-[#374033] mt-1 leading-relaxed">
+                  야근·날씨 패턴에 맞춰 도착 25분 전 ‘{regularMenuName}’ 등 맞춤
+                  메뉴를 먼저 제안합니다.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                onOpenAiChat
+                  ? onOpenAiChat(
+                      '성인 2명, 얼큰한 국물, 총액 25,000원 이하, 30분 이내'
+                    )
+                  : onGoToHomePrefs()
+              }
+              className="w-full min-h-[42px] px-3.5 py-2 bg-white hover:bg-[#ECF3E2] border border-[#C5D8B5] text-[#1F3A11] text-xs font-bold rounded-xl cursor-pointer transition-colors"
+            >
+              오늘 퇴근길 제안 바로 보기
+            </button>
+          </div>
+
+          {/* Card 2: 원탭 3초 재주문 */}
+          <div className="p-4 bg-[#141812] text-white border border-[#242F20] rounded-2xl flex flex-col justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-bold text-[#B8D98E] flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 shrink-0" />
+                  <span>탐색 0단계 · 단골 고정</span>
+                </span>
+                <span className="font-mono text-[#CBDCC0] tabular-nums">
+                  평균 3초
+                </span>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">
+                  원탭 3초 재주문
+                </h3>
+                <p className="text-xs text-[#CBDCC0] mt-1 leading-relaxed">
+                  {regularStoreName} ·{' '}
+                  <strong className="text-white font-semibold">
+                    {regularMenuName} ({regularServings}인)
+                  </strong>{' '}
+                  이전 옵션과 요청사항 그대로 즉시 주문합니다.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                onQuickReorderToConfirm
+                  ? onQuickReorderToConfirm(regularMenuId, regularServings)
+                  : onGoToHomePrefs()
+              }
+              className="w-full min-h-[42px] px-3.5 py-2 bg-[#4B6B28] hover:bg-[#5E8434] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>원탭 3초 재주문 실행</span>
+            </button>
+          </div>
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Clock,
   Footprints,
   Heart,
   MapPin,
@@ -16,6 +17,7 @@ import {
   Search,
   ShoppingBasket,
   SlidersHorizontal,
+  Sparkles,
   Users,
   Zap,
 } from 'lucide-react';
@@ -253,7 +255,7 @@ export function ConditionHome({
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-1.5 text-sm font-bold text-[#141812]">
           <MapPin className="w-4 h-4 text-[#2E531A] shrink-0" />
-          <span>수령지 A</span>
+          <span>대구 수성구 범어동</span>
           <ChevronDown className="w-3.5 h-3.5 text-[#4A5246]" />
         </div>
         <button
@@ -264,6 +266,55 @@ export function ConditionHome({
           단골 스탬프 {stampCount}개
         </button>
       </div>
+
+      {/* Non-Price Zero-UI Value Strip (Replaces Generic Coupon/Discount Banner) */}
+      <section
+        aria-label="Zero-UI 핵심 효용"
+        className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
+      >
+        <div className="px-4 py-3 bg-white border border-[#D7E3CA] rounded-2xl flex items-center justify-between gap-3 shadow-[0_1px_6px_rgba(20,24,18,0.02)]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#ECF3E2] text-[#2E531A] flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-[#4A5246]">
+                탐색 피로 제거 · Zero-UI
+              </div>
+              <div className="text-xs sm:text-sm font-bold text-[#141812] tabular-nums truncate">
+                평균 메뉴 탐색 시간 <span className="text-[#4A5246] line-through font-medium">12분</span> →{' '}
+                <span className="text-[#2E531A]">15초 단축</span>
+              </div>
+            </div>
+          </div>
+          <span className="text-[11px] font-mono font-bold text-[#2E531A] tabular-nums shrink-0">
+            -98%
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() =>
+            onOpenAiChat('성인 2명, 얼큰한 국물, 총액 25,000원 이하, 30분 이내')
+          }
+          className="px-4 py-3 bg-[#141812] hover:bg-[#1E251B] text-white border border-[#232D1F] rounded-2xl flex items-center justify-between gap-3 text-left transition-colors cursor-pointer shadow-[0_1px_6px_rgba(20,24,18,0.06)]"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#2E531A] text-[#DCE9C8] flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-medium text-[#C5D8B5]">
+                대구 비 오는 날씨 · 야근 패턴 반영
+              </div>
+              <div className="text-xs sm:text-sm font-bold text-white truncate">
+                오늘의 컨디션 맞춤 Zero-UI 추천
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#C5D8B5] shrink-0" />
+        </button>
+      </section>
 
       {/* Top AI Hero Banner matching IMG_8626 */}
       <section className="bg-[#ECF3E2] border border-[#DCE6CF] rounded-3xl p-5 sm:p-7 shadow-[0_2px_12px_rgba(20,24,18,0.03)] space-y-5">
@@ -831,6 +882,11 @@ export function ConditionHome({
                             </>
                           )}
                         </div>
+                        {(item.aiReason || item.menu.aiReason) && (
+                          <p className="text-[11px] font-medium text-[#2E531A] leading-snug line-clamp-2 pt-0.5">
+                            AI 추천 · {item.aiReason ?? item.menu.aiReason}
+                          </p>
+                        )}
                         <div className="flex items-center justify-between pt-1.5 text-xs">
                           <span className="font-mono tabular-nums font-bold text-sm text-[#2E531A]">
                             총 {formatWon(item.estimatedTotal)}

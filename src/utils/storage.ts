@@ -9,7 +9,7 @@ import {
 } from '../data/seedData';
 import { AllePersistedState } from '../types/alle';
 
-const STORAGE_KEY = 'alle_mvp_demo_state_v4';
+const STORAGE_KEY = 'alle_mvp_demo_state_v5_daegu';
 
 export type StorageMode = 'localStorage' | 'memory';
 
@@ -83,7 +83,7 @@ export function loadDemoState(): {
     }
 
     const storeImageById = new Map(INITIAL_STORES.map((s) => [s.id, s.image]));
-    const menuImageById = new Map(INITIAL_MENUS.map((m) => [m.id, m.image]));
+    const menuSeedById = new Map(INITIAL_MENUS.map((m) => [m.id, m]));
 
     const migratedStores = parsed.stores.map((store) => ({
       ...store,
@@ -93,14 +93,18 @@ export function loadDemoState(): {
         store.image,
     }));
 
-    const migratedMenus = parsed.menus.map((menu) => ({
-      ...menu,
-      image:
-        resolveBundledImage(menu.image) ||
-        menuImageById.get(menu.id) ||
-        storeImageById.get(menu.storeId) ||
-        menu.image,
-    }));
+    const migratedMenus = parsed.menus.map((menu) => {
+      const seedMenu = menuSeedById.get(menu.id);
+      return {
+        ...menu,
+        image:
+          resolveBundledImage(menu.image) ||
+          seedMenu?.image ||
+          storeImageById.get(menu.storeId) ||
+          menu.image,
+        aiReason: menu.aiReason ?? seedMenu?.aiReason,
+      };
+    });
 
     return {
       state: {

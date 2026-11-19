@@ -2,14 +2,44 @@ import { useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  Briefcase,
   CalendarClock,
+  Check,
+  CreditCard,
   Sparkles,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { MOCK_COUPONS, RESERVATION_SLOTS_15M } from '../data/seedData';
-import { MenuItem, Store } from '../types/alle';
+import { MenuItem, PaymentMethod, Store } from '../types/alle';
 import { formatWon } from '../utils/parser';
 import { FoodImage } from './FoodImage';
+
+const PAYMENT_OPTIONS: Array<{
+  id: PaymentMethod;
+  label: string;
+  subtitle: string;
+  benefitText: string;
+}> = [
+  {
+    id: 'local_currency',
+    label: '대구로페이 / 지역화폐',
+    subtitle: '지역 상권 직결제 · 중개수수료 0%',
+    benefitText: '보조금 소진 이후에도 수수료 0% 직결제 구조 유지',
+  },
+  {
+    id: 'b2b_meal_point',
+    label: '기업 식대 포인트 (B2B 법인결제)',
+    subtitle: '대구 제휴 오피스 식대 · 자동 법인 정산',
+    benefitText: '지자체 예산 없이 기업 복지 식대로 자생 매출 창출',
+  },
+  {
+    id: 'alle_regular_pass',
+    label: 'Alle 단골 패스',
+    subtitle: 'AI 단골 구독 결제 · 스탬프 +1 자동 적립',
+    benefitText: '단골 패스 주문 시 스탬프 자동 적립 · 이웃 묶음 우선 매칭',
+  },
+];
 
 interface OrderConfirmationViewProps {
   menu: MenuItem;
@@ -19,6 +49,7 @@ interface OrderConfirmationViewProps {
   initialCouponCode: string;
   initialSharedDelivery?: boolean;
   initialReservationSlot?: string;
+  initialPaymentMethod?: PaymentMethod;
   stampCount: number;
   defaultNote: string;
   onBack: () => void;
@@ -33,6 +64,8 @@ interface OrderConfirmationViewProps {
     customerAlias: string;
     addressAlias: string;
     customerNote: string;
+    paymentMethod?: PaymentMethod;
+    paymentMethodLabel?: string;
   }) => { ok: boolean; error?: string };
 }
 
@@ -44,6 +77,7 @@ export function OrderConfirmationView({
   initialCouponCode,
   initialSharedDelivery = false,
   initialReservationSlot = 'now',
+  initialPaymentMethod = 'local_currency',
   stampCount,
   defaultNote,
   onBack,
@@ -60,10 +94,17 @@ export function OrderConfirmationView({
     initialReservationSlot || 'now'
   );
   const [customerAlias, setCustomerAlias] = useState<string>('고객 A');
-  const [addressAlias, setAddressAlias] = useState<string>('수령지 A');
+  const [addressAlias, setAddressAlias] = useState<string>(
+    '대구 수성구 범어동 수령지 A'
+  );
   const [customerNote, setCustomerNote] = useState<string>(defaultNote);
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>(initialPaymentMethod);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const selectedPaymentOption =
+    PAYMENT_OPTIONS.find((p) => p.id === paymentMethod) ?? PAYMENT_OPTIONS[0];
 
   const isStoreClosed = !store.isOpen;
   const isMenuSoldOut = menu.isSoldOut || menu.stock <= 0;
@@ -141,8 +182,10 @@ export function OrderConfirmationView({
       reservationSlot:
         reservationSlotId === 'now' ? null : chosenReservationObj.label,
       customerAlias: customerAlias.trim() || '고객 A',
-      addressAlias: addressAlias.trim() || '수령지 A',
+      addressAlias: addressAlias.trim() || '대구 수성구 범어동 수령지 A',
       customerNote: customerNote.trim(),
+      paymentMethod,
+      paymentMethodLabel: selectedPaymentOption.label,
     });
 
     if (!result.ok) {
@@ -213,6 +256,16 @@ export function OrderConfirmationView({
             </p>
           </div>
         </div>
+
+        {menu.aiReason && (
+          <div className="px-3.5 py-2.5 bg-[#EFF5E6] border border-[#CFE0B9] rounded-2xl flex items-start gap-2">
+            <Sparkles className="w-4 h-4 text-[#2E531A] shrink-0 mt-0.5" />
+            <div className="text-xs leading-relaxed text-[#223B13]">
+              <span className="font-bold text-[#2E531A] mr-1.5">AI 추천 근거</span>
+              <span>{menu.aiReason}</span>
+            </div>
+          </div>
+        )}
 
         {/* Quantity */}
         <div className="pt-4 border-t border-[#EBEFEB] flex items-center justify-between gap-4">
@@ -428,9 +481,93 @@ export function OrderConfirmationView({
         </div>
       </section>
 
+      {/* Self-Sustaining Payment Method Selector */}
+      <section className="bg-white border border-[#DDE3D7] rounded-3xl p-5 sm:p-6 space-y-3.5 shadow-[0_2px_12px_rgba(20,24,18,0.03)]">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-bold text-[#141812] flex items-center gap-1.5">
+            <CreditCard className="w-4 h-4 text-[#2E531A]" />
+            <span>결제 수단</span>
+          </h2>
+          <span className="text-xs font-medium text-[#4A5246]">
+            지역화폐 · 기업 식대 · 단골 패스 자생 결제
+          </span>
+        </div>
+
+        <div
+          role="radiogroup"
+          aria-label="결제 수단 선택"
+          className="space-y-2.5"
+        >
+          {PAYMENT_OPTIONS.map((option) => {
+            const active = paymentMethod === option.id;
+            const Icon =
+              option.id === 'local_currency'
+                ? Wallet
+                : option.id === 'b2b_meal_point'
+                  ? Briefcase
+                  : Sparkles;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setPaymentMethod(option.id)}
+                className={`w-full min-h-[64px] p-3.5 rounded-2xl border text-left transition-colors flex items-start justify-between gap-3 cursor-pointer ${
+                  active
+                    ? 'bg-[#ECF3E2] border-[#2E531A] ring-1 ring-[#2E531A]/20'
+                    : 'bg-white border-[#DDE3D7] hover:border-[#6FA33A]'
+                }`}
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      active
+                        ? 'bg-[#2E531A] text-white'
+                        : 'bg-[#F4F6F1] text-[#374033]'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="text-sm font-bold text-[#141812]">
+                      {option.label}
+                    </div>
+                    <div className="text-xs font-medium text-[#374033]">
+                      {option.subtitle}
+                    </div>
+                    {active && (
+                      <div className="text-[11px] font-semibold text-[#2E531A] pt-0.5">
+                        {option.benefitText}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-1 ${
+                    active
+                      ? 'bg-[#2E531A] border-[#2E531A] text-white'
+                      : 'border-[#C5D8B5] bg-white'
+                  }`}
+                >
+                  {active && <Check className="w-3 h-3" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Final Checkout Summary */}
       <section className="bg-white border border-[#DDE3D7] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(20,24,18,0.03)]">
-        <h2 className="text-base font-bold text-[#141812]">결제 금액</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-bold text-[#141812]">결제 금액</h2>
+          <span className="text-xs font-bold text-[#2E531A]">
+            {selectedPaymentOption.label}
+          </span>
+        </div>
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between text-[#141812]">
             <dt>
@@ -470,7 +607,7 @@ export function OrderConfirmationView({
         >
           {isSubmitting
             ? '주문 접수 중...'
-            : `${formatWon(totalAmount)} 주문하기`}
+            : `${selectedPaymentOption.label} · ${formatWon(totalAmount)} 주문하기`}
         </button>
       </section>
     </div>

@@ -10,6 +10,7 @@ import {
   Info,
   MessageSquare,
   RotateCcw,
+  Sparkles,
   Store as StoreIcon,
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
@@ -271,13 +272,29 @@ export function RecommendationView({
                       }, 50);
                     }
                   }}
-                  className={`w-full text-left bg-white rounded-3xl border p-4 transition-all cursor-pointer ${
+                  className={`w-full text-left bg-white rounded-3xl border overflow-hidden transition-all cursor-pointer ${
                     isSelected
                       ? 'border-[#2E531A] ring-2 ring-[#2E531A]/15 shadow-[0_4px_16px_rgba(46,83,26,0.08)]'
                       : 'border-[#DDE3D7] hover:border-[#2E531A]/40'
                   }`}
                 >
-                  <div className="flex gap-3.5">
+                  {/* Top Explainable AI Reason Highlight Strip */}
+                  {(item.aiReason || item.menu.aiReason) && (
+                    <div
+                      className={`px-4 py-2 border-b flex items-center gap-1.5 text-[11px] sm:text-xs font-bold ${
+                        isSelected
+                          ? 'bg-[#2E531A] border-[#2E531A] text-white'
+                          : 'bg-[#ECF3E2] border-[#DCE7CE] text-[#1F3A11]'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">
+                        {item.aiReason ?? item.menu.aiReason}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="p-4 flex gap-3.5">
                     <div className="w-24 h-20 sm:w-28 sm:h-24 rounded-2xl overflow-hidden shrink-0 border border-[#EBEFEB]">
                       <FoodImage
                         src={item.menu.image}
@@ -348,6 +365,20 @@ export function RecommendationView({
               ref={detailPanelRef}
               className="lg:col-span-7 bg-white border border-[#DDE3D7] rounded-3xl overflow-hidden shadow-[0_2px_14px_rgba(20,24,18,0.04)] scroll-mt-16"
             >
+              {(activeMatch.aiReason || activeMatch.menu.aiReason) && (
+                <div className="px-5 py-3 bg-[#141812] text-white flex items-center gap-2.5">
+                  <Sparkles className="w-4 h-4 text-[#A9D17B] shrink-0" />
+                  <div className="min-w-0 text-xs sm:text-sm font-semibold leading-snug">
+                    <span className="text-[#A9D17B] font-bold mr-1.5">
+                      AI 추천 정답
+                    </span>
+                    <span>
+                      {activeMatch.aiReason ?? activeMatch.menu.aiReason}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 sm:p-5 pb-0">
                 <div className="aspect-4/3 sm:aspect-16/9 max-h-[280px] w-full rounded-2xl overflow-hidden border border-[#EBEFEB]">
                   <FoodImage

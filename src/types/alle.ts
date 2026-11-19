@@ -75,6 +75,7 @@ export interface MenuItem {
   comparisonDate: string | null;
   estimatedMinutes: number;
   image: string;
+  aiReason?: string;
 }
 
 export interface Review {
@@ -115,6 +116,11 @@ export interface EvidenceRecord {
   recordedAt: string;
 }
 
+export type PaymentMethod =
+  | 'local_currency'
+  | 'b2b_meal_point'
+  | 'alle_regular_pass';
+
 export interface Order {
   id: string;
   orderCode: string;
@@ -133,6 +139,8 @@ export interface Order {
   sharedDeliveryApplied?: boolean;
   reservationSlot?: string | null;
   isB2B?: boolean;
+  paymentMethod?: PaymentMethod;
+  paymentMethodLabel?: string;
   couponCode: string | null;
   couponDiscount: number;
   totalAmount: number;
@@ -214,6 +222,29 @@ export interface RecommendationMatch {
   effectiveMinutes: number;
   matchedTags: string[];
   isSameStorePrice: boolean;
+  aiReason?: string;
+}
+
+export interface StoreProfitComparison {
+  savedCommissionAndAdFee: number;
+  aiRegularIncrementalSales: number;
+  aiRegularMatchedOrders: number;
+}
+
+export interface OwnerProfitComparison {
+  periodLabel: string;
+  competitorPlatformLabel: string;
+  alleCommissionRateLabel: string;
+  savedCommissionAndAdFee: number;
+  savedBreakdown: {
+    brokerageFeeSaved: number;
+    adExposureFeeSaved: number;
+  };
+  aiRegularIncrementalSales: number;
+  aiRegularMatchedOrders: number;
+  repeatCustomerRatePercent: number;
+  subsidyDependencyRatioPercent: number;
+  byStore: Record<string, StoreProfitComparison>;
 }
 
 export interface ExcludedCandidate {

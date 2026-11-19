@@ -1,13 +1,20 @@
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,
+  ArrowRight,
   Briefcase,
   Camera,
+  Car,
   CheckCircle2,
+  Clock,
   Footprints,
+  MapPin,
   Receipt,
+  RotateCcw,
   ShieldCheck,
+  Sparkles,
   Users,
+  Utensils,
 } from 'lucide-react';
 import {
   B2B_OFFPEAK_SLOTS,
@@ -18,6 +25,7 @@ import {
   ErrandRequest,
   ErrandStatus,
   MenuItem,
+  Order,
   Store,
   SuperAppTab,
 } from '../types/alle';
@@ -30,6 +38,7 @@ interface SuperAppHubViewProps {
   stores: Store[];
   menus: MenuItem[];
   errands: ErrandRequest[];
+  latestOrder?: Order;
   onJoinGroupBuy: (menuId: string) => void;
   onCreateB2BOrder: (payload: {
     menuId: string;
@@ -58,11 +67,32 @@ export function SuperAppHubView({
   stores,
   menus,
   errands,
+  latestOrder,
   onJoinGroupBuy,
   onCreateB2BOrder,
   onCreateErrand,
   onAdvanceErrand,
 }: SuperAppHubViewProps) {
+  const [taxiStatus, setTaxiStatus] = useState<'idle' | 'matching' | 'reserved'>(
+    'idle'
+  );
+  const [taxiEtaAdjusted, setTaxiEtaAdjusted] = useState<boolean>(false);
+
+  const handleSimulateTaxiBooking = () => {
+    if (taxiStatus !== 'idle') return;
+    setTaxiStatus('matching');
+    window.setTimeout(() => {
+      setTaxiStatus('reserved');
+    }, 450);
+  };
+
+  const handleResetTaxiBooking = () => {
+    setTaxiStatus('idle');
+    setTaxiEtaAdjusted(false);
+  };
+
+  const activeMealName = latestOrder?.menuName ?? '얼큰 소고기국밥';
+  const activeStoreName = latestOrder?.storeName ?? '수성 범어 소고기국밥';
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
 
@@ -172,13 +202,156 @@ export function SuperAppHubView({
 
   return (
     <div className="space-y-6">
-      <div className="bg-[#E9F1E2] border border-[#CBDCC0] rounded-3xl p-5 sm:p-6 space-y-1.5">
-        <h1 className="text-xl sm:text-2xl font-bold text-[#141812]">
-          공동구매 · B2B 오프피크 · 생활 심부름
-        </h1>
-        <p className="text-xs sm:text-sm text-[#374033]">
-          우리 동네 이웃과 배달비를 나누고 단체 예약과 생활 심부름까지 한 번에 신청하세요.
-        </p>
+      {/* Cross-Domain Single AI Agent Proposal Card (Food -> Mobility) */}
+      <section
+        aria-label="단일 AI 에이전트 크로스 도메인 제안"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#141812] via-[#1C2716] to-[#283E1A] text-white p-5 sm:p-6 border border-[#344C24] shadow-[0_10px_28px_rgba(20,24,18,0.16)] space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-[#C7F08F]">
+            <Sparkles className="w-3.5 h-3.5 text-[#8BC34A]" />
+            <span>SINGLE AI AGENT · 크로스 도메인 맥락 제안</span>
+          </div>
+          <span className="text-[11px] font-semibold text-[#D5E6C3] font-mono tabular-nums">
+            식사 → 이동 자동 연계
+          </span>
+        </div>
+
+        {/* Context Chain Visual */}
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2.5 bg-white/8 border border-white/12 rounded-2xl p-3.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#8BC34A]/20 border border-[#8BC34A]/35 flex items-center justify-center shrink-0">
+              <Utensils className="w-4 h-4 text-[#C7F08F]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] text-[#B9CCB0] font-medium">
+                진행 중인 식사 주문 · 도착 예정 12:40
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-white truncate">
+                {activeStoreName} · {activeMealName}
+              </p>
+            </div>
+          </div>
+
+          <div className="hidden sm:flex items-center justify-center px-1 text-[#8BC34A]">
+            <ArrowRight className="w-4 h-4" />
+          </div>
+
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-white/12 border border-white/20 flex items-center justify-center shrink-0">
+              <Car className="w-4 h-4 text-[#C7F08F]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] text-[#B9CCB0] font-medium">
+                다음 일정 감지 · 동성로 오후 미팅
+              </p>
+              <p className="text-xs sm:text-sm font-bold text-white truncate">
+                범어동 수령지 A → 동성로 중앙로역 (13:15 출발)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Proposal Headline & Details */}
+        <div className="space-y-2">
+          <h1 className="text-lg sm:text-xl font-bold leading-snug text-white">
+            “식사 도착 예정 시간(12:40)에 맞춰 동성로 미팅 장소로 이동할 호출
+            택시를 미리 예약할까요?”
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#CFE0C5]">
+            <span className="inline-flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-[#8BC34A]" />
+              식사 완료 후 13:15 자동 배차
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-[#8BC34A]" />
+              예상 이동 14분 · 예상 요금 6,800원 (B2B·지역화폐 통합 정산)
+            </span>
+          </div>
+        </div>
+
+        {/* One-Click Simulation Action Area */}
+        {taxiStatus === 'reserved' ? (
+          <div className="bg-[#8BC34A]/18 border border-[#8BC34A]/45 rounded-2xl p-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-[#A5E058] shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-bold text-white">
+                    호출 택시 연계 예약 완료 · 대구 31바 4820 (중형)
+                  </p>
+                  <p className="text-xs text-[#DCECD0]">
+                    {taxiEtaAdjusted
+                      ? '배달 5분 지연 시나리오 반영 → 택시 픽업 시각이 13:20으로 자동 재조정되었습니다.'
+                      : '13:15 범어동 수령지 A 앞 대기 예정 · 배달 도착 변동 시 호출 시각 자동 동기화'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetTaxiBooking}
+                className="min-h-[34px] px-3 py-1 bg-white/10 hover:bg-white/20 text-[#DCECD0] text-xs font-semibold rounded-xl inline-flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>다시 시연</span>
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/12">
+              <button
+                type="button"
+                onClick={() => setTaxiEtaAdjusted((prev) => !prev)}
+                className="min-h-[34px] px-3 py-1 bg-white/12 hover:bg-white/20 text-white text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                {taxiEtaAdjusted
+                  ? '기본 13:15 스케줄로 복귀'
+                  : '배달 5분 지연 시 자동 재조정 시뮬레이션'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeTab(SuperAppTab.ERRAND)}
+                className="min-h-[34px] px-3 py-1 bg-transparent hover:bg-white/10 border border-white/20 text-[#DCECD0] text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                식후 약국·생활 심부름도 함께 보기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 pt-1">
+            <button
+              type="button"
+              disabled={taxiStatus === 'matching'}
+              onClick={handleSimulateTaxiBooking}
+              className="flex-1 min-h-[48px] px-5 py-2.5 bg-[#8BC34A] hover:bg-[#9BD15B] disabled:bg-[#709A3F] text-[#141812] text-sm font-bold rounded-2xl inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <Car className="w-4 h-4 shrink-0" />
+              <span>
+                {taxiStatus === 'matching'
+                  ? 'AI가 12:40 배달 동선과 배차 슬롯을 연동 중...'
+                  : '원클릭으로 13:15 호출 택시 예약 시뮬레이션'}
+              </span>
+              {taxiStatus === 'idle' && <ArrowRight className="w-4 h-4 shrink-0" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeTab(SuperAppTab.B2B)}
+              className="min-h-[48px] px-4 py-2.5 bg-white/10 hover:bg-white/18 border border-white/18 text-white text-xs sm:text-sm font-semibold rounded-2xl whitespace-nowrap cursor-pointer"
+            >
+              B2B 팀 식사 연계
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Secondary Hub Intro */}
+      <div className="bg-[#E9F1E2] border border-[#CBDCC0] rounded-3xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base sm:text-lg font-bold text-[#141812]">
+            하이퍼로컬 슈퍼앱 서비스 허브
+          </h2>
+          <p className="text-xs text-[#374033] mt-0.5">
+            하나의 AI 에이전트 안에서 이웃 묶음배달, B2B 오프피크 단체 예약, C2C 생활 심부름까지 연결합니다.
+          </p>
+        </div>
       </div>
 
       {/* Sub-Tabs */}
@@ -199,7 +372,7 @@ export function SuperAppHubView({
           }`}
         >
           <Users className="w-4 h-4 shrink-0 hidden sm:block" />
-          <span>이웃 공동구매</span>
+          <span>이웃 묶음배달</span>
         </button>
 
         <button

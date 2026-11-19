@@ -608,6 +608,7 @@ export function OrderStatusView({
 
                     <div className="mt-1.5 text-xs text-[#4A5246] font-mono tabular-nums">
                       {order.createdAt}
+                      {order.paymentMethodLabel && ` · ${order.paymentMethodLabel}`}
                       {order.reservationSlot && ` · 도착 예약: ${order.reservationSlot}`}
                       {order.sharedDeliveryApplied && ' · 이웃 묶음배달'}
                       {order.selectedOptionNames.length > 0 &&
