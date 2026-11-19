@@ -94,3 +94,49 @@ export function startKoreanVoiceInput(callbacks: {
     return () => {};
   }
 }
+
+export function isSpeechSynthesisSupported(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    'speechSynthesis' in window &&
+    typeof SpeechSynthesisUtterance !== 'undefined'
+  );
+}
+
+export function stopSpeaking(): void {
+  if (!isSpeechSynthesisSupported()) return;
+  try {
+    window.speechSynthesis.cancel();
+  } catch {
+    // ignore speech synthesis cancellation errors
+  }
+}
+
+export function speakKoreanText(rawText: string): void {
+  if (!isSpeechSynthesisSupported()) return;
+  const cleaned = rawText
+    .replace(/[✨🔥🧺🎁⚡→·]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return;
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+    utterance.lang = 'ko-KR';
+    utterance.rate = 1.03;
+    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const koreanVoice = voices.find((v) =>
+      v.lang.toLowerCase().startsWith('ko')
+    );
+    if (koreanVoice) {
+      utterance.voice = koreanVoice;
+    }
+
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    // ignore speech synthesis runtime errors
+  }
+}

@@ -11,6 +11,8 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
+  Volume2,
+  VolumeX,
   Zap,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -27,7 +29,12 @@ import {
   getEffectiveMenuPrice,
   parseConditionInput,
 } from '../utils/parser';
-import { startKoreanVoiceInput } from '../utils/voice';
+import {
+  isSpeechSynthesisSupported,
+  speakKoreanText,
+  startKoreanVoiceInput,
+  stopSpeaking,
+} from '../utils/voice';
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
 
@@ -235,6 +242,13 @@ export function AiChatOrderView({
   const [isListening, setIsListening] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReady, setAiReady] = useState(() => hasGeminiApiKey());
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('alle_voice_reply_enabled') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [showVoiceTips, setShowVoiceTips] = useState(false);
 
   useEffect(() => {
@@ -246,6 +260,7 @@ export function AiChatOrderView({
   const [stagedOptions, setStagedOptions] = useState<Record<string, string[]>>({});
   const stopVoiceRef = useRef<(() => void) | null>(null);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const lastSpokenMsgIdRef = useRef<string | null>(null);
 
   const [activeCondition, setActiveCondition] = useState<ParsedCondition>(() =>
     parseConditionInput(
@@ -331,8 +346,22 @@ export function AiChatOrderView({
   }, [messages]);
 
   useEffect(() => {
+    if (!voiceReplyEnabled || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (
+      last.sender === 'bot' &&
+      last.id !== 'welcome' &&
+      last.id !== lastSpokenMsgIdRef.current
+    ) {
+      lastSpokenMsgIdRef.current = last.id;
+      speakKoreanText(last.text);
+    }
+  }, [messages, voiceReplyEnabled]);
+
+  useEffect(() => {
     return () => {
       stopVoiceRef.current?.();
+      stopSpeaking();
     };
   }, []);
 
@@ -693,6 +722,25 @@ export function AiChatOrderView({
     ]);
   };
 
+  const handleToggleVoiceReply = () => {
+    const next = !voiceReplyEnabled;
+    setVoiceReplyEnabled(next);
+    try {
+      window.localStorage.setItem('alle_voice_reply_enabled', String(next));
+    } catch {
+      // ignore storage errors
+    }
+    if (!next) {
+      stopSpeaking();
+    } else {
+      const lastBot = [...messages].reverse().find((m) => m.sender === 'bot');
+      if (lastBot) {
+        lastSpokenMsgIdRef.current = lastBot.id;
+        speakKoreanText(lastBot.text);
+      }
+    }
+  };
+
   const handleMicToggle = () => {
     if (isListening) {
       stopVoiceRef.current?.();
@@ -700,6 +748,7 @@ export function AiChatOrderView({
       return;
     }
 
+    stopSpeaking();
     setShowVoiceTips(false);
     setIsListening(true);
     stopVoiceRef.current = startKoreanVoiceInput({
@@ -743,8 +792,27 @@ export function AiChatOrderView({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {isSpeechSynthesisSupported() && (
+            <button
+              type="button"
+              onClick={handleToggleVoiceReply}
+              aria-pressed={voiceReplyEnabled}
+              className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 cursor-pointer transition-colors border ${
+                voiceReplyEnabled
+                  ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                  : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
+              }`}
+            >
+              {voiceReplyEnabled ? (
+                <Volume2 className="w-3.5 h-3.5" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5" />
+              )}
+              <span>{voiceReplyEnabled ? '음성 안내 ON' : '음성 안내'}</span>
+            </button>
+          )}
           {aiReady && (
-            <span className="min-h-[34px] px-3 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl inline-flex items-center gap-1.5">
+            <span className="hidden sm:inline-flex min-h-[36px] px-3 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
               <span>alle 분석</span>
             </span>
