@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -23,6 +23,12 @@ import {
   ReviewReply,
 } from '../types/alle';
 import { formatWon } from '../utils/parser';
+import {
+  buildRuleReviewSummary,
+  hasGeminiApiKey,
+  ReviewAiSummary,
+  summarizeReviewsWithAI,
+} from '../utils/gemini';
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
 
@@ -85,6 +91,41 @@ export function RecommendationView({
     if (!activeMatch) return [];
     return reviews.filter((r) => r.menuId === activeMatch.menu.id);
   }, [activeMatch, reviews]);
+
+  const [aiReviewSummary, setAiReviewSummary] = useState<ReviewAiSummary | null>(
+    null
+  );
+  const [isSummarizingReviews, setIsSummarizingReviews] = useState(false);
+
+  useEffect(() => {
+    if (!activeMatch || activeReviews.length === 0) {
+      setAiReviewSummary(null);
+      setIsSummarizingReviews(false);
+      return;
+    }
+
+    const fallback = buildRuleReviewSummary(activeReviews);
+    setAiReviewSummary(fallback);
+
+    if (!hasGeminiApiKey()) return;
+
+    let cancelled = false;
+    setIsSummarizingReviews(true);
+    summarizeReviewsWithAI(
+      activeMatch.menu.name,
+      activeMatch.store.name,
+      activeReviews
+    ).then((res) => {
+      if (!cancelled) {
+        setAiReviewSummary(res);
+        setIsSummarizingReviews(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMatch, activeReviews]);
 
   const reviewTagSummary = useMemo(() => {
     const prosCount = new Map<string, number>();
@@ -648,7 +689,28 @@ export function RecommendationView({
                       등록된 리뷰가 없습니다.
                     </p>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-3">
+                      {aiReviewSummary && (
+                        <div className="p-3.5 bg-[#EAF1E2]/70 border border-[#D4E1C5] rounded-2xl space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3D5720]">
+                              <Sparkles className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                              <span>{aiReviewSummary.headline}</span>
+                            </span>
+                            <span className="text-[10px] font-semibold text-[#4E6E2A]">
+                              {isSummarizingReviews
+                                ? 'AI 요약 중...'
+                                : aiReviewSummary.source === 'gemini'
+                                  ? 'Gemini AI 요약'
+                                  : '자동 태그 요약'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#3D5720]">
+                            💡 {aiReviewSummary.recommendationTip}
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
                         <span className="block text-xs font-bold text-[#1A1D1A]">
                           좋은 점
@@ -694,6 +756,7 @@ export function RecommendationView({
                           <p className="text-xs text-[#687064]">없음</p>
                         )}
                       </div>
+                    </div>
                     </div>
                   )}
 

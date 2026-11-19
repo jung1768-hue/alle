@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   BarChart3,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Flag,
+  Loader2,
   Lock,
   MessageSquare,
   Mic,
@@ -33,6 +35,12 @@ import {
   Store,
 } from '../types/alle';
 import { formatWon } from '../utils/parser';
+import {
+  ExtractedMenuCandidate,
+  extractMenusFromImageWithAI,
+  hasGeminiApiKey,
+  parseOwnerVoiceCommandWithAI,
+} from '../utils/gemini';
 import { startKoreanVoiceInput } from '../utils/voice';
 
 interface OwnerDashboardViewProps {
@@ -65,6 +73,7 @@ interface OwnerDashboardViewProps {
   onSaveReviewReply: (reviewId: string, replyText: string) => void;
   onToggleReviewFlag: (reviewId: string, reason: string) => void;
   onSwitchToConsumer: () => void;
+  onOpenAiSettings?: () => void;
 }
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -96,6 +105,7 @@ export function OwnerDashboardView({
   onSaveReviewReply,
   onToggleReviewFlag,
   onSwitchToConsumer,
+  onOpenAiSettings,
 }: OwnerDashboardViewProps) {
   const [ownerSection, setOwnerSection] = useState<
     'orders' | 'dashboard' | 'ops' | 'crm'
@@ -111,6 +121,7 @@ export function OwnerDashboardView({
   const [commandInput, setCommandInput] = useState('');
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
   const [isKitchenListening, setIsKitchenListening] = useState(false);
+  const [isCommandProcessing, setIsCommandProcessing] = useState(false);
   const stopKitchenVoiceRef = useRef<(() => void) | null>(null);
 
   const [newMenuStoreId, setNewMenuStoreId] = useState(stores[0]?.id ?? 's1');
@@ -118,6 +129,13 @@ export function OwnerDashboardView({
     '대구식 차돌 된장찌개 10000원 얼큰한 국물 한식'
   );
   const [menuAddNotice, setMenuAddNotice] = useState<string | null>(null);
+  const [ocrImagePreview, setOcrImagePreview] = useState<string | null>(null);
+  const [isOcrScanning, setIsOcrScanning] = useState(false);
+  const [ocrCandidates, setOcrCandidates] = useState<
+    Array<ExtractedMenuCandidate & { selected: boolean }>
+  >([]);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const ocrFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [savedReplyId, setSavedReplyId] = useState<string | null>(null);
@@ -303,101 +321,275 @@ export function OwnerDashboardView({
     };
   }, [orders, stores, menus, reviews]);
 
-  const runOwnerCommand = (cmdRaw: string) => {
+  const runOwnerCommand = async (cmdRaw: string) => {
     const cmd = cmdRaw.trim();
     if (!cmd) return;
 
+    const executeAction = (
+      action:
+        | 'accept_order'
+        | 'start_cooking'
+        | 'pickup_order'
+        | 'complete_order'
+        | 'sold_out'
+        | 'restock'
+        | 'add_prep_minutes'
+        | 'toggle_store',
+      opts?: {
+        targetName?: string;
+        value?: number;
+        dispatchMode?: DispatchMode;
+      }
+    ): boolean => {
+      if (action === 'accept_order') {
+        const pendingOrder = orders.find((o) => o.status === OrderStatus.PENDING);
+        if (!pendingOrder) {
+          setCommandFeedback('접수 대기 중인 주문이 없습니다.');
+          return true;
+        }
+        onAdvanceOrderStatus(pendingOrder.id, OrderStatus.ACCEPTED);
+        setCommandFeedback(
+          `${pendingOrder.orderCode} (${pendingOrder.menuName}) 주문을 수락했습니다.`
+        );
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'start_cooking') {
+        const acceptedOrder = orders.find((o) => o.status === OrderStatus.ACCEPTED);
+        if (!acceptedOrder) {
+          setCommandFeedback('수락된 주문이 없습니다.');
+          return true;
+        }
+        onAdvanceOrderStatus(acceptedOrder.id, OrderStatus.COOKING);
+        setCommandFeedback(`${acceptedOrder.orderCode} 조리를 시작했습니다.`);
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'pickup_order') {
+        const cookingOrder = orders.find((o) => o.status === OrderStatus.COOKING);
+        if (!cookingOrder) {
+          setCommandFeedback('조리 중인 주문이 없습니다.');
+          return true;
+        }
+        const mode = opts?.dispatchMode ?? DispatchMode.NEIGHBOR_WALK;
+        onAdvanceOrderStatus(cookingOrder.id, OrderStatus.PICKUP, mode);
+        setCommandFeedback(
+          `${cookingOrder.orderCode} (${
+            mode === DispatchMode.AGENCY_RIDER ? '전문 라이더' : '이웃 도보'
+          }) 픽업 처리했습니다.`
+        );
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'complete_order') {
+        const pickupOrder = orders.find((o) => o.status === OrderStatus.PICKUP);
+        if (!pickupOrder) {
+          setCommandFeedback('픽업 상태의 주문만 완료 처리할 수 있습니다.');
+          return true;
+        }
+        onAdvanceOrderStatus(pickupOrder.id, OrderStatus.COMPLETED);
+        setCommandFeedback(`${pickupOrder.orderCode} 주문을 완료 처리했습니다.`);
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'add_prep_minutes') {
+        const delta = opts?.value ?? 5;
+        const targetStore =
+          (opts?.targetName
+            ? stores.find((s) => s.name.includes(opts.targetName!))
+            : undefined) ?? stores[0];
+        if (!targetStore) return false;
+        onAdjustStoreExtraPrep(targetStore.id, delta);
+        setCommandFeedback(
+          `"${targetStore.name}" 추가 조리시간을 ${delta > 0 ? `+${delta}` : delta}분 조정했습니다.`
+        );
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'restock') {
+        const targetMenu = opts?.targetName
+          ? menus.find(
+              (m) =>
+                m.name.includes(opts.targetName!) ||
+                opts.targetName!.includes(m.name)
+            )
+          : menus.find((m) => cmd.includes(m.name));
+        if (!targetMenu) {
+          setCommandFeedback('재고를 변경할 메뉴명을 함께 말씀해 주세요.');
+          return true;
+        }
+        const qty = opts?.value ?? 5;
+        onAdjustMenuStock(targetMenu.id, qty);
+        if (targetMenu.isSoldOut) {
+          onToggleMenuSoldOut(targetMenu.id);
+        }
+        setCommandFeedback(
+          `"${targetMenu.name}" 재고를 +${qty}개 입고(판매 재개)했습니다.`
+        );
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'sold_out') {
+        const targetMenu = opts?.targetName
+          ? menus.find(
+              (m) =>
+                m.name.includes(opts.targetName!) ||
+                opts.targetName!.includes(m.name)
+            )
+          : menus.find((m) => cmd.includes(m.name));
+        if (!targetMenu) {
+          setCommandFeedback(
+            '메뉴명을 함께 말씀해 주세요. 예: "얼큰 소고기국밥 품절"'
+          );
+          return true;
+        }
+        if (!targetMenu.isSoldOut) {
+          onToggleMenuSoldOut(targetMenu.id);
+        }
+        setCommandFeedback(`"${targetMenu.name}"을 품절 처리했습니다.`);
+        setCommandInput('');
+        return true;
+      }
+
+      if (action === 'toggle_store') {
+        const targetStore =
+          (opts?.targetName
+            ? stores.find((s) => s.name.includes(opts.targetName!))
+            : undefined) ?? stores.find((s) => cmd.includes(s.name));
+        if (!targetStore) {
+          setCommandFeedback(
+            '매장명을 함께 입력해 주세요. 예: "수성 범어 소고기국밥 영업 중단"'
+          );
+          return true;
+        }
+        onToggleStoreOpen(targetStore.id);
+        setCommandFeedback(`"${targetStore.name}" 영업 상태를 변경했습니다.`);
+        setCommandInput('');
+        return true;
+      }
+
+      return false;
+    };
+
     if (cmd.includes('수락')) {
-      const pendingOrder = orders.find((o) => o.status === OrderStatus.PENDING);
-      if (!pendingOrder) {
-        setCommandFeedback('접수 대기 중인 주문이 없습니다.');
-        return;
-      }
-      onAdvanceOrderStatus(pendingOrder.id, OrderStatus.ACCEPTED);
-      setCommandFeedback(
-        `${pendingOrder.orderCode} (${pendingOrder.menuName}) 주문을 수락했습니다.`
-      );
-      setCommandInput('');
+      executeAction('accept_order');
       return;
     }
-
     if (cmd.includes('조리 시작') || cmd.includes('조리시작')) {
-      const acceptedOrder = orders.find((o) => o.status === OrderStatus.ACCEPTED);
-      if (!acceptedOrder) {
-        setCommandFeedback('수락된 주문이 없습니다.');
-        return;
-      }
-      onAdvanceOrderStatus(acceptedOrder.id, OrderStatus.COOKING);
-      setCommandFeedback(`${acceptedOrder.orderCode} 조리를 시작했습니다.`);
-      setCommandInput('');
+      executeAction('start_cooking');
       return;
     }
-
     if (cmd.includes('픽업') || cmd.includes('라이더')) {
-      const cookingOrder = orders.find((o) => o.status === OrderStatus.COOKING);
-      if (!cookingOrder) {
-        setCommandFeedback('조리 중인 주문이 없습니다.');
-        return;
-      }
       const mode =
         cmd.includes('대행사') || cmd.includes('라이더')
           ? DispatchMode.AGENCY_RIDER
           : DispatchMode.NEIGHBOR_WALK;
-      onAdvanceOrderStatus(cookingOrder.id, OrderStatus.PICKUP, mode);
-      setCommandFeedback(
-        `${cookingOrder.orderCode} (${
-          mode === DispatchMode.AGENCY_RIDER ? '전문 라이더' : '이웃 도보'
-        }) 픽업 처리했습니다.`
-      );
-      setCommandInput('');
+      executeAction('pickup_order', { dispatchMode: mode });
       return;
     }
-
     if (cmd.includes('완료')) {
-      const pickupOrder = orders.find((o) => o.status === OrderStatus.PICKUP);
-      if (!pickupOrder) {
-        setCommandFeedback('픽업 상태의 주문만 완료 처리할 수 있습니다.');
-        return;
-      }
-      onAdvanceOrderStatus(pickupOrder.id, OrderStatus.COMPLETED);
-      setCommandFeedback(`${pickupOrder.orderCode} 주문을 완료 처리했습니다.`);
-      setCommandInput('');
+      executeAction('complete_order');
       return;
     }
-
+    if (cmd.includes('품절 해제') || cmd.includes('판매 재개')) {
+      executeAction('restock', { value: 5 });
+      return;
+    }
+    if (cmd.includes('재고') && (cmd.includes('추가') || cmd.includes('입고'))) {
+      const numMatch = cmd.match(/(\d+)/);
+      executeAction('restock', {
+        value: numMatch ? parseInt(numMatch[1], 10) : 5,
+      });
+      return;
+    }
+    if (cmd.includes('지연') || cmd.includes('조리시간') || cmd.includes('분 더')) {
+      const numMatch = cmd.match(/(\d+)\s*분/);
+      executeAction('add_prep_minutes', {
+        value: numMatch ? parseInt(numMatch[1], 10) : 5,
+      });
+      return;
+    }
     if (cmd.includes('품절')) {
-      const targetMenu = menus.find((m) => cmd.includes(m.name));
-      if (!targetMenu) {
-        setCommandFeedback(
-          '메뉴명을 함께 말씀해 주세요. 예: "얼큰 소고기국밥 품절"'
-        );
-        return;
-      }
-      if (!targetMenu.isSoldOut) {
-        onToggleMenuSoldOut(targetMenu.id);
-      }
-      setCommandFeedback(`"${targetMenu.name}"을 품절 처리했습니다.`);
-      setCommandInput('');
+      executeAction('sold_out');
+      return;
+    }
+    if (cmd.includes('영업 중단') || cmd.includes('영업 재개')) {
+      executeAction('toggle_store');
       return;
     }
 
-    if (cmd.includes('영업 중단') || cmd.includes('영업 재개')) {
-      const targetStore = stores.find((s) => cmd.includes(s.name));
-      if (!targetStore) {
-        setCommandFeedback(
-          '매장명을 함께 입력해 주세요. 예: "수성 범어 소고기국밥 영업 중단"'
-        );
-        return;
+    if (hasGeminiApiKey()) {
+      setIsCommandProcessing(true);
+      const aiCmd = await parseOwnerVoiceCommandWithAI(
+        cmd,
+        stores.map((s) => s.name),
+        menus.map((m) => m.name)
+      );
+      setIsCommandProcessing(false);
+      if (aiCmd && aiCmd.action !== 'unknown') {
+        const handled = executeAction(aiCmd.action, {
+          targetName: aiCmd.targetName,
+          value: aiCmd.value,
+          dispatchMode:
+            aiCmd.dispatchMode === 'agency_rider'
+              ? DispatchMode.AGENCY_RIDER
+              : DispatchMode.NEIGHBOR_WALK,
+        });
+        if (handled) return;
       }
-      onToggleStoreOpen(targetStore.id);
-      setCommandFeedback(`"${targetStore.name}" 영업 상태를 변경했습니다.`);
-      setCommandInput('');
-      return;
     }
 
     setCommandFeedback(
-      '지원 명령: "주문 수락", "조리 시작", "픽업 처리", "완료 처리", "[메뉴명] 품절"'
+      '지원 명령: "주문 수락", "조리 시작", "픽업 처리", "조리시간 10분 추가", "[메뉴명] 품절 / 품절 해제"'
     );
+  };
+
+  const handleMenuImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOcrError(null);
+    setOcrCandidates([]);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!dataUrl) return;
+      setOcrImagePreview(dataUrl);
+
+      const base64 = dataUrl.split(',')[1] ?? '';
+      const mimeType = file.type || 'image/jpeg';
+
+      if (!hasGeminiApiKey()) {
+        setOcrError(
+          '실제 메뉴판 사진 인식은 Gemini AI 키가 필요합니다. 상단 AI 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
+        );
+        return;
+      }
+
+      setIsOcrScanning(true);
+      try {
+        const extracted = await extractMenusFromImageWithAI(base64, mimeType);
+        setOcrCandidates(extracted.map((item) => ({ ...item, selected: true })));
+        if (extracted.length === 0) {
+          setOcrError('사진에서 메뉴를 찾지 못했습니다. 더 선명한 메뉴판 사진을 올려주세요.');
+        }
+      } catch (err) {
+        setOcrError(
+          err instanceof Error
+            ? err.message
+            : '메뉴판 인식 중 오류가 발생했습니다.'
+        );
+      } finally {
+        setIsOcrScanning(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleKitchenVoice = () => {
@@ -653,9 +845,10 @@ export function OwnerDashboardView({
                     />
                     <button
                       type="submit"
-                      className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
+                      disabled={isCommandProcessing}
+                      className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:opacity-60 text-white text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
                     >
-                      실행
+                      {isCommandProcessing ? '분석 중...' : '실행'}
                     </button>
                   </form>
                   <button
@@ -1256,21 +1449,157 @@ export function OwnerDashboardView({
                   신규 메뉴 등록
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const count = onBulkAddMenusFromSample(
-                    newMenuStoreId,
-                    PAPER_MENU_OCR_SAMPLE
-                  );
-                  setMenuAddNotice(`추천 메뉴 ${count}종이 일괄 등록되었습니다.`);
-                }}
-                className="min-h-[36px] px-3.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
-              >
-                <ScanText className="w-3.5 h-3.5" />
-                <span>메뉴판 일괄 등록</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={ocrFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleMenuImageUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => ocrFileInputRef.current?.click()}
+                  disabled={isOcrScanning}
+                  className="min-h-[36px] px-3.5 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:opacity-60 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isOcrScanning ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {isOcrScanning ? 'AI 메뉴판 인식 중...' : '종이 메뉴판 사진 인식'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const count = onBulkAddMenusFromSample(
+                      newMenuStoreId,
+                      PAPER_MENU_OCR_SAMPLE
+                    );
+                    setMenuAddNotice(`추천 메뉴 ${count}종이 일괄 등록되었습니다.`);
+                  }}
+                  className="min-h-[36px] px-3.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ScanText className="w-3.5 h-3.5" />
+                  <span>샘플 일괄 등록</span>
+                </button>
+              </div>
             </div>
+
+            {(ocrImagePreview || ocrError || ocrCandidates.length > 0) && (
+              <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {ocrImagePreview && (
+                      <img
+                        src={ocrImagePreview}
+                        alt="업로드된 메뉴판"
+                        className="w-16 h-16 object-cover rounded-xl border border-[#E8ECE4] shrink-0"
+                      />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-[#1A1D1A] inline-flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                        <span>Gemini Vision 종이 메뉴판 추출 결과</span>
+                      </p>
+                      <p className="text-[11px] text-[#687064] mt-0.5">
+                        인식된 메뉴를 확인하고 선택 항목을 한 번에 등록하세요.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOcrImagePreview(null);
+                      setOcrCandidates([]);
+                      setOcrError(null);
+                    }}
+                    className="text-xs font-semibold text-[#687064] hover:text-[#1A1D1A] cursor-pointer"
+                  >
+                    닫기
+                  </button>
+                </div>
+
+                {ocrError && (
+                  <div className="p-3 bg-[#FFFBEF] border border-[#E8D595] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+                    <span>{ocrError}</span>
+                    {onOpenAiSettings && (
+                      <button
+                        type="button"
+                        onClick={onOpenAiSettings}
+                        className="px-3 py-1 bg-[#4E6E2A] text-white font-semibold rounded-lg cursor-pointer"
+                      >
+                        AI 키 설정
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {ocrCandidates.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {ocrCandidates.map((item, idx) => (
+                        <label
+                          key={`${item.name}-${idx}`}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer text-xs ${
+                            item.selected
+                              ? 'bg-white border-[#82B440]'
+                              : 'bg-white/60 border-[#E8ECE4] opacity-70'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={item.selected}
+                              onChange={() =>
+                                setOcrCandidates((prev) =>
+                                  prev.map((c, i) =>
+                                    i === idx ? { ...c, selected: !c.selected } : c
+                                  )
+                                )
+                              }
+                              className="w-4 h-4 accent-[#4E6E2A]"
+                            />
+                            <span className="font-semibold text-[#1A1D1A] truncate">
+                              {item.name}
+                            </span>
+                          </span>
+                          <span className="font-mono font-bold text-[#4E6E2A] shrink-0">
+                            {formatWon(item.price)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selected = ocrCandidates.filter((c) => c.selected);
+                        if (selected.length === 0) return;
+                        const lines = selected.map(
+                          (c) => `${c.name} ${c.price}원 ${c.tags.join(' ')}`
+                        );
+                        const added = onBulkAddMenusFromSample(
+                          newMenuStoreId,
+                          lines
+                        );
+                        setMenuAddNotice(
+                          `메뉴판 사진에서 추출한 ${added}개 메뉴를 등록했습니다.`
+                        );
+                        setOcrCandidates([]);
+                        setOcrImagePreview(null);
+                      }}
+                      className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-semibold rounded-xl cursor-pointer"
+                    >
+                      선택 메뉴 ({ocrCandidates.filter((c) => c.selected).length}개) 일괄 등록
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-2.5">
               <select

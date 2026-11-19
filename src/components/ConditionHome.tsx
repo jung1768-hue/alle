@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
-  Bike,
   CalendarClock,
   ChevronDown,
   ChevronRight,
@@ -12,7 +11,6 @@ import {
   Mic,
   MicOff,
   Search,
-  ShoppingBasket,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -232,56 +230,44 @@ export function ConditionHome({
 
   const quickServices = [
     {
-      id: 'reserve',
-      label: 'AI 예약주문',
-      icon: CalendarClock,
-      onClick: () => onOpenSuperApp(SuperAppTab.B2B),
-    },
-    {
-      id: 'delivery',
-      label: '배달주문',
-      icon: Bike,
-      onClick: () => onSubmitSearch(parsedCondition),
-    },
-    {
-      id: 'save-fee',
-      label: '배달비 줄이기',
+      id: 'group-buy',
+      label: '이웃 공동구매 · 배달비 1/N',
       icon: Users,
       onClick: () => onOpenSuperApp(SuperAppTab.GROUP_BUY),
     },
     {
-      id: 'group-buy',
-      label: '이웃 공동구매',
-      icon: ShoppingBasket,
-      onClick: () => onOpenSuperApp(SuperAppTab.GROUP_BUY),
+      id: 'reserve',
+      label: '오피스 B2B 15분 예약',
+      icon: CalendarClock,
+      onClick: () => onOpenSuperApp(SuperAppTab.B2B),
     },
     {
       id: 'errand',
-      label: '심부름',
+      label: '생활 심부름',
       icon: Footprints,
       onClick: () => onOpenSuperApp(SuperAppTab.ERRAND),
     },
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-7">
+    <div className="max-w-3xl mx-auto space-y-5">
       {/* 1. Soft Sage Green Hero Card: 'AI에게 주문해보세요' */}
       <section
         aria-label="AI에게 주문해보세요"
-        className="bg-[#EAF1E2] border border-[#DCE7CF] shadow-sm rounded-3xl p-6 sm:p-8 space-y-6"
+        className="bg-[#EAF1E2] border border-[#DCE7CF] shadow-sm rounded-3xl p-5 sm:p-7 space-y-5"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="inline-flex items-center gap-1.5 font-semibold text-[#3D5720]">
             <Sparkles className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
             <span>
-              오늘의 컨디션 맞춤 · {activeLocation?.areaName ?? '대구 수성구 범어동'}
+              Zero-UI 1줄 주문 · {activeLocation?.areaName ?? '대구 수성구 범어동'}
             </span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#687064] tabular-nums">
             <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
-            <span>탐색 시간</span>
-            <span className="line-through">12분</span>
-            <strong className="text-[#3D5720]">15초</strong>
+            <span>기존 20번 터치</span>
+            <span aria-hidden="true">→</span>
+            <strong className="text-[#3D5720]">1줄 · 15초</strong>
           </span>
         </div>
 
@@ -320,36 +306,64 @@ export function ConditionHome({
           </div>
         </div>
 
-        {/* Bottom Pill Primary CTA flanked by Voice Waveforms */}
-        <div className="flex items-center justify-center gap-2.5 sm:gap-4 pt-1">
-          <VoiceWaveformIcon className="text-[#82B440] shrink-0" />
-          <button
-            type="button"
-            onClick={() => onOpenAiChat()}
-            className="flex-1 max-w-md min-h-[54px] px-5 sm:px-6 py-3.5 rounded-full bg-[#4E6E2A] hover:bg-[#3F5A21] active:scale-[0.99] text-white font-bold text-sm sm:text-base inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-6px_rgba(78,110,42,0.45)] transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Mic className="w-5 h-5 shrink-0" />
-            <span>말하고 바로 주문하기</span>
-          </button>
-          <VoiceWaveformIcon className="text-[#82B440] shrink-0" />
-        </div>
+        {/* Direct 1-Line Zero-UI Input + Voice CTA */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = rawInput.trim();
+            if (q) {
+              onOpenAiChat(q);
+            } else {
+              onOpenAiChat();
+            }
+          }}
+          className="flex flex-col sm:flex-row gap-2"
+        >
+          <div className="relative flex-1 flex items-center">
+            <Search className="w-4 h-4 text-[#4E6E2A] absolute left-4 pointer-events-none" />
+            <input
+              type="text"
+              value={rawInput}
+              onChange={(e) => onRawInputChange(e.target.value)}
+              placeholder="예: 어제 과음해서 속 쓰린데 안 맵고 25분 내로"
+              className="w-full min-h-[48px] pl-10 pr-4 py-2.5 bg-white border border-[#D4E1C5] rounded-full text-sm text-[#1A1D1A] placeholder:text-[#687064] shadow-2xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              className="flex-1 sm:flex-initial min-h-[48px] px-5 py-2.5 rounded-full bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold text-sm inline-flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <span>AI 바로 찾기</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleVoiceTrigger}
+              aria-label={isListening ? '음성 듣기 중지' : '음성으로 주문하기'}
+              className={`min-w-[48px] min-h-[48px] px-3.5 rounded-full border inline-flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                isListening
+                  ? 'bg-red-600 border-red-600 text-white'
+                  : 'bg-white border-[#D4E1C5] text-[#4E6E2A] hover:bg-[#F7F8F5]'
+              }`}
+            >
+              {isListening ? (
+                <MicOff className="w-4 h-4" />
+              ) : (
+                <Mic className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </form>
 
         <div className="flex items-center justify-center gap-3 text-xs text-[#687064]">
           <button
             type="button"
-            onClick={handleVoiceTrigger}
-            className={`inline-flex items-center gap-1 font-semibold cursor-pointer transition-colors ${
-              isListening
-                ? 'text-red-600'
-                : 'text-[#3D5720] hover:text-[#4E6E2A]'
-            }`}
+            onClick={() => onOpenAiChat()}
+            className="inline-flex items-center gap-1 font-semibold text-[#3D5720] hover:text-[#4E6E2A] cursor-pointer"
           >
-            {isListening ? (
-              <MicOff className="w-3.5 h-3.5" />
-            ) : (
-              <Mic className="w-3.5 h-3.5" />
-            )}
-            <span>{isListening ? '음성 듣기 중지' : '바로 음성 입력하기'}</span>
+            <VoiceWaveformIcon className="text-[#82B440] w-5 h-3.5" />
+            <span>대화형 AI 주문 열기</span>
           </button>
           <span aria-hidden="true">·</span>
           <span className="tabular-nums">
@@ -461,10 +475,10 @@ export function ConditionHome({
         </section>
       )}
 
-      {/* 3. Service Quick Menu (5 Clean White Rounded Icon Boxes with Deep Olive Line Icons) */}
+      {/* 3. Compact Extension Pill Strip (Streamlined UX) */}
       <section
-        aria-label="서비스 퀵 메뉴"
-        className="grid grid-cols-5 gap-2 sm:gap-3"
+        aria-label="확장 서비스"
+        className="flex flex-wrap items-center gap-2"
       >
         {quickServices.map((svc) => {
           const Icon = svc.icon;
@@ -473,14 +487,10 @@ export function ConditionHome({
               key={svc.id}
               type="button"
               onClick={svc.onClick}
-              className="flex flex-col items-center gap-2 group cursor-pointer"
+              className="flex-1 min-w-[140px] min-h-[42px] px-3.5 py-2 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl shadow-2xs inline-flex items-center justify-center gap-2 text-xs font-semibold text-[#1A1D1A] transition-all cursor-pointer"
             >
-              <div className="w-14 h-14 sm:w-[68px] sm:h-[68px] bg-white border border-[#E8ECE4] group-hover:border-[#82B440] rounded-2xl shadow-sm flex items-center justify-center text-[#4E6E2A] transition-all">
-                <Icon className="w-6 h-6" strokeWidth={1.85} />
-              </div>
-              <span className="text-[11px] sm:text-xs font-semibold text-[#1A1D1A] text-center leading-tight whitespace-nowrap">
-                {svc.label}
-              </span>
+              <Icon className="w-4 h-4 text-[#4E6E2A] shrink-0" strokeWidth={1.9} />
+              <span className="whitespace-nowrap">{svc.label}</span>
             </button>
           );
         })}

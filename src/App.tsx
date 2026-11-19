@@ -10,6 +10,7 @@ import {
   Presentation,
   RotateCcw,
   Search,
+  Sparkles,
   Store as StoreIcon,
   Truck,
   User,
@@ -19,6 +20,7 @@ import { AiChatOrderView } from './components/AiChatOrderView';
 import { AlleLogo } from './components/AlleBrand';
 import { ConditionHome } from './components/ConditionHome';
 import { FutureScopeModal } from './components/FutureScopeModal';
+import { GeminiKeyModal } from './components/GeminiKeyModal';
 import { LocationPickerModal } from './components/LocationPickerModal';
 import { MyHubView } from './components/MyHubView';
 import { OrderConfirmationView } from './components/OrderConfirmationView';
@@ -48,6 +50,13 @@ import {
   UserPreferences,
 } from './types/alle';
 import { evaluateRecommendations, parseConditionInput } from './utils/parser';
+import { checkServerGeminiAvailable } from './utils/gemini';
+import {
+  extractSharedState,
+  FirebaseSyncStatus,
+  pushSharedState,
+  subscribeSharedState,
+} from './utils/firebase';
 import {
   loadDemoState,
   resetDemoStorage,
@@ -154,12 +163,51 @@ export default function App() {
     string | undefined
   >(undefined);
   const [showFutureModal, setShowFutureModal] = useState<boolean>(false);
+  const [showGeminiModal, setShowGeminiModal] = useState<boolean>(false);
   const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [showDemoSwitcher, setShowDemoSwitcher] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [firebaseSyncStatus, setFirebaseSyncStatus] =
+    useState<FirebaseSyncStatus>('connecting');
 
   const orderSubmitLockRef = useRef<boolean>(false);
+  const skipNextFirestorePushRef = useRef<boolean>(false);
+  const lastSharedJsonRef = useRef<string>(
+    JSON.stringify(extractSharedState(initialLoad.state))
+  );
+
+  useEffect(() => {
+    void checkServerGeminiAvailable();
+  }, []);
+
+  useEffect(() => {
+    const seedShared = extractSharedState(initialLoad.state);
+    const unsubscribe = subscribeSharedState(
+      seedShared,
+      (remote) => {
+        const remoteJson = JSON.stringify(
+          extractSharedState({ ...initialLoad.state, ...remote })
+        );
+        if (remoteJson === lastSharedJsonRef.current) return;
+        lastSharedJsonRef.current = remoteJson;
+        skipNextFirestorePushRef.current = true;
+        setAppState((prev) => ({
+          ...prev,
+          stores: remote.stores,
+          menus: remote.menus,
+          orders: remote.orders,
+          errands: remote.errands,
+          reviewReplies: remote.reviewReplies,
+          priceReports: remote.priceReports,
+        }));
+      },
+      (status) => {
+        setFirebaseSyncStatus(status);
+      }
+    );
+    return () => unsubscribe();
+  }, [initialLoad.state]);
 
   useEffect(() => {
     const mode = saveDemoState({
@@ -167,6 +215,19 @@ export default function App() {
       lastConditionInput: rawInput,
     });
     setStorageMode(mode);
+
+    const shared = extractSharedState(appState);
+    const sharedJson = JSON.stringify(shared);
+    if (skipNextFirestorePushRef.current) {
+      skipNextFirestorePushRef.current = false;
+      lastSharedJsonRef.current = sharedJson;
+      return;
+    }
+
+    if (sharedJson !== lastSharedJsonRef.current) {
+      lastSharedJsonRef.current = sharedJson;
+      void pushSharedState(shared);
+    }
   }, [appState, rawInput]);
 
   const showToast = (msg: string) => {
@@ -1288,6 +1349,7 @@ export default function App() {
             onSaveReviewReply={handleSaveReviewReply}
             onToggleReviewFlag={handleToggleReviewFlag}
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
+            onOpenAiSettings={() => setShowGeminiModal(true)}
           />
         ) : role === DemoRole.PARTNER ? (
           <PartnerDashboardView
@@ -1338,6 +1400,7 @@ export default function App() {
               setAiChatInitialPrompt(undefined);
               setStep(ConsumerStep.HOME);
             }}
+            onOpenAiSettings={() => setShowGeminiModal(true)}
             onOpenRecommendationWithCondition={handleOpenRecommendationWithCondition}
             onProceedToConfirm={handleProceedToConfirm}
           />
@@ -1450,7 +1513,18 @@ export default function App() {
 
       <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span>alle · 차세대 하이퍼로컬 AI 생활 OS</span>
+          <span>
+            alle · 차세대 하이퍼로컬 AI 생활 OS{' '}
+            <span className="text-[#4E6E2A] font-semibold">
+              (
+              {firebaseSyncStatus === 'synced'
+                ? 'Firebase 실시간 동기화'
+                : firebaseSyncStatus === 'connecting'
+                  ? 'Firebase 연결 중...'
+                  : '로컬 저장소 모드'}
+              )
+            </span>
+          </span>
           <div className="flex items-center gap-5">
             <button
               type="button"
@@ -1726,6 +1800,17 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setShowDemoSwitcher(false);
+                    setShowGeminiModal(true);
+                  }}
+                  className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3 text-[#82B440]" />
+                  <span>AI 키</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDemoSwitcher(false);
                     setShowFutureModal(true);
                   }}
                   className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
@@ -1778,6 +1863,18 @@ export default function App() {
       <FutureScopeModal
         isOpen={showFutureModal}
         onClose={() => setShowFutureModal(false)}
+      />
+
+      <GeminiKeyModal
+        isOpen={showGeminiModal}
+        onClose={() => setShowGeminiModal(false)}
+        onSaved={(hasKey) =>
+          showToast(
+            hasKey
+              ? 'Gemini AI 실시간 연동이 활성화되었습니다.'
+              : '로컬 규칙 엔진 모드로 전환되었습니다.'
+          )
+        }
       />
     </div>
   );

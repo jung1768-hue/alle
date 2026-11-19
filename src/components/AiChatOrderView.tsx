@@ -9,12 +9,14 @@ import {
   RotateCcw,
   Send,
   ShoppingBag,
+  Sparkles,
   Star,
   Zap,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
 import { MenuItem, ParsedCondition, Store } from '../types/alle';
+import { hasGeminiApiKey, parseConditionWithAI } from '../utils/gemini';
 import {
   evaluateRecommendations,
   formatWon,
@@ -109,6 +111,7 @@ interface ChatMessage {
   servings?: number;
   isEmptyRelaxPrompt?: boolean;
   stagedMenuId?: string;
+  aiSource?: 'gemini' | 'rule';
 }
 
 interface AiChatOrderViewProps {
@@ -118,6 +121,7 @@ interface AiChatOrderViewProps {
   initialPrompt?: string;
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
+  onOpenAiSettings?: () => void;
   onOpenRecommendationWithCondition: (
     condition: ParsedCondition,
     selectedMenuId?: string
@@ -208,12 +212,14 @@ export function AiChatOrderView({
   initialPrompt,
   onToggleWishlist,
   onBackToHome,
+  onOpenAiSettings,
   onOpenRecommendationWithCondition,
   onProceedToConfirm,
 }: AiChatOrderViewProps) {
   const [input, setInput] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showVoiceTips, setShowVoiceTips] = useState(false);
   const [stagedServings, setStagedServings] = useState<Record<string, number>>({});
   const [stagedOptions, setStagedOptions] = useState<Record<string, string[]>>({});
@@ -309,9 +315,9 @@ export function AiChatOrderView({
     };
   }, []);
 
-  const runChatQuery = (rawText: string) => {
+  const runChatQuery = async (rawText: string) => {
     const trimmed = rawText.trim();
-    if (!trimmed) return;
+    if (!trimmed || isAnalyzing) return;
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
@@ -358,7 +364,24 @@ export function AiChatOrderView({
       return;
     }
 
-    const merged = mergeConversationalCondition(activeCondition, trimmed);
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
+
+    let merged = mergeConversationalCondition(activeCondition, trimmed);
+    let aiSource: 'gemini' | 'rule' = 'rule';
+    let aiConversationalReply: string | undefined;
+
+    if (hasGeminiApiKey() && !/초기화|처음부터|새로/.test(trimmed)) {
+      setIsAnalyzing(true);
+      const aiResult = await parseConditionWithAI(trimmed, activeCondition);
+      setIsAnalyzing(false);
+      if (aiResult.source === 'gemini') {
+        merged = aiResult.condition;
+        aiSource = 'gemini';
+        aiConversationalReply = aiResult.conversationalReply;
+      }
+    }
+
     setActiveCondition(merged);
     const evaluated = evaluateRecommendations(merged, stores, menus);
     const topMatches = evaluated.matches.slice(0, 3);
@@ -377,6 +400,8 @@ export function AiChatOrderView({
       }${
         merged.maxMinutes ? ` · ${merged.maxMinutes}분 이내` : ''
       } 조건을 모두 만족하는 메뉴를 찾지 못했어요. 조건을 조금 넓혀서 다시 찾아드릴까요?`;
+    } else if (aiConversationalReply) {
+      botText = aiConversationalReply;
     } else {
       const tagPart =
         merged.tags.length > 0 ? ` (${merged.tags.slice(0, 3).join('·')})` : '';
@@ -403,10 +428,10 @@ export function AiChatOrderView({
       servings: merged.servings,
       stagedMenuId: autoStaged?.id,
       isEmptyRelaxPrompt,
+      aiSource,
     };
 
-    setMessages((prev) => [...prev, userMsg, botMsg]);
-    setInput('');
+    setMessages((prev) => [...prev, botMsg]);
   };
 
   const handleConfirmTagInChat = (baseParsed: ParsedCondition, tag: string) => {
@@ -568,14 +593,30 @@ export function AiChatOrderView({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => runChatQuery('초기화')}
-          className="min-h-[36px] px-3 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>새 대화</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenAiSettings && (
+            <button
+              type="button"
+              onClick={onOpenAiSettings}
+              className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors border ${
+                hasGeminiApiKey()
+                  ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
+                  : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:text-[#1A1D1A]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{hasGeminiApiKey() ? 'Gemini AI 연결됨' : 'AI 키 설정'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => runChatQuery('초기화')}
+            className="min-h-[36px] px-3 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>새 대화</span>
+          </button>
+        </div>
       </div>
 
       {/* Chat Stream */}
@@ -610,6 +651,12 @@ export function AiChatOrderView({
                   <AlleBotIllustration size="sm" />
                 </div>
                 <div className="max-w-[88%] bg-white border border-[#E8ECE4] rounded-2xl rounded-tl-xs px-4 py-3 text-sm text-[#1A1D1A] leading-relaxed shadow-sm space-y-2.5">
+                  {msg.aiSource === 'gemini' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Gemini AI 분석
+                    </span>
+                  )}
                   <p>{msg.text}</p>
 
                   {msg.parsed?.needsConfirmation &&
@@ -978,6 +1025,18 @@ export function AiChatOrderView({
                   “{s.text}”
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {isAnalyzing && (
+          <div className="flex items-start gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-white border border-[#E8ECE4] shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+              <AlleBotIllustration size="sm" />
+            </div>
+            <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse" />
+              <span>Gemini AI가 컨디션과 조건에 맞는 매장을 분석하고 있어요...</span>
             </div>
           </div>
         )}
