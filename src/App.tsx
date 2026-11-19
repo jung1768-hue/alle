@@ -1282,7 +1282,7 @@ export default function App() {
                     className="w-full text-left p-2.5 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] transition-colors cursor-pointer"
                   >
                     <p className="font-semibold text-[#1A1D1A]">
-                      식후 동성로 호출 택시 연계 제안
+                      이웃 공동구매 · 오피스 B2B 예약 확인
                     </p>
                     <p className="text-[#687064] mt-0.5">
                       12:40 식사 도착 예정에 맞춘 이동 스케줄이 준비되었어요.
@@ -1777,7 +1777,7 @@ export default function App() {
                   ④ [확장] 음식-이동 연결 슈퍼앱 허브
                 </p>
                 <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                  단일 AI 에이전트 식사 후 호출 택시 원클릭 연계
+                  이웃 공동구매 · 오피스 B2B · 생활 심부름 통합
                 </p>
               </button>
             </div>

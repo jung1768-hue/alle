@@ -1,20 +1,16 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertCircle,
-  ArrowRight,
   Briefcase,
   Camera,
-  Car,
   CheckCircle2,
   Clock,
   Footprints,
   MapPin,
   Receipt,
-  RotateCcw,
   ShieldCheck,
   Sparkles,
   Users,
-  Utensils,
 } from 'lucide-react';
 import {
   B2B_OFFPEAK_SLOTS,
@@ -69,34 +65,12 @@ export function SuperAppHubView({
   stores,
   menus,
   errands,
-  latestOrder,
   activeLocation,
   onJoinGroupBuy,
   onCreateB2BOrder,
   onCreateErrand,
   onAdvanceErrand,
 }: SuperAppHubViewProps) {
-  const heroRef = useRef<HTMLElement | null>(null);
-  const [taxiStatus, setTaxiStatus] = useState<'idle' | 'matching' | 'reserved'>(
-    'idle'
-  );
-  const [taxiEtaAdjusted, setTaxiEtaAdjusted] = useState<boolean>(false);
-
-  const handleSimulateTaxiBooking = () => {
-    if (taxiStatus !== 'idle') return;
-    setTaxiStatus('matching');
-    window.setTimeout(() => {
-      setTaxiStatus('reserved');
-    }, 450);
-  };
-
-  const handleResetTaxiBooking = () => {
-    setTaxiStatus('idle');
-    setTaxiEtaAdjusted(false);
-  };
-
-  const activeMealName = latestOrder?.menuName ?? '얼큰 소고기국밥';
-  const activeStoreName = latestOrder?.storeName ?? '수성 범어 소고기국밥';
   const activeOrigin = activeLocation?.detailAddress ?? '범어동 수령지 A';
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
@@ -208,183 +182,28 @@ export function SuperAppHubView({
   const b2bTotal = b2bSubtotal + b2bDeliveryFee;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-9">
-      {/* DOMINANT HERO: Next-Action AI Agent Proposal Card (Food -> Mobility) */}
-      <section
-        ref={heroRef}
-        aria-label="다음 행동 AI 제안"
-        className="os-card rounded-[32px] p-7 sm:p-10 space-y-6"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4E6E2A]">
-            <Sparkles className="w-4 h-4 shrink-0" />
-            <span>Alle AI 에이전트 · 다음 행동 제안</span>
-          </div>
-          <span className="text-xs font-medium text-[#687064] tabular-nums">
-            식사 주문 → 이동 자동 연결
-          </span>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Clean Local Extension Hub Header */}
+      <section className="os-card rounded-3xl p-6 sm:p-7 space-y-2">
+        <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4E6E2A]">
+          <Sparkles className="w-4 h-4 shrink-0" />
+          <span>alle 동네 생활 확장</span>
         </div>
-
-        {/* Conversational Main Proposal Headline */}
-        <div className="space-y-3">
-          <h1 className="text-2xl sm:text-[28px] font-bold text-[#1A1D1A] leading-snug tracking-tight text-balance">
-            “식사 도착 예정 시간(12:40)에 맞춰 동성로 미팅 장소로 이동할 호출
-            택시를 미리 예약할까요?”
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm text-[#687064]">
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-[#4E6E2A] shrink-0" />
-              식사 후 <strong className="text-[#1A1D1A]">13:15</strong> 자동 배차
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-[#4E6E2A] shrink-0" />
-              예상 14분 · <strong className="font-mono text-[#1A1D1A]">6,800원</strong>{' '}
-              (B2B·지역화폐 통합 정산)
-            </span>
-          </div>
-        </div>
-
-        {/* Clean 2-Step Context Chain */}
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-3 p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-white border border-[#E8ECE4] flex items-center justify-center shrink-0">
-              <Utensils className="w-4 h-4 text-[#4E6E2A]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-[#687064]">
-                현재 식사 주문 · 12:40 도착
-              </p>
-              <p className="text-xs sm:text-sm font-bold text-[#1A1D1A] truncate">
-                {activeStoreName} · {activeMealName}
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden sm:flex items-center justify-center text-[#919A8D]">
-            <ArrowRight className="w-4 h-4" />
-          </div>
-
-          <div className="flex items-center gap-3 min-w-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-[#E8ECE4]">
-            <div className="w-10 h-10 rounded-xl bg-[#EAF1E2] border border-[#D4E1C5] flex items-center justify-center shrink-0">
-              <Car className="w-4 h-4 text-[#4E6E2A]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-[#4E6E2A]">
-                다음 일정 · 동성로 미팅 이동
-              </p>
-              <p className="text-xs sm:text-sm font-bold text-[#1A1D1A] truncate">
-                {activeOrigin} → 동성로 중앙로역
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Primary Focal CTA or Confirmed Simulation State */}
-        {taxiStatus === 'reserved' ? (
-          <div className="p-5 bg-[#EAF1E2] border border-[#D4E1C5] rounded-2xl space-y-3.5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="w-5 h-5 text-[#4E6E2A] shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-[#1A1D1A]">
-                    호출 택시 연계 예약 완료 · 대구 31바 4820 (중형)
-                  </p>
-                  <p className="text-xs text-[#3D5720] leading-relaxed">
-                    {taxiEtaAdjusted
-                      ? '배달 5분 지연 시나리오 반영 → 택시 픽업 시각이 13:20으로 자동 재조정되었습니다.'
-                      : `13:15 ${activeOrigin} 앞 대기 예정 · 배달 도착 변동 시 호출 시각 자동 동기화`}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleResetTaxiBooking}
-                className="min-h-[34px] px-3 py-1 bg-white hover:bg-[#F7F8F5] border border-[#D4E1C5] text-[#4E6E2A] text-xs font-semibold rounded-xl inline-flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>다시 시연</span>
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#D4E1C5]/60">
-              <button
-                type="button"
-                onClick={() => setTaxiEtaAdjusted((prev) => !prev)}
-                className="min-h-[36px] px-3.5 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-semibold rounded-xl cursor-pointer transition-colors"
-              >
-                {taxiEtaAdjusted
-                  ? '기본 13:15 스케줄로 복귀'
-                  : '배달 5분 지연 시 자동 재조정 시뮬레이션'}
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeTab(SuperAppTab.ERRAND)}
-                className="min-h-[36px] px-3.5 py-1.5 bg-white hover:bg-[#F7F8F5] border border-[#D4E1C5] text-[#3D5720] text-xs font-semibold rounded-xl cursor-pointer transition-colors"
-              >
-                식후 생활 심부름 함께 보기
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              disabled={taxiStatus === 'matching'}
-              onClick={handleSimulateTaxiBooking}
-              className="w-full min-h-[58px] px-6 py-3.5 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] text-white text-sm sm:text-base font-bold rounded-2xl inline-flex items-center justify-center gap-2.5 transition-colors shadow-[0_8px_20px_rgba(78,110,42,0.22)] cursor-pointer"
-            >
-              <Car className="w-5 h-5 shrink-0" />
-              <span>
-                {taxiStatus === 'matching'
-                  ? '12:40 배달 동선과 배차 슬롯 연동 중...'
-                  : '원탭으로 13:15 호출 택시 예약하기'}
-              </span>
-              {taxiStatus === 'idle' && <ArrowRight className="w-4 h-4 shrink-0" />}
-            </button>
-            <p className="text-center text-xs text-[#687064]">
-              배달이 늦어지면 AI가 택시 호출 시각도 자동으로 뒤로 미뤄줍니다.
-            </p>
-          </div>
-        )}
+        <h1 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] tracking-tight">
+          이웃 공동구매 · 오피스 B2B · 생활 심부름
+        </h1>
+        <p className="text-xs sm:text-sm text-[#555D51] leading-relaxed">
+          배달비를 나누는 반경 300m 공동구매부터 오프피크 단체 예약, 에스크로 기반 동네 심부름까지 한 번에 이용할 수 있습니다.
+        </p>
       </section>
 
-      {/* QUIET SECONDARY SECTION: Connected Local Services Dock */}
-      <section className="space-y-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
-          <h2 className="text-sm font-bold text-[#1A1D1A]">
-            연결된 동네 생활 서비스
-          </h2>
-          <span className="text-xs text-[#687064]">
-            단일 AI 에이전트 안에서 바로 전환
-          </span>
-        </div>
-
-        {/* Quiet, Compact Lower-Hierarchy Service Grid */}
+      {/* Connected Local Services Dock */}
+      <section className="space-y-4">
         <div
           role="tablist"
           aria-label="생활 확장 서비스 선택"
-          className="grid grid-cols-2 sm:grid-cols-4 gap-2.5"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-2.5"
         >
-          <button
-            type="button"
-            onClick={() => {
-              heroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              if (taxiStatus === 'idle') handleSimulateTaxiBooking();
-            }}
-            className="min-h-[68px] p-3 rounded-2xl border border-[#E8ECE4] bg-white hover:border-[#4E6E2A]/40 text-left flex items-center gap-3 transition-colors cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-xl bg-[#F7F8F5] text-[#687064] flex items-center justify-center shrink-0">
-              <Car className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-[#1A1D1A] truncate">
-                호출 택시
-              </div>
-              <div className="text-[11px] text-[#687064] truncate">
-                {taxiStatus === 'reserved' ? '13:15 예약됨' : '식후 연계'}
-              </div>
-            </div>
-          </button>
 
           <button
             type="button"

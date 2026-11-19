@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --font-display: "Outfit", "Noto Sans KR", sans-serif;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-display: "Pretendard Variable", "Outfit", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --color-os-bg: #F7F8F5;
@@ -10,7 +10,7 @@
   --color-os-subtle: #F0F3EC;
   --color-os-border: #E8ECE4;
   --color-os-ink: #1A1D1A;
-  --color-os-muted: #687064;
+  --color-os-muted: #555D51;
   --color-os-accent: #4E6E2A;
   --color-os-accent-hover: #3F5A21;
   --color-os-lime: #82B440;
@@ -21,12 +21,31 @@
 @layer base {
   html {
     font-family: var(--font-sans);
+    font-size: 16px;
     background-color: #F7F8F5;
     color: #1A1D1A;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (max-width: 639px) {
+    html {
+      font-size: 17px;
+    }
+
+    .text-xs {
+      font-size: 0.8125rem;
+      line-height: 1.4;
+    }
+
+    .text-\[11px\],
+    .text-\[10\.5px\],
+    .text-\[10px\] {
+      font-size: 0.75rem;
+      line-height: 1.35;
+    }
   }
 
   h1, h2, h3 {
