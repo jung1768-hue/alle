@@ -1614,7 +1614,10 @@ export default function App() {
               setAiChatInitialPrompt(undefined);
               setStep(ConsumerStep.HOME);
             }}
-            onOpenAiSettings={() => setShowGeminiModal(true)}
+            onOpenSuperApp={handleOpenSuperApp}
+            onUseRelayCoupon={(menuId) =>
+              handleQuickReorderToConfirm(menuId, 1, { couponCode: 'RELAY1000' })
+            }
             onOpenRecommendationWithCondition={handleOpenRecommendationWithCondition}
             onProceedToConfirm={handleProceedToConfirm}
           />

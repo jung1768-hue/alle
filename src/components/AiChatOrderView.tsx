@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
-import { MenuItem, ParsedCondition, Store } from '../types/alle';
+import { MenuItem, ParsedCondition, Store, SuperAppTab } from '../types/alle';
 import {
   checkServerGeminiAvailable,
   hasGeminiApiKey,
@@ -24,6 +24,7 @@ import {
 import {
   evaluateRecommendations,
   formatWon,
+  getEffectiveMenuPrice,
   parseConditionInput,
 } from '../utils/parser';
 import { startKoreanVoiceInput } from '../utils/voice';
@@ -116,6 +117,11 @@ interface ChatMessage {
   isEmptyRelaxPrompt?: boolean;
   stagedMenuId?: string;
   aiSource?: 'gemini' | 'rule';
+  actionLink?: {
+    label: string;
+    tab?: SuperAppTab;
+    relayMenuId?: string;
+  };
 }
 
 interface AiChatOrderViewProps {
@@ -126,6 +132,8 @@ interface AiChatOrderViewProps {
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
   onOpenAiSettings?: () => void;
+  onOpenSuperApp?: (tab: SuperAppTab) => void;
+  onUseRelayCoupon?: (menuId: string) => void;
   onOpenRecommendationWithCondition: (
     condition: ParsedCondition,
     selectedMenuId?: string
@@ -140,24 +148,24 @@ interface AiChatOrderViewProps {
 
 const COUNSELOR_QUICK_STARTERS = [
   {
+    label: '🔥 마감 30% 특가',
+    prompt: '오늘 마감 특가 뭐 있어?',
+  },
+  {
+    label: '🧺 전통시장·골목 묶음',
+    prompt: '전통시장 여러 가게 한 바구니로 묶어 시켜줘',
+  },
+  {
+    label: '🎁 옆집 릴레이 쿠폰',
+    prompt: '옆집 릴레이 쿠폰 쓸 수 있는 곳 알려줘',
+  },
+  {
     label: '치킨 시켜줘',
     prompt: '치킨 시켜줘',
   },
   {
     label: '마라탕 땡기네',
     prompt: '마라탕 땡기네',
-  },
-  {
-    label: '달달한 커피랑 케이크',
-    prompt: '달달한 커피랑 케이크',
-  },
-  {
-    label: '다이어트 샐러드',
-    prompt: '다이어트 샐러드',
-  },
-  {
-    label: '야식으로 족발이나 떡볶이',
-    prompt: '야식으로 족발이나 떡볶이',
   },
   {
     label: '비 오는데 전이나 국물',
@@ -216,7 +224,9 @@ export function AiChatOrderView({
   initialPrompt,
   onToggleWishlist,
   onBackToHome,
-  onOpenAiSettings,
+  onOpenAiSettings: _onOpenAiSettings,
+  onOpenSuperApp,
+  onUseRelayCoupon,
   onOpenRecommendationWithCondition,
   onProceedToConfirm,
 }: AiChatOrderViewProps) {
@@ -377,6 +387,134 @@ export function AiChatOrderView({
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+
+    // Special local-commerce intent routing (마감특가 / 시장묶음 / 공동구매 / B2B / 릴레이쿠폰)
+    if (/(마감|타임세일|떨이|잔여\s*특가)/.test(trimmed)) {
+      const closingMenus = menus
+        .filter((m) => {
+          const st = storeMap.get(m.storeId);
+          return (
+            Boolean(st?.isOpen) &&
+            !m.isSoldOut &&
+            m.stock > 0 &&
+            (m.closingDiscountPercent ?? 0) > 0
+          );
+        })
+        .slice(0, 3);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-closing-${Date.now() + 1}`,
+          sender: 'bot',
+          text:
+            closingMenus.length > 0
+              ? `지금 바로 주문 가능한 동네 마감 특가(최대 30% 할인) 메뉴 ${closingMenus.length}곳을 찾았어요! 매장 동일가 기준에서 추가 할인되어 바로 결제하실 수 있어요.`
+              : '현재 진행 중인 마감 특가 메뉴가 잠시 소진되었습니다. 대신 일반 매장 동일가 인기 메뉴를 찾아드릴까요?',
+          matchedMenuIds: closingMenus.map((m) => m.id),
+          servings: 1,
+          stagedMenuId: closingMenus[0]?.id,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (/(시장|한\s*바구니|여러\s*가게|합배송|골목\s*묶음)/.test(trimmed)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-market-${Date.now() + 1}`,
+          sender: 'bot',
+          text: '전통시장과 골목 가게 여러 곳의 메뉴를 최소주문금액 없이 한 바구니에 담고, 이웃 도보 통합 배달비 1회(1,500원)로 한 번에 받아보실 수 있어요.',
+          actionLink: onOpenSuperApp
+            ? {
+                label: '전통시장·골목 한 바구니 담으러 가기 →',
+                tab: SuperAppTab.MARKET_BUNDLE,
+              }
+            : undefined,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (/(공동구매|배달비\s*아끼|배달비\s*절약|배달비\s*반값|1\/n)/.test(trimmed)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-group-${Date.now() + 1}`,
+          sender: 'bot',
+          text: '반경 300m 이웃과 주문을 묶으면 배달비가 절반으로 줄어들어요! 지금 참여 가능한 동네 공동구매 목록을 바로 열어드릴까요?',
+          actionLink: onOpenSuperApp
+            ? {
+                label: '이웃 공동구매 참여하기 →',
+                tab: SuperAppTab.GROUP_BUY,
+              }
+            : undefined,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (/(단체|회의|오피스|법인|야근\s*식사)/.test(trimmed)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-b2b-${Date.now() + 1}`,
+          sender: 'bot',
+          text: '오피스·회의 단체 주문은 오프피크 15분 정밀 예약으로 딱 맞춰 받아보실 수 있어요. B2B 예약 화면으로 바로 연결해 드릴게요.',
+          actionLink: onOpenSuperApp
+            ? {
+                label: '오피스 B2B 15분 예약 열기 →',
+                tab: SuperAppTab.B2B,
+              }
+            : undefined,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (/(릴레이|옆집|쿠폰)/.test(trimmed)) {
+      const relayCandidate = menus.find((m) => {
+        const st = storeMap.get(m.storeId);
+        return (
+          Boolean(st?.isOpen) &&
+          !m.isSoldOut &&
+          m.stock > 0 &&
+          (st?.categoryGroup === '카페·디저트' || st?.categoryGroup === '분식·야식')
+        );
+      }) ?? menus.find((m) => !m.isSoldOut && m.stock > 0);
+
+      const relayStore = relayCandidate
+        ? storeMap.get(relayCandidate.storeId)
+        : undefined;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-relay-${Date.now() + 1}`,
+          sender: 'bot',
+          text:
+            relayCandidate && relayStore
+              ? `반경 200m 동네 이웃 매장 '${relayStore.name}'에서 옆집 릴레이 1,000원 할인 쿠폰을 바로 쓰실 수 있어요!`
+              : '인근 골목상권 릴레이 쿠폰 적용 가능한 매장을 확인해 보세요.',
+          matchedMenuIds: relayCandidate ? [relayCandidate.id] : [],
+          servings: 1,
+          actionLink:
+            relayCandidate && onUseRelayCoupon
+              ? {
+                  label: `${relayStore?.name ?? '옆집 매장'} 릴레이 1,000원 할인 주문 →`,
+                  relayMenuId: relayCandidate.id,
+                }
+              : undefined,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
 
     let merged = mergeConversationalCondition(activeCondition, trimmed);
     let aiSource: 'gemini' | 'rule' = 'rule';
@@ -662,6 +800,25 @@ export function AiChatOrderView({
                   )}
                   <p>{msg.text}</p>
 
+                  {msg.actionLink && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (msg.actionLink?.tab && onOpenSuperApp) {
+                          onOpenSuperApp(msg.actionLink.tab);
+                        } else if (
+                          msg.actionLink?.relayMenuId &&
+                          onUseRelayCoupon
+                        ) {
+                          onUseRelayCoupon(msg.actionLink.relayMenuId);
+                        }
+                      }}
+                      className="min-h-[38px] px-3.5 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl cursor-pointer transition-colors"
+                    >
+                      {msg.actionLink.label}
+                    </button>
+                  )}
+
                   {msg.parsed?.needsConfirmation &&
                     msg.parsed.unknownTokens.length > 0 && (
                       <div className="p-3 bg-[#FFFBEF] border border-[#E8D595] rounded-xl space-y-2">
@@ -739,7 +896,10 @@ export function AiChatOrderView({
                     if (!store) return null;
                     const wished = wishlistIds.includes(item.id);
                     const servings = msg.servings ?? 2;
-                    const total = item.pricePerPerson * servings + store.deliveryFee;
+                    const effectivePrice = getEffectiveMenuPrice(item);
+                    const total = effectivePrice * servings + store.deliveryFee;
+                    const isSameStore = item.storePrice === item.pricePerPerson;
+                    const hasClosingDiscount = (item.closingDiscountPercent ?? 0) > 0;
 
                     return (
                       <div
@@ -747,11 +907,25 @@ export function AiChatOrderView({
                         className="w-[268px] shrink-0 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl p-4 flex flex-col justify-between gap-3.5 shadow-sm transition-colors"
                       >
                         <div className="space-y-3">
-                          {/* Soft Sage Green '✨ AI 추천' Badge + aiReason */}
+                          {/* Soft Sage Green '✨ AI 추천' Badge + Same-Store Price + Closing Sale */}
                           <div className="p-2.5 rounded-xl bg-[#EAF1E2] border border-[#DCE7CF] space-y-1">
-                            <span className="inline-flex items-center text-[11px] font-bold text-[#3D5720]">
-                              ✨ AI 추천
-                            </span>
+                            <div className="flex flex-wrap items-center justify-between gap-1">
+                              <span className="inline-flex items-center text-[11px] font-bold text-[#3D5720]">
+                                ✨ AI 추천
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {isSameStore && (
+                                  <span className="px-1.5 py-0.5 rounded-md bg-white text-[#3D5720] text-[10px] font-bold">
+                                    매장 동일가 ✓
+                                  </span>
+                                )}
+                                {hasClosingDiscount && (
+                                  <span className="px-1.5 py-0.5 rounded-md bg-amber-600 text-white text-[10px] font-bold">
+                                    마감 -{item.closingDiscountPercent}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                             {item.aiReason && (
                               <p className="text-[11px] font-medium text-[#3D5720] leading-snug line-clamp-2">
                                 {item.aiReason}

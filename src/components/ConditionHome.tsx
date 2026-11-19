@@ -470,9 +470,15 @@ export function ConditionHome({
               />
             </div>
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-1 text-xs font-bold text-[#4E6E2A]">
+              <div className="inline-flex flex-wrap items-center gap-1.5 text-xs font-bold text-[#4E6E2A]">
                 <Zap className="w-3.5 h-3.5 fill-[#82B440] text-[#4E6E2A] shrink-0" />
                 <span>단골 1초결제</span>
+                {quickReorderCandidate.menu.storePrice ===
+                  quickReorderCandidate.menu.pricePerPerson && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                    매장 동일가 ✓
+                  </span>
+                )}
               </div>
               <p className="text-sm font-bold text-[#1A1D1A] truncate mt-0.5">
                 {quickReorderCandidate.store.name} ·{' '}
@@ -673,6 +679,19 @@ export function ConditionHome({
                           }`}
                         />
                       </button>
+
+                      <div className="absolute bottom-2.5 left-2.5 flex flex-wrap items-center gap-1">
+                        {item.isSameStorePrice && (
+                          <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#3D5720] border border-[#D4E1C5] text-[11px] font-bold shadow-2xs">
+                            매장 동일가 ✓
+                          </span>
+                        )}
+                        {(item.menu.closingDiscountPercent ?? 0) > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold shadow-2xs">
+                            마감 -{item.menu.closingDiscountPercent}%
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Crisp White Lower Area */}
