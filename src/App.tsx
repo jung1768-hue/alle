@@ -1481,15 +1481,185 @@ export default function App() {
             </button>
           </div>
 
-          {/* Right Notification Bell Icon with Fresh Lime Green Dot */}
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowNotifications((prev) => !prev)}
-              aria-expanded={showNotifications}
-              aria-label="알림 보기"
-              className="relative w-10 h-10 rounded-xl hover:bg-[#F7F8F5] text-[#1A1D1A] flex items-center justify-center transition-colors cursor-pointer"
-            >
+          {/* Right Demo Mode Quick Switcher + Notification Bell */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotifications(false);
+                  setShowDemoSwitcher((prev) => !prev);
+                }}
+                aria-expanded={showDemoSwitcher}
+                aria-label="Demo Mode 발표자 시연 전환 열기"
+                className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                  showDemoSwitcher
+                    ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
+                    : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
+                }`}
+              >
+                <Presentation className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                <span>Demo Mode</span>
+              </button>
+
+              {showDemoSwitcher && (
+                <div
+                  role="dialog"
+                  aria-label="IR 발표자용 시연 퀵 스위처"
+                  className="absolute right-0 mt-2 w-[min(92vw,344px)] bg-[#1A1D1A]/95 backdrop-blur-xl text-white border border-white/15 rounded-2xl shadow-2xl p-3.5 space-y-2.5 z-50"
+                >
+                  <div className="flex items-center justify-between px-1 pb-1.5 border-b border-white/10">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#EAF1E2]">
+                      <Presentation className="w-3.5 h-3.5 text-[#82B440]" />
+                      <span>IR 발표자 퀵 스위처</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDemoSwitcher(false)}
+                      aria-label="시연 퀵 스위처 닫기"
+                      className="p-1 text-[#919A8D] hover:text-white rounded-lg cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div
+                      className={`rounded-xl border transition-colors p-2.5 ${
+                        role === DemoRole.CONSUMER &&
+                        (step === ConsumerStep.HOME || step === ConsumerStep.AI_CHAT)
+                          ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleJumpDemoScene('customer_home')}
+                          className="flex-1 text-left cursor-pointer"
+                        >
+                          <p className="text-xs font-semibold text-white">
+                            ① [고객] 컨디션 홈 & AI 10초 주문
+                          </p>
+                          <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
+                            비가격 효용 지표 · 원탭 Zero-UI 진입
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleJumpDemoScene('customer_chat')}
+                          className="px-2.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[10.5px] font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          AI 채팅 →
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleJumpDemoScene('b2b_checkout')}
+                      className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
+                        role === DemoRole.CONSUMER && step === ConsumerStep.CONFIRM
+                          ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-white">
+                        ② [결제] B2B 식대 & 추천 근거 확인 결제
+                      </p>
+                      <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
+                        Explainable AI 근거 · 자생형 법인 식대 결제
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleJumpDemoScene('owner_dashboard')}
+                      className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
+                        role === DemoRole.OWNER
+                          ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-white">
+                        ③ [점주] 실시간 주문 접수 · 순수익 대시보드
+                      </p>
+                      <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
+                        입점 효과 요약 · 광고비 절감 & AI 단골 순증 매출
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleJumpDemoScene('superapp_hub')}
+                      className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
+                        role === DemoRole.CONSUMER && step === ConsumerStep.SUPERAPP
+                          ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-white">
+                        ④ [확장] 동네 생활 확장 허브
+                      </p>
+                      <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
+                        이웃 공동구매 · 오피스 B2B · 생활 심부름 통합
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Compact Presenter Utilities */}
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-1.5 text-[10.5px] text-[#DCE2D9]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRole(DemoRole.PARTNER);
+                        setShowDemoSwitcher(false);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-white/8 hover:bg-white/15 inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Truck className="w-3 h-3 text-[#82B440]" />
+                      <span>파트너 ({activePartnerOrderCount})</span>
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDemoSwitcher(false);
+                          setShowFutureModal(true);
+                        }}
+                        className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <HelpCircle className="w-3 h-3 text-[#C8D0C4]" />
+                        <span>안내</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleResetDemo();
+                          setShowDemoSwitcher(false);
+                        }}
+                        className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3 text-[#C8D0C4]" />
+                        <span>초기화</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDemoSwitcher(false);
+                  setShowNotifications((prev) => !prev);
+                }}
+                aria-expanded={showNotifications}
+                aria-label="알림 보기"
+                className="relative w-10 h-10 rounded-xl hover:bg-[#F7F8F5] text-[#1A1D1A] flex items-center justify-center transition-colors cursor-pointer"
+              >
               <Bell className="w-5 h-5" strokeWidth={1.9} />
               <span
                 aria-hidden="true"
@@ -1552,6 +1722,7 @@ export default function App() {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
 
@@ -1944,170 +2115,6 @@ export default function App() {
           </button>
         </div>
       </nav>
-
-      {/* Subtle Presenter Demo Mode Quick Switcher */}
-      <div className="fixed bottom-20 right-3 md:bottom-20 md:right-5 z-50 flex flex-col items-end gap-2">
-        {showDemoSwitcher && (
-          <div
-            role="dialog"
-            aria-label="IR 발표자용 시연 퀵 스위처"
-            className="w-[312px] sm:w-[344px] bg-[#1A1D1A]/95 backdrop-blur-xl text-white border border-white/15 rounded-2xl shadow-2xl p-3.5 space-y-2.5"
-          >
-            <div className="flex items-center justify-between px-1 pb-1.5 border-b border-white/10">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#EAF1E2]">
-                <Presentation className="w-3.5 h-3.5 text-[#82B440]" />
-                <span>IR 발표자 퀵 스위처</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDemoSwitcher(false)}
-                aria-label="시연 퀵 스위처 닫기"
-                className="p-1 text-[#919A8D] hover:text-white rounded-lg cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="space-y-1.5">
-              <div
-                className={`rounded-xl border transition-colors p-2.5 ${
-                  role === DemoRole.CONSUMER &&
-                  (step === ConsumerStep.HOME || step === ConsumerStep.AI_CHAT)
-                    ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleJumpDemoScene('customer_home')}
-                    className="flex-1 text-left cursor-pointer"
-                  >
-                    <p className="text-xs font-semibold text-white">
-                      ① [고객] 컨디션 홈 & AI 10초 주문
-                    </p>
-                    <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                      비가격 효용 지표 · 원탭 Zero-UI 진입
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleJumpDemoScene('customer_chat')}
-                    className="px-2.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[10.5px] font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    AI 채팅 →
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleJumpDemoScene('b2b_checkout')}
-                className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
-                  role === DemoRole.CONSUMER && step === ConsumerStep.CONFIRM
-                    ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <p className="text-xs font-semibold text-white">
-                  ② [결제] B2B 식대 & 추천 근거 확인 결제
-                </p>
-                <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                  Explainable AI 근거 · 자생형 법인 식대 결제
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleJumpDemoScene('owner_dashboard')}
-                className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
-                  role === DemoRole.OWNER
-                    ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <p className="text-xs font-semibold text-white">
-                  ③ [점주] 실시간 주문 접수 · 순수익 대시보드
-                </p>
-                <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                  입점 효과 요약 · 광고비 절감 & AI 단골 순증 매출
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleJumpDemoScene('superapp_hub')}
-                className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
-                  role === DemoRole.CONSUMER && step === ConsumerStep.SUPERAPP
-                    ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <p className="text-xs font-semibold text-white">
-                  ④ [확장] 음식-이동 연결 슈퍼앱 허브
-                </p>
-                <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                  이웃 공동구매 · 오피스 B2B · 생활 심부름 통합
-                </p>
-              </button>
-            </div>
-
-            {/* Compact Presenter Utilities */}
-            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-1.5 text-[10.5px] text-[#DCE2D9]">
-              <button
-                type="button"
-                onClick={() => {
-                  setRole(DemoRole.PARTNER);
-                  setShowDemoSwitcher(false);
-                }}
-                className="px-2 py-1 rounded-lg bg-white/8 hover:bg-white/15 inline-flex items-center gap-1 cursor-pointer"
-              >
-                <Truck className="w-3 h-3 text-[#82B440]" />
-                <span>파트너 ({activePartnerOrderCount})</span>
-              </button>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDemoSwitcher(false);
-                    setShowFutureModal(true);
-                  }}
-                  className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <HelpCircle className="w-3 h-3 text-[#C8D0C4]" />
-                  <span>안내</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleResetDemo();
-                    setShowDemoSwitcher(false);
-                  }}
-                  className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3 text-[#C8D0C4]" />
-                  <span>초기화</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setShowDemoSwitcher((prev) => !prev)}
-          aria-expanded={showDemoSwitcher}
-          aria-label="Demo Mode 발표자 시연 전환 열기"
-          className={`min-h-[32px] px-3 py-1.5 rounded-full text-[11px] font-semibold backdrop-blur-md border shadow-sm inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-            showDemoSwitcher
-              ? 'bg-[#1A1D1A]/95 text-[#EAF1E2] border-[#82B440]/60'
-              : 'bg-[#1A1D1A]/55 hover:bg-[#1A1D1A]/85 text-white/90 hover:text-white border-white/15'
-          }`}
-        >
-          <Presentation className="w-3.5 h-3.5 text-[#82B440]" />
-          <span>Demo Mode</span>
-        </button>
-      </div>
 
       <LocationPickerModal
         isOpen={showLocationPicker}
