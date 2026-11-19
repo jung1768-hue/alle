@@ -1,0 +1,3766 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Bell,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Mic,
+  Zap,
+  Calendar as CalendarIcon,
+  Bike,
+  Users,
+  ShoppingBag,
+  Footprints,
+  Home,
+  Search,
+  ClipboardList,
+  Heart,
+  User,
+  Star,
+  Plus,
+  Minus,
+  Check,
+  Sparkles,
+  ShieldCheck,
+  Volume2,
+  Send,
+  RotateCcw,
+  Share2,
+  Store,
+  AlertTriangle,
+  Clock,
+  Leaf,
+  Coins,
+  FileCheck,
+  Radio,
+  CheckCircle2,
+  X,
+  Info,
+  Award,
+  Camera,
+  SlidersHorizontal,
+} from 'lucide-react';
+
+// ============================================================================
+// 1. 타입 정의 (TypeScript Interfaces)
+// ============================================================================
+
+type RoleType = 'customer' | 'merchant' | 'partner';
+type MainTab = 'home' | 'search' | 'orders' | 'wishlist' | 'my';
+type SubView =
+  | { type: 'none' }
+  | { type: 'ai_chat'; initialPrompt?: string }
+  | { type: 'menu_detail'; menuId: string; isGroupBuy?: boolean; groupBuyId?: string }
+  | { type: 'group_buy' }
+  | { type: 'delivery_match' }
+  | { type: 'errands' }
+  | { type: 'all_stores' }
+  | { type: 'one_sec_pay' }
+  | { type: 'reservation' };
+
+interface MenuOption {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface MenuAddon {
+  id: string;
+  name: string;
+  price: number;
+}
+
+interface MenuItem {
+  id: string;
+  storeId: string;
+  storeName: string;
+  name: string;
+  category: '한식/국물' | '치킨' | '중식' | '카페/디저트' | '샐러드/분식';
+  price: number;
+  rating: number;
+  reviewCount: number;
+  deliveryMinutes: number;
+  deliveryFee: number;
+  isAvailableNow: boolean;
+  isSinglePriceGuaranteed: boolean;
+  isAiRecommended?: boolean;
+  remainingLimited?: number;
+  tags: string[];
+  description: string;
+  aiPros: string[];
+  aiCons: string[];
+  dishArt:
+    | 'galbitang'
+    | 'chicken'
+    | 'jjajang'
+    | 'kimchi_stew'
+    | 'sundubu'
+    | 'latte'
+    | 'salad'
+    | 'gimbap'
+    | 'pizza'
+    | 'burger'
+    | 'ramen'
+    | 'cake';
+  options: MenuOption[];
+  addons: MenuAddon[];
+}
+
+interface GroupBuyDeal {
+  id: string;
+  menuId: string;
+  storeName: string;
+  menuName: string;
+  originalPrice: number;
+  groupPrice: number;
+  discountPercent: number;
+  currentParticipants: number;
+  targetParticipants: number;
+  remainingTimeText: string;
+  status: 'ongoing' | 'upcoming';
+  dishArt: MenuItem['dishArt'];
+}
+
+interface CouponItem {
+  id: string;
+  title: string;
+  discountAmount: number;
+  minOrderAmount: number;
+  source: string;
+}
+
+interface OrderRecord {
+  id: string;
+  dateStr: string; // YYYY-MM-DD
+  timeStr: string; // HH:mm
+  storeName: string;
+  menuId: string;
+  menuName: string;
+  optionName: string;
+  quantity: number;
+  itemsSubtotal: number;
+  discountApplied: number;
+  deliveryFee: number;
+  totalPaid: number;
+  deliveryMode: '이웃 도보 (Track 1)' | '전문 라이더 (Track 2)' | '공동구매 묶음';
+  reservationTime?: string;
+  statusStep: 1 | 2 | 3 | 4; // 1:주문접수, 2:조리중, 3:픽업완료, 4:배송완료
+  dishArt: MenuItem['dishArt'];
+  csResolved?: string;
+}
+
+interface ErrandTask {
+  id: string;
+  title: string;
+  detail: string;
+  itemDeposit: number;
+  errandFee: number;
+  status: '모집중' | '수행중' | '영수증검수완료';
+  partnerName: string;
+}
+
+interface ChatMessage {
+  id: string;
+  sender: 'ai' | 'user';
+  text: string;
+  recommendedMenuIds?: string[];
+  quickOrderMenuId?: string;
+  quickOrderQty?: number;
+}
+
+interface ConfirmModalState {
+  isOpen: boolean;
+  title: string;
+  subtitle: string;
+  itemsSubtotal: number;
+  couponTitle?: string;
+  couponDiscount: number;
+  deliveryFee: number;
+  finalAmount: number;
+  badgeText?: string;
+  onConfirm: () => void;
+}
+
+// ============================================================================
+// 2. 시연용 내장 JSON 데이터 (Demo Seed Data - 모든 데이터는 시연 자료)
+// ============================================================================
+
+const DEMO_NEIGHBORHOODS = [
+  '대구 수성구 범어동',
+  '대구 수성구 만촌동',
+  '대구 중구 동성로',
+  '대구 달서구 상인동',
+];
+
+const INITIAL_MENUS: MenuItem[] = [
+  {
+    id: 'menu-galbitang',
+    storeId: 'store-jinbaegi',
+    storeName: '진배기 사골국밥',
+    name: '수성갈비탕',
+    category: '한식/국물',
+    price: 22000,
+    rating: 4.9,
+    reviewCount: 1420,
+    deliveryMinutes: 28,
+    deliveryFee: 1500,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    isAiRecommended: true,
+    remainingLimited: 7,
+    tags: ['따뜻한', '국물', '한식', '갈비탕', '보양', '점심', '저녁', '고기'],
+    description:
+      '부드러운 갈비와 깊고 진한 국물이 일품인 수성갈비탕의 대표 메뉴예요. (시연 자료)',
+    aiPros: [
+      '갈빗대가 큼직하고 살코기가 뼈에서 부드럽게 분리됨',
+      '국물이 느끼하지 않고 맑고 깊어 해장·보양식으로 호평',
+      '매장 식사 가격(22,000원)과 동일한 단일가격 보증 매장',
+    ],
+    aiCons: [
+      '피크타임(12:00~12:40)에는 특 사이즈가 조기 품절될 수 있음',
+    ],
+    dishArt: 'galbitang',
+    options: [
+      { id: 'opt-galbi-std', name: '수성갈비탕', price: 22000 },
+      { id: 'opt-galbi-sp', name: '특 수성갈비탕 (갈비 추가)', price: 26000 },
+    ],
+    addons: [
+      { id: 'add-rice', name: '공기밥 추가', price: 1000 },
+      { id: 'add-kkakdugi', name: '석박지 넉넉히', price: 0 },
+    ],
+  },
+  {
+    id: 'menu-chicken',
+    storeId: 'store-basak',
+    storeName: '바삭치킨 범어점',
+    name: '바삭치킨 범어점',
+    category: '치킨',
+    price: 19900,
+    rating: 4.9,
+    reviewCount: 2150,
+    deliveryMinutes: 25,
+    deliveryFee: 1500,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    isAiRecommended: true,
+    tags: ['치킨', '바삭', '야식', '맥주', '간식', '인기'],
+    description:
+      '100% 국내산 신선육을 깨끗한 전용유에 튀겨 겉은 바삭하고 속은 촉촉한 시그니처 치킨입니다.',
+    aiPros: [
+      '도보 이웃 배달로 식지 않고 25분 내 바삭하게 도착',
+      '염지가 과하지 않아 아이들과 함께 먹기 좋다는 평 다수',
+    ],
+    aiCons: ['양념 소스 추가 시 별도 옵션 선택 필요'],
+    dishArt: 'chicken',
+    options: [
+      { id: 'opt-chk-orig', name: '오리지널 바삭 후라이드', price: 19900 },
+      { id: 'opt-chk-half', name: '반반 (후라이드+달콤양념)', price: 20900 },
+    ],
+    addons: [
+      { id: 'add-radish', name: '치킨무 추가', price: 500 },
+      { id: 'add-zero', name: '제로 콜라 500ml', price: 1500 },
+    ],
+  },
+  {
+    id: 'menu-jjajang',
+    storeId: 'store-chunha',
+    storeName: '춘하짜장',
+    category: '중식',
+    price: 8500,
+    rating: 4.8,
+    reviewCount: 980,
+    deliveryMinutes: 20,
+    deliveryFee: 1500,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    tags: ['중식', '짜장', '면', '혼밥', '가성비', '빠른배달', '점심'],
+    description:
+      '직화로 볶아낸 고소한 춘장과 탱글탱글한 수타식 면발, 반숙 계란후라이가 올라간 옛날 짜장면.',
+    aiPros: [
+      '주문 후 20분 이내 초고속 도착으로 면이 불지 않음',
+      '1만 원 이하 혼밥 가성비 최고 메뉴로 재주문율 1위',
+    ],
+    aiCons: ['곱빼기 주문 시 소스 넉넉히 요청 권장'],
+    dishArt: 'jjajang',
+    options: [
+      { id: 'opt-jj-std', name: '춘하 옛날짜장', price: 8500 },
+      { id: 'opt-jj-dbl', name: '춘하 옛날짜장 (곱빼기)', price: 10000 },
+    ],
+    addons: [{ id: 'add-dumpling', name: '군만두 4pcs', price: 3000 }],
+  },
+  {
+    id: 'menu-kimchi-stew',
+    storeId: 'store-jinbaegi',
+    storeName: '범어 한상차림',
+    name: '김치찌개 정식',
+    category: '한식/국물',
+    price: 11000,
+    rating: 4.8,
+    reviewCount: 980,
+    deliveryMinutes: 20,
+    deliveryFee: 1500,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    tags: ['따뜻한', '국물', '한식', '얼큰', '김치찌개', '혼밥', '점심'],
+    description:
+      '잘 익은 묵은지와 두툼한 국내산 생삼겹살을 푹 끓여낸 칼칼하고 깊은 맛의 김치찌개 정식.',
+    aiPros: [
+      '고기와 두부가 아낌없이 들어가 한 끼 식사로 든든함',
+      '기본 반찬 3종과 갓 지은 흑미밥 포함 구성',
+    ],
+    aiCons: ['매운맛 조절은 덜 맵게 옵션으로 선택 가능'],
+    dishArt: 'kimchi_stew',
+    options: [
+      { id: 'opt-km-std', name: '돼지고기 김치찌개 정식', price: 11000 },
+      { id: 'opt-km-tuna', name: '통조림 참치 김치찌개 정식', price: 11000 },
+    ],
+    addons: [{ id: 'add-eggroll', name: '계란말이 반줄', price: 3500 }],
+  },
+  {
+    id: 'menu-sundubu',
+    storeId: 'store-sundubu',
+    storeName: '수성 맷돌순두부',
+    name: '순두부찌개',
+    category: '한식/국물',
+    price: 10500,
+    rating: 4.8,
+    reviewCount: 1120,
+    deliveryMinutes: 22,
+    deliveryFee: 1500,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    tags: ['따뜻한', '국물', '한식', '얼큰', '순두부', '계란', '점심'],
+    description:
+      '매일 아침 직접 갈아 만든 몽글몽글한 순두부에 해물 육수와 날계란을 얹은 얼큰 순두부찌개.',
+    aiPros: [
+      '부드러운 순두부 식감과 칼칼한 해물 육수의 조화',
+      '22분 내 따끈하게 도착하여 계란이 알맞게 반숙됨',
+    ],
+    aiCons: ['조개 껍데기 주의 안내 문구 확인 필요'],
+    dishArt: 'sundubu',
+    options: [
+      { id: 'opt-sd-seafood', name: '해물 순두부찌개', price: 10500 },
+      { id: 'opt-sd-beef', name: '차돌 순두부찌개', price: 12000 },
+    ],
+    addons: [{ id: 'add-nori', name: '조미김 추가', price: 500 }],
+  },
+  {
+    id: 'menu-latte',
+    storeId: 'store-namu',
+    storeName: '카페 나무',
+    name: '카페라떼 (HOT)',
+    category: '카페/디저트',
+    price: 4800,
+    rating: 4.9,
+    reviewCount: 640,
+    deliveryMinutes: 15,
+    deliveryFee: 1000,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    tags: ['커피', '카페', '라떼', '음료', '디저트', '단골'],
+    description:
+      '고소한 스페셜티 원두 에스프레소와 벨벳처럼 부드러운 스팀 밀크가 어우러진 시그니처 라떼.',
+    aiPros: [
+      '이웃 도보 배달(배달비 1,000원)로 한 잔도 부담 없이 주문 가능',
+      '실링 포장 완벽해 이동 중 쏟김 제로',
+    ],
+    aiCons: ['오트밀크 변경 시 +500원'],
+    dishArt: 'latte',
+    options: [
+      { id: 'opt-lt-hot', name: '카페라떼 (HOT)', price: 4800 },
+      { id: 'opt-lt-ice', name: '카페라떼 (ICE)', price: 4800 },
+    ],
+    addons: [{ id: 'add-shot', name: '에스프레소 샷 추가', price: 500 }],
+  },
+  {
+    id: 'menu-salad',
+    storeId: 'store-green',
+    storeName: '그린샐러드',
+    name: '닭가슴살 샐러드',
+    category: '샐러드/분식',
+    price: 11000,
+    rating: 4.9,
+    reviewCount: 830,
+    deliveryMinutes: 18,
+    deliveryFee: 1500,
+    isAvailableNow: true,
+    isSinglePriceGuaranteed: true,
+    tags: ['샐러드', '다이어트', '건강', '닭가슴살', '점심', '가벼운'],
+    description:
+      '수비드 공법으로 촉촉하게 익힌 닭가슴살과 제철 채소, 반숙란, 오리엔탈 드레싱 구성.',
+    aiPros: [
+      '채소 신선도가 매우 높고 수비드 닭가슴살이 퍽퍽하지 않음',
+      '단골 1초결제 재주문율 상위 3% 메뉴',
+    ],
+    aiCons: ['드레싱 별도 포장 기본 제공'],
+    dishArt: 'salad',
+    options: [
+      { id: 'opt-sl-chk', name: '수비드 닭가슴살 샐러드', price: 11000 },
+      { id: 'opt-sl-avo', name: '아보카도 연어 샐러드', price: 13500 },
+    ],
+    addons: [{ id: 'add-egg', name: '반숙란 1알 추가', price: 1000 }],
+  },
+];
+
+const INITIAL_GROUP_BUYS: GroupBuyDeal[] = [
+  {
+    id: 'gb-1',
+    menuId: 'menu-chicken',
+    storeName: '바삭치킨 범어점',
+    menuName: '오리지널 바삭 후라이드',
+    originalPrice: 24000,
+    groupPrice: 19900,
+    discountPercent: 17,
+    currentParticipants: 12,
+    targetParticipants: 20,
+    remainingTimeText: '2시간 30분 남음',
+    status: 'ongoing',
+    dishArt: 'chicken',
+  },
+  {
+    id: 'gb-2',
+    menuId: 'menu-jjajang',
+    storeName: '춘하짜장',
+    menuName: '춘하 옛날짜장 + 군만두 세트',
+    originalPrice: 8500,
+    groupPrice: 7200,
+    discountPercent: 15,
+    currentParticipants: 16,
+    targetParticipants: 20,
+    remainingTimeText: '1시간 15분 남음',
+    status: 'ongoing',
+    dishArt: 'jjajang',
+  },
+  {
+    id: 'gb-3',
+    menuId: 'menu-galbitang',
+    storeName: '진배기 사골국밥',
+    menuName: '수성갈비탕 저녁 공동구매',
+    originalPrice: 22000,
+    groupPrice: 18500,
+    discountPercent: 16,
+    currentParticipants: 5,
+    targetParticipants: 15,
+    remainingTimeText: '오늘 17:00 오픈 예정',
+    status: 'upcoming',
+    dishArt: 'galbitang',
+  },
+];
+
+const INITIAL_COUPONS: CouponItem[] = [
+  {
+    id: 'cp-first',
+    title: '우리동네 단골 AI 자동할인 쿠폰',
+    discountAmount: 2000,
+    minOrderAmount: 10000,
+    source: '가맹점 단골 O2O 연동',
+  },
+  {
+    id: 'cp-small',
+    title: '커피·간식 1,000원 즉시할인',
+    discountAmount: 1000,
+    minOrderAmount: 4000,
+    source: '대구로페이 제휴',
+  },
+];
+
+const INITIAL_ORDERS: OrderRecord[] = [
+  {
+    id: 'ord-20260222-1',
+    dateStr: '2026-02-22',
+    timeStr: '16:37',
+    storeName: '카페 나무',
+    menuId: 'menu-latte',
+    menuName: '카페라떼 (HOT)',
+    optionName: '카페라떼 (HOT)',
+    quantity: 1,
+    itemsSubtotal: 4800,
+    discountApplied: 0,
+    deliveryFee: 0,
+    totalPaid: 4800,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'latte',
+  },
+  {
+    id: 'ord-20260222-2',
+    dateStr: '2026-02-22',
+    timeStr: '12:10',
+    storeName: '그린샐러드',
+    menuId: 'menu-salad',
+    menuName: '닭가슴살 샐러드',
+    optionName: '수비드 닭가슴살 샐러드',
+    quantity: 1,
+    itemsSubtotal: 11000,
+    discountApplied: 0,
+    deliveryFee: 0,
+    totalPaid: 11000,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'salad',
+  },
+  {
+    id: 'ord-20260202-1',
+    dateStr: '2026-02-02',
+    timeStr: '12:25',
+    storeName: '진배기 사골국밥',
+    menuId: 'menu-galbitang',
+    menuName: '수성갈비탕',
+    optionName: '수성갈비탕',
+    quantity: 1,
+    itemsSubtotal: 22000,
+    discountApplied: 2000,
+    deliveryFee: 1500,
+    totalPaid: 21500,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'galbitang',
+  },
+  {
+    id: 'ord-20260206-1',
+    dateStr: '2026-02-06',
+    timeStr: '18:10',
+    storeName: '범어 김밥집',
+    menuId: 'menu-jjajang',
+    menuName: '참치야채 김밥 세트',
+    optionName: '기본 구성',
+    quantity: 2,
+    itemsSubtotal: 9000,
+    discountApplied: 0,
+    deliveryFee: 1500,
+    totalPaid: 10500,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'gimbap',
+  },
+  {
+    id: 'ord-20260212-1',
+    dateStr: '2026-02-12',
+    timeStr: '15:05',
+    storeName: '카페 나무',
+    menuId: 'menu-latte',
+    menuName: '제주 말차라떼',
+    optionName: 'ICE',
+    quantity: 1,
+    itemsSubtotal: 5500,
+    discountApplied: 1000,
+    deliveryFee: 1000,
+    totalPaid: 5500,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'latte',
+  },
+  {
+    id: 'ord-20260214-1',
+    dateStr: '2026-02-14',
+    timeStr: '19:20',
+    storeName: '수성 화덕피자',
+    menuId: 'menu-chicken',
+    menuName: '페퍼로니 콤비네이션 피자',
+    optionName: 'M 사이즈',
+    quantity: 1,
+    itemsSubtotal: 18900,
+    discountApplied: 2000,
+    deliveryFee: 2000,
+    totalPaid: 18900,
+    deliveryMode: '전문 라이더 (Track 2)',
+    statusStep: 4,
+    dishArt: 'pizza',
+  },
+  {
+    id: 'ord-20260216-1',
+    dateStr: '2026-02-16',
+    timeStr: '12:40',
+    storeName: '범어 한상차림',
+    menuId: 'menu-kimchi-stew',
+    menuName: '김치찌개 정식',
+    optionName: '돼지고기 김치찌개 정식',
+    quantity: 1,
+    itemsSubtotal: 11000,
+    discountApplied: 0,
+    deliveryFee: 1500,
+    totalPaid: 12500,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'kimchi_stew',
+  },
+  {
+    id: 'ord-20260218-1',
+    dateStr: '2026-02-18',
+    timeStr: '13:15',
+    storeName: '범어 수제버거',
+    menuId: 'menu-chicken',
+    menuName: '클래식 치즈버거 세트',
+    optionName: '세트',
+    quantity: 1,
+    itemsSubtotal: 12500,
+    discountApplied: 0,
+    deliveryFee: 1500,
+    totalPaid: 14000,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'burger',
+  },
+  {
+    id: 'ord-20260220-1',
+    dateStr: '2026-02-20',
+    timeStr: '20:05',
+    storeName: '수성 라멘공방',
+    menuId: 'menu-sundubu',
+    menuName: '돈코츠 차슈 라멘',
+    optionName: '반숙란 추가',
+    quantity: 1,
+    itemsSubtotal: 10500,
+    discountApplied: 0,
+    deliveryFee: 1500,
+    totalPaid: 12000,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'ramen',
+  },
+  {
+    id: 'ord-20260224-1',
+    dateStr: '2026-02-24',
+    timeStr: '21:10',
+    storeName: '바삭치킨 범어점',
+    menuId: 'menu-chicken',
+    menuName: '바삭치킨 범어점',
+    optionName: '오리지널 바삭 후라이드',
+    quantity: 1,
+    itemsSubtotal: 19900,
+    discountApplied: 2000,
+    deliveryFee: 1500,
+    totalPaid: 19400,
+    deliveryMode: '공동구매 묶음',
+    statusStep: 4,
+    dishArt: 'chicken',
+  },
+  {
+    id: 'ord-20260226-1',
+    dateStr: '2026-02-26',
+    timeStr: '12:05',
+    storeName: '그린샐러드',
+    menuId: 'menu-salad',
+    menuName: '닭가슴살 샐러드',
+    optionName: '수비드 닭가슴살 샐러드',
+    quantity: 1,
+    itemsSubtotal: 11000,
+    discountApplied: 0,
+    deliveryFee: 1500,
+    totalPaid: 12500,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'salad',
+  },
+  {
+    id: 'ord-20260228-1',
+    dateStr: '2026-02-28',
+    timeStr: '15:45',
+    storeName: '범어 파티세리',
+    menuId: 'menu-latte',
+    menuName: '생딸기 쇼트케이크',
+    optionName: '1조각',
+    quantity: 1,
+    itemsSubtotal: 7500,
+    discountApplied: 0,
+    deliveryFee: 1500,
+    totalPaid: 9000,
+    deliveryMode: '이웃 도보 (Track 1)',
+    statusStep: 4,
+    dishArt: 'cake',
+  },
+];
+
+const INITIAL_ERRANDS: ErrandTask[] = [
+  {
+    id: 'err-1',
+    title: '범어역 3번 출구 약국 상비약(연고·밴드) 대리구매',
+    detail: 'AI 에스크로 예치 완료 · 영수증 Vision OCR 자동 정산 적용',
+    itemDeposit: 12000,
+    errandFee: 2500,
+    status: '수행중',
+    partnerName: '이웃파트너 김*수 (도보 450m)',
+  },
+  {
+    id: 'err-2',
+    title: '범어동 크린세탁소 정장 1벌 수령 및 문 앞 전달',
+    detail: '출발·도착 듀얼 비전 검수 & 시간제 미니보험 자동 가입',
+    itemDeposit: 0,
+    errandFee: 3000,
+    status: '모집중',
+    partnerName: '매칭 대기중 (반경 800m 이웃)',
+  },
+];
+
+// ============================================================================
+// 3. 안전 저장소 (localStorage + 자동 메모리 폴백) & 금액/수량 검증 유틸리티
+// ============================================================================
+
+const STORAGE_KEY = 'alle_hyperlocal_demo_state_v1';
+
+function checkStorageAvailable(): boolean {
+  try {
+    const testKey = '__alle_storage_test__';
+    window.localStorage.setItem(testKey, '1');
+    window.localStorage.removeItem(testKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 양의 정수 수량 검증 (Positive integer >= 1)
+function sanitizeQuantity(qty: number): number {
+  if (!Number.isFinite(qty) || Number.isNaN(qty)) return 1;
+  return Math.max(1, Math.floor(qty));
+}
+
+// 원 단위 정수 금액 포맷
+function formatKRW(amount: number): string {
+  const safe = Math.max(0, Math.round(Number.isFinite(amount) ? amount : 0));
+  return `${safe.toLocaleString('ko-KR')}원`;
+}
+
+// 최적 할인 자동 계산 (상품할인 쿠폰이 절대 상품합계보다 커지지 않도록 보장)
+function calculateBestCoupon(
+  itemsSubtotal: number,
+  coupons: CouponItem[]
+): { coupon: CouponItem | null; appliedDiscount: number } {
+  const safeSubtotal = Math.max(0, Math.round(itemsSubtotal));
+  let bestCoupon: CouponItem | null = null;
+  let bestDiscount = 0;
+
+  for (const cp of coupons) {
+    if (safeSubtotal >= cp.minOrderAmount) {
+      // 핵심 검증: 상품할인 쿠폰이 상품합계(itemsSubtotal)를 초과할 수 없음
+      const clampedDiscount = Math.min(safeSubtotal, Math.max(0, Math.round(cp.discountAmount)));
+      if (clampedDiscount > bestDiscount) {
+        bestDiscount = clampedDiscount;
+        bestCoupon = cp;
+      }
+    }
+  }
+  return { coupon: bestCoupon, appliedDiscount: bestDiscount };
+}
+
+// 규칙 기반 로컬 자연어 추천/검색 엔진 (실제 Gemini 호출은 후속 단계로 분리)
+function runRuleBasedRecommender(query: string, menus: MenuItem[]): {
+  replyText: string;
+  matchedMenus: MenuItem[];
+  quickOrderMenu: MenuItem;
+} {
+  const q = query.trim().toLowerCase();
+
+  // 예산 파싱 (예: "2만 5천원 이하", "25000원 이하", "1만원 이하")
+  let maxBudget: number | null = null;
+  const manCheonMatch = q.match(/(\d+)\s*만\s*(\d+)\s*천/);
+  const manMatch = q.match(/(\d+)\s*만/);
+  const numWonMatch = q.match(/(\d{4,6})\s*원?/);
+
+  if (manCheonMatch) {
+    maxBudget = parseInt(manCheonMatch[1], 10) * 10000 + parseInt(manCheonMatch[2], 10) * 1000;
+  } else if (manMatch) {
+    maxBudget = parseInt(manMatch[1], 10) * 10000;
+  } else if (numWonMatch) {
+    maxBudget = parseInt(numWonMatch[1], 10);
+  }
+
+  let candidates = menus.filter((m) => m.isAvailableNow);
+
+  if (maxBudget !== null && maxBudget > 0) {
+    const withinBudget = candidates.filter((m) => m.price <= maxBudget!);
+    if (withinBudget.length > 0) {
+      candidates = withinBudget;
+    }
+  }
+
+  // 키워드 가중치 점수 계산
+  const scored = candidates.map((menu) => {
+    let score = menu.rating * 2;
+    if (q.includes('국물') || q.includes('따뜻') || q.includes('한식') || q.includes('해장')) {
+      if (menu.tags.includes('국물') || menu.category === '한식/국물') score += 15;
+    }
+    if (q.includes('얼큰') || q.includes('매운') || q.includes('칼칼')) {
+      if (menu.tags.includes('얼큰')) score += 15;
+    }
+    if (q.includes('치킨') || q.includes('야식') || q.includes('바삭')) {
+      if (menu.category === '치킨') score += 18;
+    }
+    if (q.includes('짜장') || q.includes('중식') || q.includes('면')) {
+      if (menu.category === '중식') score += 18;
+    }
+    if (q.includes('커피') || q.includes('라떼') || q.includes('카페')) {
+      if (menu.category === '카페/디저트') score += 18;
+    }
+    if (q.includes('샐러드') || q.includes('다이어트') || q.includes('가벼')) {
+      if (menu.category === '샐러드/분식') score += 18;
+    }
+    if (q.includes('빠른') || q.includes('빨리') || q.includes('30분')) {
+      if (menu.deliveryMinutes <= 28) score += 8;
+    }
+    // 직접 메뉴/가게명 매칭
+    if (q.includes(menu.name.toLowerCase()) || q.includes(menu.storeName.toLowerCase())) {
+      score += 25;
+    }
+    return { menu, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const topMenus = scored.slice(0, 3).map((s) => s.menu);
+  const best = topMenus[0] || menus[0];
+
+  let replyText = '따뜻한 국물 요리로 이 근처의 인기 메뉴를 추천해드릴게요! 😊';
+  if (q.includes('치킨') || q.includes('야식')) {
+    replyText = '지금 바로 바삭하게 튀겨 25분 내 도착하는 우리 동네 인기 치킨이에요! 🍗';
+  } else if (q.includes('짜장') || q.includes('중식')) {
+    replyText = '불지 않고 20분 만에 도착하는 단일가격 보증 중식 메뉴를 찾았어요! 🍜';
+  } else if (q.includes('커피') || q.includes('라떼')) {
+    replyText = '이웃 도보 배달(1,000원)로 한 잔도 부담 없는 카페 메뉴예요! ☕';
+  } else if (q.includes('샐러드') || q.includes('다이어트')) {
+    replyText = '가볍고 든든하게 즐기기 좋은 신선 샐러드 메뉴를 골라봤어요! 🥗';
+  } else if (maxBudget) {
+    replyText = `${formatKRW(maxBudget)} 이하 조건에 딱 맞는 지금 주문 가능한 맛집이에요! ✨`;
+  }
+
+  return {
+    replyText,
+    matchedMenus: topMenus,
+    quickOrderMenu: best,
+  };
+}
+
+// ============================================================================
+// 4. 커스텀 SVG 일러스트 컴포넌트 (로봇 마스코트 & 고품질 음식 비주얼)
+// ============================================================================
+
+const AlleRobotMascot: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
+  const dim = size === 'sm' ? 'w-10 h-10' : size === 'lg' ? 'w-20 h-20' : 'w-14 h-14';
+  return (
+    <div className={`${dim} relative flex items-center justify-center select-none shrink-0`}>
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
+        {/* 안테나 */}
+        <line x1="50" y1="24" x2="50" y2="11" stroke="#689F38" strokeWidth="4.5" strokeLinecap="round" />
+        <circle cx="50" cy="9" r="5.5" fill="#7CB342" />
+        {/* 좌우 귀 */}
+        <rect x="8" y="42" width="10" height="22" rx="5" fill="#689F38" />
+        <rect x="82" y="42" width="10" height="22" rx="5" fill="#689F38" />
+        {/* 하얀 본체 */}
+        <rect
+          x="16"
+          y="24"
+          width="68"
+          height="58"
+          rx="22"
+          fill="#FFFFFF"
+          stroke="#E5EBE0"
+          strokeWidth="2.5"
+        />
+        {/* 다크 스크린 얼굴 */}
+        <rect x="24" y="34" width="52" height="38" rx="14" fill="#1E241B" />
+        {/* 웃는 눈 */}
+        <path
+          d="M 34 50 Q 39 43 44 50"
+          fill="none"
+          stroke="#8BC34A"
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+        <path
+          d="M 56 50 Q 61 43 66 50"
+          fill="none"
+          stroke="#8BC34A"
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+        {/* 미소 입 */}
+        <path
+          d="M 44 58 Q 50 64 56 58"
+          fill="none"
+          stroke="#8BC34A"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  );
+};
+
+const DishIllustration: React.FC<{
+  art: MenuItem['dishArt'];
+  className?: string;
+}> = ({ art, className = 'w-full h-24' }) => {
+  switch (art) {
+    case 'galbitang':
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#F3EFE6] to-[#E6DEC8] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="54" rx="44" ry="26" fill="#23201E" />
+            <ellipse cx="60" cy="51" rx="39" ry="21" fill="#7D5A38" />
+            <ellipse cx="60" cy="50" rx="36" ry="18" fill="#9E764B" />
+            {/* 갈비 고기 */}
+            <rect x="34" y="42" width="16" height="10" rx="3" fill="#5D3A22" transform="rotate(-12 34 42)" />
+            <rect x="52" y="45" width="18" height="11" rx="3" fill="#6E462B" transform="rotate(8 52 45)" />
+            <rect x="68" y="40" width="15" height="10" rx="3" fill="#54331D" transform="rotate(-6 68 40)" />
+            {/* 파 고명 */}
+            <circle cx="56" cy="40" r="6" fill="none" stroke="#8BC34A" strokeWidth="3" />
+            <circle cx="64" cy="39" r="5" fill="none" stroke="#AED581" strokeWidth="2.5" />
+            <circle cx="60" cy="44" r="5" fill="none" stroke="#7CB342" strokeWidth="2.5" />
+          </svg>
+        </div>
+      );
+    case 'chicken':
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#FAF0E1] to-[#F2DEC0] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="64" rx="44" ry="16" fill="#FFFFFF" stroke="#E5E0D8" strokeWidth="2" />
+            <ellipse cx="46" cy="52" rx="14" ry="10" fill="#D9822B" />
+            <ellipse cx="72" cy="53" rx="15" ry="10" fill="#C9711E" />
+            <ellipse cx="58" cy="43" rx="15" ry="11" fill="#E69538" />
+            <ellipse cx="48" cy="40" rx="11" ry="8" fill="#EDA345" />
+            <ellipse cx="69" cy="41" rx="11" ry="8" fill="#DF892E" />
+            <circle cx="55" cy="38" r="2" fill="#F8C471" />
+            <circle cx="64" cy="44" r="2" fill="#F8C471" />
+          </svg>
+        </div>
+      );
+    case 'jjajang':
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#F4EFEA] to-[#E6DDD3] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="53" rx="43" ry="25" fill="#1E1E1E" />
+            <ellipse cx="60" cy="50" rx="38" ry="20" fill="#F4D03F" />
+            <path d="M 28 48 Q 52 34 72 52 Q 55 66 28 54 Z" fill="#2C1B12" />
+            {/* 계란후라이 */}
+            <ellipse cx="68" cy="44" rx="12" ry="8" fill="#FFFFFF" />
+            <circle cx="69" cy="44" r="4.5" fill="#F39C12" />
+          </svg>
+        </div>
+      );
+    case 'kimchi_stew':
+    case 'sundubu':
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#FBECE6] to-[#F5D6C8] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="54" rx="43" ry="25" fill="#23201E" />
+            <ellipse cx="60" cy="51" rx="38" ry="20" fill="#C0392B" />
+            <ellipse cx="60" cy="50" rx="35" ry="17" fill="#E74C3C" />
+            <rect x="40" y="43" width="12" height="9" rx="2" fill="#FDF2E9" />
+            <rect x="65" y="45" width="12" height="9" rx="2" fill="#FDF2E9" />
+            {art === 'sundubu' ? (
+              <>
+                <circle cx="60" cy="47" r="7" fill="#FFFFFF" />
+                <circle cx="60" cy="47" r="4" fill="#F1C40F" />
+              </>
+            ) : (
+              <circle cx="58" cy="42" r="5" fill="#7CB342" />
+            )}
+          </svg>
+        </div>
+      );
+    case 'latte':
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#F7F4EE] to-[#EAE3D5] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="68" rx="34" ry="10" fill="#FFFFFF" stroke="#E0DBD1" strokeWidth="1.5" />
+            <path d="M 38 38 L 43 64 Q 60 70 77 64 L 82 38 Z" fill="#FFFFFF" stroke="#E0DBD1" strokeWidth="1.5" />
+            <ellipse cx="60" cy="38" rx="22" ry="9" fill="#B98B56" />
+            <path d="M 52 38 Q 60 32 68 38 Q 60 44 52 38 Z" fill="#FFFDF9" />
+          </svg>
+        </div>
+      );
+    case 'salad':
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#EEF6E8] to-[#DCEAD0] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="56" rx="40" ry="21" fill="#FFFFFF" stroke="#D5DFCC" strokeWidth="2" />
+            <circle cx="48" cy="48" r="11" fill="#7CB342" />
+            <circle cx="71" cy="49" r="11" fill="#8BC34A" />
+            <circle cx="59" cy="44" r="10" fill="#689F38" />
+            <circle cx="64" cy="52" r="5" fill="#E74C3C" />
+            <ellipse cx="50" cy="52" rx="6" ry="4" fill="#FDEBD0" />
+          </svg>
+        </div>
+      );
+    default:
+      return (
+        <div className={`${className} bg-gradient-to-br from-[#F3F5EF] to-[#E5EBDD] flex items-center justify-center overflow-hidden`}>
+          <svg viewBox="0 0 120 90" className="w-full h-full">
+            <ellipse cx="60" cy="56" rx="38" ry="20" fill="#FFFFFF" stroke="#DCE3D5" strokeWidth="2" />
+            <circle cx="60" cy="47" r="15" fill="#8BC34A" opacity="0.85" />
+            <circle cx="54" cy="44" r="4" fill="#F39C12" />
+            <circle cx="66" cy="48" r="4" fill="#E74C3C" />
+          </svg>
+        </div>
+      );
+  }
+};
+
+// ============================================================================
+// 5. 메인 애플리케이션 컴포넌트 (App)
+// ============================================================================
+
+export function App() {
+  // 저장소 사용 가능 여부 감지 (불가능할 경우 메모리 모드 안내 배너 노출)
+  const [storageAvailable] = useState<boolean>(() => checkStorageAvailable());
+
+  // 초기 상태 로드 (localStorage -> 실패 시 내장 JSON 기본값)
+  const loadInitialState = () => {
+    if (storageAvailable) {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          return JSON.parse(raw);
+        }
+      } catch {
+        // 메모리 모드로 계속 진행
+      }
+    }
+    return null;
+  };
+
+  const saved = useMemo(() => loadInitialState(), []);
+
+  // 핵심 애플리케이션 상태
+  const [role, setRole] = useState<RoleType>(saved?.role || 'customer');
+  const [activeTab, setActiveTab] = useState<MainTab>('home');
+  const [subView, setSubView] = useState<SubView>({ type: 'none' });
+  const [neighborhood, setNeighborhood] = useState<string>(
+    saved?.neighborhood || '대구 수성구 범어동'
+  );
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+
+  const [menus, setMenus] = useState<MenuItem[]>(saved?.menus || INITIAL_MENUS);
+  const [groupBuys, setGroupBuys] = useState<GroupBuyDeal[]>(
+    saved?.groupBuys || INITIAL_GROUP_BUYS
+  );
+  const [coupons, setCoupons] = useState<CouponItem[]>(saved?.coupons || INITIAL_COUPONS);
+  const [orders, setOrders] = useState<OrderRecord[]>(saved?.orders || INITIAL_ORDERS);
+  const [wishlistIds, setWishlistIds] = useState<string[]>(
+    saved?.wishlistIds || ['menu-galbitang', 'menu-chicken']
+  );
+  const [walletBalance, setWalletBalance] = useState<number>(saved?.walletBalance ?? 35000);
+  const [errands, setErrands] = useState<ErrandTask[]>(saved?.errands || INITIAL_ERRANDS);
+
+  // 주문내역 서브탭 & 달력 상태
+  const [ordersSubTab, setOrdersSubTab] = useState<'status' | 'history'>('history');
+  const [calendarMode, setCalendarMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedMonth, setSelectedMonth] = useState<number>(2); // 2월 (첨부 이미지 동일)
+  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-02-22');
+
+  // 검색 화면 상태
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [onlyAvailableNow, setOnlyAvailableNow] = useState<boolean>(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('전체');
+
+  // AI 주문하기 채팅 상태
+  const [voiceMode, setVoiceMode] = useState<boolean>(true);
+  const [chatInput, setChatInput] = useState<string>('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 'msg-welcome',
+      sender: 'ai',
+      text: '안녕하세요!\n뭐 드시고 싶으세요?\n말로 하시거나, 아래에서 선택해도 돼요.',
+    },
+    {
+      id: 'msg-user-init',
+      sender: 'user',
+      text: '따뜻한 국물 있는 한식 먹고 싶어요',
+    },
+    {
+      id: 'msg-ai-rec',
+      sender: 'ai',
+      text: '따뜻한 국물 요리로 이 근처의 인기 메뉴를 추천해드릴게요! 😊',
+      recommendedMenuIds: ['menu-galbitang', 'menu-kimchi-stew', 'menu-sundubu'],
+      quickOrderMenuId: 'menu-galbitang',
+      quickOrderQty: 1,
+    },
+  ]);
+
+  // 메뉴 상세 화면 상태
+  const [detailOptionId, setDetailOptionId] = useState<string>('');
+  const [detailAddonIds, setDetailAddonIds] = useState<string[]>([]);
+  const [detailQty, setDetailQty] = useState<number>(1);
+  const [detailReservationSlot, setDetailReservationSlot] = useState<string>('즉시 배달 (약 28분)');
+
+  // 공동구매 탭 상태
+  const [gbTab, setGbTab] = useState<'ongoing' | 'upcoming'>('ongoing');
+
+  // 심부름 입력 상태
+  const [errandPrompt, setErrandPrompt] = useState<string>('');
+
+  // 점주 음성 명령 / 로그 상태
+  const [merchantVoiceLog, setMerchantVoiceLog] = useState<string[]>([
+    'AI 주방 도우미 대기중 — "주문 수락, 20분" 또는 "치즈볼 품절"을 눌러 시연해보세요.',
+  ]);
+  const [merchantTab, setMerchantTab] = useState<'orders' | 'menus' | 'reviews'>('orders');
+  const [reviewReplySent, setReviewReplySent] = useState<boolean>(false);
+  const [maliciousBlocked, setMaliciousBlocked] = useState<boolean>(false);
+
+  // 토스트 알림 & 최종 확인 모달
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    itemsSubtotal: 0,
+    couponDiscount: 0,
+    deliveryFee: 0,
+    finalAmount: 0,
+    onConfirm: () => {},
+  });
+
+  // 상태 변경 시 localStorage 자동 저장
+  useEffect(() => {
+    if (!storageAvailable) return;
+    try {
+      const payload = {
+        role,
+        neighborhood,
+        menus,
+        groupBuys,
+        coupons,
+        orders,
+        wishlistIds,
+        walletBalance,
+        errands,
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // 저장 실패 시 무시하고 메모리 상태 유지
+    }
+  }, [
+    storageAvailable,
+    role,
+    neighborhood,
+    menus,
+    groupBuys,
+    coupons,
+    orders,
+    wishlistIds,
+    walletBalance,
+    errands,
+  ]);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    window.setTimeout(() => {
+      setToastMsg((prev) => (prev === msg ? null : prev));
+    }, 3000);
+  };
+
+  // 데모 초기화 핸들러
+  const handleResetDemo = () => {
+    if (storageAvailable) {
+      try {
+        window.localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    setRole('customer');
+    setActiveTab('home');
+    setSubView({ type: 'none' });
+    setNeighborhood('대구 수성구 범어동');
+    setMenus(INITIAL_MENUS);
+    setGroupBuys(INITIAL_GROUP_BUYS);
+    setCoupons(INITIAL_COUPONS);
+    setOrders(INITIAL_ORDERS);
+    setWishlistIds(['menu-galbitang', 'menu-chicken']);
+    setWalletBalance(35000);
+    setErrands(INITIAL_ERRANDS);
+    setOrdersSubTab('history');
+    setSelectedMonth(2);
+    setSelectedDateStr('2026-02-22');
+    showToast('시연 데이터가 초기 상태로 리셋되었습니다.');
+  };
+
+  // 찜 토글
+  const toggleWishlist = (menuId: string) => {
+    setWishlistIds((prev) => {
+      const exists = prev.includes(menuId);
+      const next = exists ? prev.filter((id) => id !== menuId) : [...prev, menuId];
+      showToast(exists ? '찜 목록에서 해제했어요.' : '찜 목록에 담았어요! 💚');
+      return next;
+    });
+  };
+
+  // 메뉴 상세 화면 열기
+  const openMenuDetail = (menuId: string, isGroupBuy = false, groupBuyId?: string) => {
+    const target = menus.find((m) => m.id === menuId) || menus[0];
+    setDetailOptionId(target.options[0]?.id || '');
+    setDetailAddonIds([]);
+    setDetailQty(1);
+    setDetailReservationSlot(`즉시 배달 (약 ${target.deliveryMinutes}분)`);
+    setSubView({ type: 'menu_detail', menuId: target.id, isGroupBuy, groupBuyId });
+  };
+
+  // 주문/예약 최종 확인 모달 열기 -> 확인 후에만 모의 주문 생성
+  const triggerOrderConfirmation = (params: {
+    menu: MenuItem;
+    optionName: string;
+    unitPrice: number;
+    quantity: number;
+    deliveryFee: number;
+    deliveryMode: OrderRecord['deliveryMode'];
+    reservationTime?: string;
+    groupBuyId?: string;
+  }) => {
+    const safeQty = sanitizeQuantity(params.quantity);
+    const safeUnit = Math.max(0, Math.round(params.unitPrice));
+    const itemsSubtotal = safeUnit * safeQty;
+    const { coupon, appliedDiscount } = calculateBestCoupon(itemsSubtotal, coupons);
+    const safeDeliveryFee = Math.max(0, Math.round(params.deliveryFee));
+    const finalAmount = Math.max(0, itemsSubtotal - appliedDiscount + safeDeliveryFee);
+
+    setConfirmModal({
+      isOpen: true,
+      title: `${params.menu.name} (${safeQty}개)`,
+      subtitle: `${params.menu.storeName} · ${params.optionName}${
+        params.reservationTime ? ` · 예약: ${params.reservationTime}` : ''
+      }`,
+      itemsSubtotal,
+      couponTitle: coupon?.title,
+      couponDiscount: appliedDiscount,
+      deliveryFee: safeDeliveryFee,
+      finalAmount,
+      badgeText: params.deliveryMode,
+      onConfirm: () => {
+        const newOrder: OrderRecord = {
+          id: `ord-${Date.now()}`,
+          dateStr: '2026-02-22',
+          timeStr: '09:41',
+          storeName: params.menu.storeName,
+          menuId: params.menu.id,
+          menuName: params.menu.name,
+          optionName: params.optionName,
+          quantity: safeQty,
+          itemsSubtotal,
+          discountApplied: appliedDiscount,
+          deliveryFee: safeDeliveryFee,
+          totalPaid: finalAmount,
+          deliveryMode: params.deliveryMode,
+          reservationTime: params.reservationTime,
+          statusStep: 2, // 조리 중 상태로 실시간 관제 시작
+          dishArt: params.menu.dishArt,
+        };
+
+        setOrders((prev) => [newOrder, ...prev]);
+        setWalletBalance((prev) => Math.max(0, prev - finalAmount));
+
+        // 한정 수량 차감
+        setMenus((prev) =>
+          prev.map((m) =>
+            m.id === params.menu.id && typeof m.remainingLimited === 'number'
+              ? { ...m, remainingLimited: Math.max(0, m.remainingLimited - safeQty) }
+              : m
+          )
+        );
+
+        // 공동구매 참여 수 증가
+        if (params.groupBuyId) {
+          setGroupBuys((prev) =>
+            prev.map((g) =>
+              g.id === params.groupBuyId
+                ? {
+                    ...g,
+                    currentParticipants: Math.min(g.targetParticipants, g.currentParticipants + 1),
+                  }
+                : g
+            )
+          );
+        }
+
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        setSubView({ type: 'none' });
+        setActiveTab('orders');
+        setOrdersSubTab('status');
+        showToast('모의 결제가 완료되어 실시간 라이브 관제를 시작합니다!');
+      },
+    });
+  };
+
+  // AI 채팅 메시지 전송 처리 (규칙 기반 추천)
+  const handleSendChat = (customPrompt?: string) => {
+    const text = (customPrompt ?? chatInput).trim();
+    if (!text) return;
+
+    const userMsg: ChatMessage = {
+      id: `u-${Date.now()}`,
+      sender: 'user',
+      text,
+    };
+
+    const rec = runRuleBasedRecommender(text, menus);
+    const aiMsg: ChatMessage = {
+      id: `a-${Date.now() + 1}`,
+      sender: 'ai',
+      text: rec.replyText,
+      recommendedMenuIds: rec.matchedMenus.map((m) => m.id),
+      quickOrderMenuId: rec.quickOrderMenu.id,
+      quickOrderQty: 1,
+    };
+
+    setChatMessages((prev) => [...prev, userMsg, aiMsg]);
+    if (!customPrompt) setChatInput('');
+  };
+
+  // 브라우저 공유 시연
+  const handleShareDemo = (label: string) => {
+    const shareText = `[올이(Alle) 시연] ${label} - 같은 브라우저 내 시연 모드 링크가 복사되었습니다.`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareText).catch(() => {});
+    }
+    showToast('같은 브라우저 시연 공유 안내가 복사되었습니다.');
+  };
+
+  // ============================================================================
+  // 6. 서브 화면 렌더링 함수들
+  // ============================================================================
+
+  // (A) AI 주문하기 화면 (첨부 이미지 2번 디자인 정밀 반영)
+  const renderAiChatView = () => {
+    return (
+      <div className="flex flex-col h-full bg-[#F6F7F4]">
+        {/* 상단 헤더 */}
+        <div className="flex items-center justify-between px-4 py-3.5 bg-white border-b border-black/5">
+          <button
+            onClick={() => setSubView({ type: 'none' })}
+            className="p-2 -ml-2 rounded-full hover:bg-black/5 active:scale-95 transition"
+            aria-label="뒤로가기"
+          >
+            <ChevronLeft className="w-6 h-6 text-[#141812]" />
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-5 h-3.5 rounded-b-full border-b-[3.5px] border-l-[3.5px] border-r-[3.5px] border-[#5D8C32]" />
+            <span className="font-extrabold text-[19px] text-[#141812] tracking-tight">AI 주문하기</span>
+          </div>
+          <button
+            onClick={() => {
+              setVoiceMode((v) => !v);
+              showToast(!voiceMode ? '음성모드가 켜졌습니다 (시연)' : '텍스트 입력 모드로 전환');
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition ${
+              voiceMode
+                ? 'bg-[#E7EFE1] text-[#2E531A] border-[#C3D6B4]'
+                : 'bg-white text-[#4A5246] border-gray-200'
+            }`}
+          >
+            <Volume2 className="w-4 h-4" />
+            음성모드
+          </button>
+        </div>
+
+        {/* 규칙 기반 시연 안내 배지 */}
+        <div className="px-4 py-2 bg-[#E7EFE1] text-xs font-medium text-[#2E531A] flex items-center justify-between">
+          <span>온디바이스 규칙 기반 Zero-UI 추천 (Gemini 연동 후속 단계)</span>
+          <span className="font-bold">시연 자료</span>
+        </div>
+
+        {/* 대화 스크롤 영역 */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {chatMessages.map((msg, idx) => {
+            if (msg.sender === 'user') {
+              return (
+                <div key={msg.id} className="flex justify-end">
+                  <div className="bg-[#2E531A] text-white px-4 py-3 rounded-2xl rounded-br-sm text-[15px] font-semibold shadow-sm flex items-center gap-2 max-w-[85%]">
+                    <span className="tracking-widest text-xs opacity-80">ılılı</span>
+                    <span>{msg.text}</span>
+                  </div>
+                </div>
+              );
+            }
+
+            const recMenus = (msg.recommendedMenuIds || [])
+              .map((id) => menus.find((m) => m.id === id))
+              .filter(Boolean) as MenuItem[];
+            const quickMenu = msg.quickOrderMenuId
+              ? menus.find((m) => m.id === msg.quickOrderMenuId)
+              : undefined;
+            const currentQty = sanitizeQuantity(msg.quickOrderQty || 1);
+
+            return (
+              <div key={msg.id} className="space-y-3">
+                {/* 로봇 말풍선 */}
+                <div className="flex items-start gap-2.5">
+                  <AlleRobotMascot size="sm" />
+                  <div className="bg-white px-4 py-3.5 rounded-2xl rounded-tl-sm shadow-sm border border-black/5 text-[15px] leading-relaxed text-[#141812] whitespace-pre-line">
+                    {msg.text}
+                  </div>
+                </div>
+
+                {/* 첫 인사말 아래 빠른 선택 칩 */}
+                {idx === 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {[
+                      { label: '오늘 추천 메뉴', prompt: '따뜻한 국물 있는 한식 먹고 싶어요' },
+                      { label: '빠른 재주문', prompt: '바삭치킨 2만 5천원 이하로 주문해줘' },
+                      { label: '배달비 아끼기', prompt: '가성비 좋은 짜장면 추천해줘' },
+                      { label: '예약 주문', prompt: '저녁에 먹을 얼큰한 순두부찌개 추천' },
+                    ].map((chip) => (
+                      <button
+                        key={chip.label}
+                        onClick={() => handleSendChat(chip.prompt)}
+                        className="shrink-0 bg-white hover:bg-[#E7EFE1] text-[#141812] text-[13px] font-semibold px-4 py-2 rounded-full border border-black/10 shadow-2xs transition"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* 가로 추천 메뉴 카드 캐러셀 */}
+                {recMenus.length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+                    {recMenus.map((item, rIdx) => {
+                      const wished = wishlistIds.includes(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          className="w-[164px] sm:w-[184px] shrink-0 bg-white rounded-2xl p-2.5 shadow-sm border border-black/5 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div
+                              onClick={() => openMenuDetail(item.id)}
+                              className="relative rounded-xl overflow-hidden cursor-pointer"
+                            >
+                              <DishIllustration art={item.dishArt} className="w-full h-28" />
+                              {rIdx === 0 && (
+                                <span className="absolute top-2 left-2 bg-[#E7EFE1]/95 text-[#2E531A] text-[11px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-2xs">
+                                  <Sparkles className="w-3 h-3" /> AI 추천
+                                </span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleWishlist(item.id);
+                                }}
+                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 flex items-center justify-center shadow-2xs"
+                                aria-label="찜하기"
+                              >
+                                <Heart
+                                  className={`w-4 h-4 ${
+                                    wished ? 'fill-red-500 text-red-500' : 'text-gray-500'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => openMenuDetail(item.id)}
+                              className="mt-2.5 text-left font-extrabold text-[15px] text-[#141812] line-clamp-1 hover:underline"
+                            >
+                              {item.name}
+                            </button>
+                            <div className="flex items-center gap-1 text-xs text-[#4A5246] mt-1">
+                              <Star className="w-3.5 h-3.5 fill-[#2E531A] text-[#2E531A]" />
+                              <span className="font-bold text-[#141812]">{item.rating}</span>
+                              <span>({item.reviewCount.toLocaleString()})</span>
+                              <span>· {item.deliveryMinutes}분</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setChatMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id
+                                    ? { ...m, quickOrderMenuId: item.id, quickOrderQty: 1 }
+                                    : m
+                                )
+                              );
+                              showToast(`${item.name}을(를) 바로 결제 카드에 담았어요.`);
+                            }}
+                            className="mt-3 w-full py-2 rounded-xl bg-[#E7EFE1] hover:bg-[#D6E4CC] text-[#2E531A] font-extrabold text-[13px] transition"
+                          >
+                            담기
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* AI 원스톱 바로 결제 카드 */}
+                {quickMenu && (
+                  <div className="space-y-2.5 pt-1">
+                    <div className="flex items-center gap-2.5">
+                      <AlleRobotMascot size="sm" />
+                      <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-black/5 text-[15px] font-semibold text-[#141812]">
+                        {quickMenu.name}을 주문할까요?
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/5 space-y-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0">
+                            <DishIllustration art={quickMenu.dishArt} className="w-full h-full" />
+                          </div>
+                          <div>
+                            <div className="font-extrabold text-[15px] text-[#141812]">
+                              {quickMenu.name} {currentQty}개
+                            </div>
+                            <div className="text-[13px] text-[#4A5246] mt-0.5">
+                              {formatKRW(quickMenu.price)} · 배달 {quickMenu.deliveryMinutes}분
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 수량 조절 (양의 정수 검증) */}
+                        <div className="flex items-center gap-2.5 bg-[#F6F7F4] rounded-full px-2.5 py-1.5 border border-black/5">
+                          <button
+                            onClick={() =>
+                              setChatMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id
+                                    ? {
+                                        ...m,
+                                        quickOrderQty: sanitizeQuantity(currentQty - 1),
+                                      }
+                                    : m
+                                )
+                              )
+                            }
+                            className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-[#141812] shadow-2xs"
+                            aria-label="수량 감소"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-sm font-extrabold w-4 text-center">{currentQty}</span>
+                          <button
+                            onClick={() =>
+                              setChatMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id
+                                    ? {
+                                        ...m,
+                                        quickOrderQty: sanitizeQuantity(currentQty + 1),
+                                      }
+                                    : m
+                                )
+                              )
+                            }
+                            className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-[#141812] shadow-2xs"
+                            aria-label="수량 증가"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2.5 border-t border-gray-100">
+                        <span className="text-[13px] text-[#4A5246] font-semibold">총 결제금액</span>
+                        <span className="text-xl font-extrabold text-[#141812]">
+                          {formatKRW(quickMenu.price * currentQty)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          onClick={() => openMenuDetail(quickMenu.id)}
+                          className="py-3 rounded-xl bg-[#F2F4EE] hover:bg-[#E5EAE0] text-[#2E531A] font-extrabold text-sm transition"
+                        >
+                          다른 메뉴 보기
+                        </button>
+                        <button
+                          onClick={() =>
+                            triggerOrderConfirmation({
+                              menu: quickMenu,
+                              optionName: quickMenu.options[0]?.name || '기본',
+                              unitPrice: quickMenu.price,
+                              quantity: currentQty,
+                              deliveryFee: quickMenu.deliveryFee,
+                              deliveryMode: '이웃 도보 (Track 1)',
+                            })
+                          }
+                          className="py-3 rounded-xl bg-[#2E531A] hover:bg-[#234113] text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-sm transition"
+                        >
+                          <Zap className="w-4 h-4 fill-current" /> 바로 결제하기
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 하단 자연어 입력 & 음성 시뮬레이션 바 */}
+        <div className="p-3.5 bg-white border-t border-black/5">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendChat();
+            }}
+            className="flex items-center gap-2.5"
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="또는 원하는 메뉴를 직접 입력하세요"
+              className="flex-1 bg-[#F3F5F0] text-[15px] px-4 py-3 rounded-full outline-none focus:ring-2 focus:ring-[#2E531A]"
+            />
+            {chatInput.trim() ? (
+              <button
+                type="submit"
+                className="w-12 h-12 rounded-full bg-[#2E531A] text-white flex items-center justify-center shadow-sm shrink-0"
+                aria-label="전송"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendChat('성인 2명 얼큰한 국물 요리 2만 5천원 이하로 추천해줘')
+                }
+                title="음성 명령 시연 실행"
+                className="w-12 h-12 rounded-full bg-[#2E531A] hover:bg-[#234113] text-white flex items-center justify-center shadow-sm shrink-0 transition"
+                aria-label="음성 주문 시연"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+            )}
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // (B) 메뉴 상세 & AI 리뷰 요약 & 15분 단위 정밀 예약배달 (첨부 이미지 3-1)
+  const renderMenuDetailView = (menuId: string, isGroupBuy?: boolean, groupBuyId?: string) => {
+    const menu = menus.find((m) => m.id === menuId) || menus[0];
+    const gbDeal = groupBuyId ? groupBuys.find((g) => g.id === groupBuyId) : undefined;
+    const wished = wishlistIds.includes(menu.id);
+
+    const selectedOpt =
+      menu.options.find((o) => o.id === detailOptionId) || menu.options[0];
+    const basePrice = gbDeal ? gbDeal.groupPrice : selectedOpt?.price ?? menu.price;
+    const addonsTotal = menu.addons
+      .filter((a) => detailAddonIds.includes(a.id))
+      .reduce((acc, cur) => acc + cur.price, 0);
+    const unitTotal = basePrice + addonsTotal;
+    const safeQty = sanitizeQuantity(detailQty);
+    const grandSubtotal = unitTotal * safeQty;
+
+    const reservationSlots = [
+      `즉시 배달 (약 ${menu.deliveryMinutes}분)`,
+      '오늘 12:15 정밀 도착',
+      '오늘 12:30 정밀 도착',
+      '오늘 18:45 퇴근맞춤 도착',
+      '오늘 19:00 정밀 도착',
+    ];
+
+    return (
+      <div className="flex flex-col h-full bg-white">
+        {/* 상단 네비게이션 */}
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-black/5">
+          <button
+            onClick={() => setSubView({ type: 'none' })}
+            className="p-2 -ml-2 rounded-full hover:bg-black/5"
+            aria-label="뒤로가기"
+          >
+            <ChevronLeft className="w-6 h-6 text-[#1E241B]" />
+          </button>
+          <span className="text-xs font-semibold text-[#486B28] bg-[#EAF1E1] px-2.5 py-1 rounded-full">
+            단일가격 보증 · 중개수수료 0% (시연)
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => toggleWishlist(menu.id)}
+              className="p-2 rounded-full hover:bg-black/5"
+              aria-label="찜하기"
+            >
+              <Heart
+                className={`w-5 h-5 ${wished ? 'fill-red-500 text-red-500' : 'text-gray-700'}`}
+              />
+            </button>
+            <button
+              onClick={() => handleShareDemo(`${menu.storeName} - ${menu.name}`)}
+              className="p-2 rounded-full hover:bg-black/5"
+              aria-label="공유하기"
+            >
+              <Share2 className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
+        </div>
+
+        {/* 스크롤 본문 */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
+          {/* 음식 이미지 배너 */}
+          <div className="mt-2 rounded-2xl overflow-hidden shadow-sm border border-black/5 relative">
+            <DishIllustration art={menu.dishArt} className="w-full h-48" />
+            {typeof menu.remainingLimited === 'number' && (
+              <span className="absolute bottom-2.5 left-2.5 bg-black/75 text-white text-[11px] font-bold px-3 py-1 rounded-full">
+                🔥 당일 준비재료 남은 수량 {menu.remainingLimited}개
+              </span>
+            )}
+          </div>
+
+          {/* 제목 & 별점 */}
+          <div>
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-extrabold text-[#1E241B]">{menu.name}</h1>
+              {isGroupBuy && gbDeal && (
+                <span className="bg-[#486B28] text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                  공동구매 {gbDeal.discountPercent}%↓
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-gray-600 mt-1">
+              <Star className="w-4 h-4 fill-[#486B28] text-[#486B28]" />
+              <span className="font-bold text-[#1E241B]">{menu.rating}</span>
+              <span>({menu.reviewCount.toLocaleString()})</span>
+              <span>· 배달 {menu.deliveryMinutes}분</span>
+            </div>
+            <p className="text-sm text-gray-600 mt-2.5 leading-relaxed">{menu.description}</p>
+          </div>
+
+          {/* 매장 카드 */}
+          <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-[#F7F7F5] border border-black/5">
+            <div className="flex items-center gap-2">
+              <Store className="w-4 h-4 text-[#486B28]" />
+              <span className="font-bold text-sm text-[#1E241B]">{menu.storeName}</span>
+            </div>
+            <button
+              onClick={() => {
+                setSubView({ type: 'none' });
+                setActiveTab('search');
+                setSearchQuery(menu.storeName);
+              }}
+              className="text-xs text-gray-500 font-medium flex items-center gap-0.5 hover:text-[#486B28]"
+            >
+              가게 더보기 <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* AI 리뷰 장단점 요약 (제안서 §1 핵심 기능) */}
+          <div className="rounded-2xl bg-[#F4F8EF] border border-[#DCE8CF] p-3.5 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#3B5920]">
+              <Sparkles className="w-4 h-4" />
+              <span>AI 포탈·올이 리뷰 핵심 요약 (시연 데이터)</span>
+            </div>
+            <div className="space-y-1.5 text-xs">
+              {menu.aiPros.map((pro, idx) => (
+                <div key={idx} className="flex items-start gap-1.5 text-[#1E241B]">
+                  <span className="text-[#486B28] font-bold shrink-0">👍 장점:</span>
+                  <span>{pro}</span>
+                </div>
+              ))}
+              {menu.aiCons.map((con, idx) => (
+                <div key={idx} className="flex items-start gap-1.5 text-gray-600">
+                  <span className="text-amber-700 font-bold shrink-0">💡 참고:</span>
+                  <span>{con}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 메뉴 선택 */}
+          <div className="space-y-2">
+            <h2 className="font-bold text-base text-[#1E241B]">메뉴 선택</h2>
+            <div className="space-y-2">
+              {menu.options.map((opt) => {
+                const checked = selectedOpt?.id === opt.id;
+                const displayPrice = gbDeal ? gbDeal.groupPrice : opt.price;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setDetailOptionId(opt.id)}
+                    className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border text-left transition ${
+                      checked
+                        ? 'bg-[#F2F7EC] border-[#567C32]'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                          checked
+                            ? 'border-[#486B28] bg-[#486B28] text-white'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {checked && <Check className="w-3 h-3" />}
+                      </span>
+                      <span className="font-semibold text-sm text-[#1E241B]">{opt.name}</span>
+                    </div>
+                    <span className="font-bold text-sm text-[#3B5920]">
+                      {formatKRW(displayPrice)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 추가 옵션 */}
+          {menu.addons.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="font-bold text-base text-[#1E241B]">추가 옵션</h2>
+              <div className="space-y-2">
+                {menu.addons.map((addon) => {
+                  const checked = detailAddonIds.includes(addon.id);
+                  return (
+                    <button
+                      key={addon.id}
+                      type="button"
+                      onClick={() =>
+                        setDetailAddonIds((prev) =>
+                          checked ? prev.filter((id) => id !== addon.id) : [...prev, addon.id]
+                        )
+                      }
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-left transition ${
+                        checked ? 'bg-[#F7FAF3] border-[#567C32]' : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                            checked
+                              ? 'bg-[#486B28] border-[#486B28] text-white'
+                              : 'border-gray-300'
+                          }`}
+                        >
+                          {checked && <Check className="w-3.5 h-3.5" />}
+                        </span>
+                        <span className="text-sm font-medium text-[#1E241B]">{addon.name}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-600">
+                        +{formatKRW(addon.price)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 15분 단위 정밀 예약배달 선택 (제안서 §1) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-sm text-[#1E241B] flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-[#486B28]" />
+                <span>도착 희망 시간 (15분 단위 정밀 예약)</span>
+              </h2>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {reservationSlots.map((slot) => (
+                <button
+                  key={slot}
+                  type="button"
+                  onClick={() => setDetailReservationSlot(slot)}
+                  className={`shrink-0 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+                    detailReservationSlot === slot
+                      ? 'bg-[#486B28] text-white border-[#486B28]'
+                      : 'bg-[#F7F7F5] text-gray-700 border-gray-200'
+                  }`}
+                >
+                  {slot}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 하단 고정 주문 바 */}
+        <div className="p-4 bg-white border-t border-black/10 flex items-center gap-3">
+          <div className="flex items-center gap-3 bg-[#F7F7F5] rounded-2xl px-3 py-2.5 border border-black/5">
+            <button
+              onClick={() => setDetailQty((q) => sanitizeQuantity(q - 1))}
+              className="w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-2xs"
+              aria-label="수량 감소"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span className="font-bold text-base w-5 text-center">{safeQty}</span>
+            <button
+              onClick={() => setDetailQty((q) => sanitizeQuantity(q + 1))}
+              className="w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-2xs"
+              aria-label="수량 증가"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+
+          <button
+            onClick={() =>
+              triggerOrderConfirmation({
+                menu,
+                optionName: selectedOpt?.name || '기본',
+                unitPrice: unitTotal,
+                quantity: safeQty,
+                deliveryFee: isGroupBuy ? 500 : menu.deliveryFee,
+                deliveryMode: isGroupBuy ? '공동구매 묶음' : '이웃 도보 (Track 1)',
+                reservationTime: detailReservationSlot.startsWith('즉시')
+                  ? undefined
+                  : detailReservationSlot,
+                groupBuyId,
+              })
+            }
+            className="flex-1 py-3.5 rounded-2xl bg-[#486B28] hover:bg-[#3A5720] text-white font-bold text-base shadow-md transition"
+          >
+            주문하기 · {formatKRW(grandSubtotal)}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // (C) 이웃 공동구매 화면 (첨부 이미지 3-2)
+  const renderGroupBuyView = () => {
+    const filtered = groupBuys.filter((g) => g.status === gbTab);
+    return (
+      <div className="flex flex-col h-full bg-[#F7F7F5]">
+        <div className="flex items-center justify-between px-4 py-3 bg-[#F7F7F5]">
+          <button
+            onClick={() => setSubView({ type: 'none' })}
+            className="p-2 -ml-2 rounded-full hover:bg-black/5"
+          >
+            <ChevronLeft className="w-6 h-6 text-[#1E241B]" />
+          </button>
+          <span className="text-xs text-gray-500 font-medium">반경 300m 이웃 AI 매칭</span>
+          <button
+            onClick={() => handleShareDemo('이웃 공동구매 모집')}
+            className="p-2 rounded-full hover:bg-black/5"
+          >
+            <Share2 className="w-5 h-5 text-gray-700" />
+          </button>
+        </div>
+
+        <div className="px-5 pt-1 pb-4 text-center space-y-2">
+          <div className="w-12 h-12 rounded-2xl bg-[#EAF1E1] text-[#486B28] flex items-center justify-center mx-auto">
+            <Users className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-extrabold text-[#1E241B]">이웃 공동구매</h1>
+          <p className="text-sm text-gray-500 leading-snug">
+            우리 동네 이웃과 함께 주문하고
+            <br />더 저렴하게 즐겨요!
+          </p>
+        </div>
+
+        {/* 탭 */}
+        <div className="grid grid-cols-2 border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setGbTab('ongoing')}
+            className={`py-3 text-sm font-bold border-b-2 transition ${
+              gbTab === 'ongoing'
+                ? 'border-[#486B28] text-[#1E241B]'
+                : 'border-transparent text-gray-400'
+            }`}
+          >
+            진행중
+          </button>
+          <button
+            onClick={() => setGbTab('upcoming')}
+            className={`py-3 text-sm font-bold border-b-2 transition ${
+              gbTab === 'upcoming'
+                ? 'border-[#486B28] text-[#1E241B]'
+                : 'border-transparent text-gray-400'
+            }`}
+          >
+            오픈예정
+          </button>
+        </div>
+
+        {/* 카드 목록 */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {filtered.map((deal) => {
+            const pct = Math.min(
+              100,
+              Math.round((deal.currentParticipants / deal.targetParticipants) * 100)
+            );
+            const wished = wishlistIds.includes(deal.menuId);
+            return (
+              <div
+                key={deal.id}
+                className="bg-white rounded-3xl overflow-hidden shadow-sm border border-black/5"
+              >
+                <div className="relative">
+                  <DishIllustration art={deal.dishArt} className="w-full h-36" />
+                  <span className="absolute top-3 left-3 bg-[#486B28] text-white text-xs font-bold px-3 py-1 rounded-full">
+                    공동구매
+                  </span>
+                  <button
+                    onClick={() => toggleWishlist(deal.menuId)}
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-sm"
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${
+                        wished ? 'fill-red-500 text-red-500' : 'text-gray-600'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-[#1E241B]">{deal.storeName}</h2>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm text-gray-400 line-through">
+                        {formatKRW(deal.originalPrice)}
+                      </span>
+                      <span className="text-base font-extrabold text-[#486B28]">
+                        → {formatKRW(deal.groupPrice)} ({deal.discountPercent}%↓)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 참여 프로그레스 바 */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-[#1E241B] flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5 text-[#486B28]" />
+                        현재 {deal.currentParticipants}명 참여중
+                      </span>
+                      <span className="text-gray-400">목표 {deal.targetParticipants}명</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#689F38] rounded-full transition-all duration-300"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{deal.remainingTimeText}</span>
+                  </div>
+
+                  <button
+                    onClick={() => openMenuDetail(deal.menuId, true, deal.id)}
+                    className="w-full py-3 rounded-2xl bg-[#EAF1E1] hover:bg-[#DCE9CC] text-[#3B5920] font-bold text-sm transition"
+                  >
+                    {deal.status === 'ongoing' ? '함께 주문하기' : '오픈 알림 & 미리보기'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // (D) 배달비 매칭 화면 (첨부 이미지 3-3)
+  const renderDeliveryMatchView = () => {
+    return (
+      <div className="flex flex-col h-full bg-[#F7F7F5]">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setSubView({ type: 'none' })}
+            className="p-2 -ml-2 rounded-full hover:bg-black/5"
+          >
+            <ChevronLeft className="w-6 h-6 text-[#1E241B]" />
+          </button>
+          <span className="text-xs font-semibold text-[#486B28]">하이브리드 이웃 물류</span>
+          <div className="w-8" />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pt-2 pb-6 space-y-5">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-[#EAF1E1] text-[#486B28] flex items-center justify-center mx-auto">
+              <Bike className="w-6 h-6" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-[#1E241B]">배달비 매칭</h1>
+            <p className="text-sm text-gray-500 leading-snug">
+              같은 시간, 같은 동네 주문과
+              <br />
+              묶어서 배달비를 아껴요!
+            </p>
+          </div>
+
+          {/* 동네 위치 박스 */}
+          <div className="bg-white rounded-2xl px-4 py-3.5 border border-black/5 shadow-2xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#486B28]" />
+              <span className="font-bold text-sm text-[#1E241B]">{neighborhood}</span>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          </div>
+
+          {/* 매칭 가능한 주문 3건 */}
+          <button
+            onClick={() => setSubView({ type: 'group_buy' })}
+            className="w-full bg-[#EEF4E6] hover:bg-[#E4EED8] rounded-2xl p-4 flex items-center justify-between transition text-left"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-white text-[#486B28] flex items-center justify-center shadow-2xs">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-gray-600 font-medium">지금 매칭 가능한 주문</div>
+                <div className="text-2xl font-extrabold text-[#1E241B]">3건</div>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-500" />
+          </button>
+
+          {/* 혜택 안내 2열 */}
+          <div className="space-y-2.5">
+            <h2 className="font-bold text-sm text-[#1E241B]">함께하면 이런 혜택이 있어요</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-2xl p-4 text-center border border-black/5 shadow-2xs space-y-1.5">
+                <Coins className="w-6 h-6 text-[#486B28] mx-auto" />
+                <div className="text-xs text-gray-500">배달비 절약</div>
+                <div className="text-sm font-extrabold text-[#486B28]">최대 3,000원</div>
+              </div>
+              <div className="bg-white rounded-2xl p-4 text-center border border-black/5 shadow-2xs space-y-1.5">
+                <Leaf className="w-6 h-6 text-[#486B28] mx-auto" />
+                <div className="text-xs text-gray-500">더 친환경적인 배달</div>
+                <div className="text-sm font-extrabold text-[#486B28]">탄소 줄이기</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 bg-[#F7F7F5]">
+          <button
+            onClick={() => openMenuDetail('menu-chicken', true, 'gb-1')}
+            className="w-full py-4 rounded-2xl bg-[#486B28] hover:bg-[#3A5720] text-white font-bold text-base shadow-md transition"
+          >
+            지금 주문하고 매칭하기
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // (E) C2C 생활 심부름 & AI 에스크로 + 금지 품목 필터링 (제안서 §6)
+  const renderErrandsView = () => {
+    const handleCreateErrand = (e: React.FormEvent) => {
+      e.preventDefault();
+      const text = errandPrompt.trim();
+      if (!text) return;
+
+      // 제안서 §6: 주류/담배/전문의약품/현금 인출 등 불법·금지 품목 프롬프트 AI 차단
+      const forbiddenKeywords = ['담배', '술', '주류', '소주', '맥주', '현금', '인출', '전문의약품'];
+      const hit = forbiddenKeywords.find((kw) => text.includes(kw));
+      if (hit) {
+        showToast(`🚫 AI 안전 필터: '${hit}' 관련 대리구매·심부름은 정책상 등록이 차단됩니다.`);
+        return;
+      }
+
+      const newTask: ErrandTask = {
+        id: `err-${Date.now()}`,
+        title: text,
+        detail: 'AI 가상 에스크로 예치 완료 · 영수증 Vision OCR 자동 정산 대기',
+        itemDeposit: 10000,
+        errandFee: 2000,
+        status: '모집중',
+        partnerName: '반경 1.2km 이웃 파트너 매칭중',
+      };
+      setErrands((prev) => [newTask, ...prev]);
+      setErrandPrompt('');
+      showToast('생활 심부름이 등록되었으며 미니보험이 자동 적용되었습니다!');
+    };
+
+    return (
+      <div className="flex flex-col h-full bg-[#F7F7F5]">
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-black/5">
+          <button
+            onClick={() => setSubView({ type: 'none' })}
+            className="p-2 -ml-2 rounded-full hover:bg-black/5"
+          >
+            <ChevronLeft className="w-6 h-6 text-[#1E241B]" />
+          </button>
+          <span className="font-bold text-base text-[#1E241B]">동네 생활 심부름 (AI 에스크로)</span>
+          <span className="text-[11px] font-bold text-[#486B28] bg-[#EAF1E1] px-2 py-0.5 rounded-full">
+            미니보험 자동
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* 심부름 음성/텍스트 접수 */}
+          <form
+            onSubmit={handleCreateErrand}
+            className="bg-white rounded-2xl p-4 shadow-sm border border-black/5 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-sm text-[#1E241B]">
+                이웃에게 심부름 부탁하기 (시연)
+              </span>
+              <span className="text-[11px] text-gray-400">영수증 OCR 자동정산</span>
+            </div>
+            <input
+              type="text"
+              value={errandPrompt}
+              onChange={(e) => setErrandPrompt(e.target.value)}
+              placeholder='예: "편의점 생수 2L 2병 대리구매" (담배/주류 입력 시 AI 차단 테스트)'
+              className="w-full bg-[#F7F7F5] text-xs px-3.5 py-3 rounded-xl outline-none focus:ring-2 focus:ring-[#567C32]"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setErrandPrompt('범어동 세탁소 코트 수령 후 문 앞 전달')}
+                className="text-[11px] bg-[#EAF1E1] text-[#486B28] px-2.5 py-1.5 rounded-lg font-semibold"
+              >
+                예시 채우기
+              </button>
+              <button
+                type="button"
+                onClick={() => setErrandPrompt('편의점에서 담배 한 갑 사다주세요')}
+                className="text-[11px] bg-red-50 text-red-600 px-2.5 py-1.5 rounded-lg font-semibold"
+              >
+                금지품목 차단 테스트
+              </button>
+            </div>
+            <button
+              type="submit"
+              className="w-full py-2.5 rounded-xl bg-[#486B28] text-white font-bold text-xs"
+            >
+              에스크로 안심 접수하기
+            </button>
+          </form>
+
+          {/* 진행중인 심부름 목록 */}
+          <div className="space-y-2.5">
+            <h2 className="font-bold text-sm text-[#1E241B]">실시간 이웃 심부름 현황</h2>
+            {errands.map((task) => (
+              <div
+                key={task.id}
+                className="bg-white rounded-2xl p-4 shadow-sm border border-black/5 space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-bold text-sm text-[#1E241B]">{task.title}</div>
+                  <span className="shrink-0 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#EAF1E1] text-[#486B28]">
+                    {task.status}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">{task.detail}</p>
+                <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
+                  <span className="text-gray-600">{task.partnerName}</span>
+                  <span className="font-bold text-[#1E241B]">
+                    심부름비 {formatKRW(task.errandFee)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // 7. 5대 하단 탭 메인 화면 렌더링
+  // ============================================================================
+
+  // [탭 1] 홈 화면 (첨부 이미지 1번 디자인 정밀 반영 + 가시성 강화)
+  const renderHomeTab = () => {
+    const quickActions = [
+      {
+        id: '1sec',
+        label: '단골 1초결제',
+        icon: Zap,
+        active: true,
+        onClick: () => {
+          const fav = menus[0];
+          triggerOrderConfirmation({
+            menu: fav,
+            optionName: fav.options[0].name,
+            unitPrice: fav.price,
+            quantity: 1,
+            deliveryFee: fav.deliveryFee,
+            deliveryMode: '이웃 도보 (Track 1)',
+          });
+        },
+      },
+      {
+        id: 'reserve',
+        label: 'AI 예약주문',
+        icon: CalendarIcon,
+        active: false,
+        onClick: () => openMenuDetail('menu-galbitang'),
+      },
+      {
+        id: 'delivery',
+        label: '배달주문',
+        icon: Bike,
+        active: false,
+        onClick: () => setActiveTab('search'),
+      },
+      {
+        id: 'savefee',
+        label: '배달비 줄이기',
+        icon: Users,
+        active: false,
+        onClick: () => setSubView({ type: 'delivery_match' }),
+      },
+      {
+        id: 'group',
+        label: '이웃 공동구매',
+        icon: ShoppingBag,
+        active: false,
+        onClick: () => setSubView({ type: 'group_buy' }),
+      },
+      {
+        id: 'errand',
+        label: '심부름',
+        icon: Footprints,
+        active: false,
+        onClick: () => setSubView({ type: 'errands' }),
+      },
+    ];
+
+    return (
+      <div className="px-4 sm:px-6 pt-3 pb-8 space-y-6">
+        {/* 브랜드 헤더: alle + 알림 벨 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-7 h-5 rounded-b-full border-b-[5px] border-l-[5px] border-r-[5px] border-[#5D8C32]" />
+              <span className="text-[30px] font-black tracking-tight text-[#141812]">alle</span>
+            </div>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#E7EFE1] text-[#2E531A]">
+              시연 자료
+            </span>
+          </div>
+
+          <button
+            onClick={() =>
+              showToast('오늘 비 예보로 따뜻한 국물 요리 2,000원 자동 할인 쿠폰이 준비되었어요!')
+            }
+            className="relative p-2.5 rounded-full hover:bg-black/5 transition"
+            aria-label="알림"
+          >
+            <Bell className="w-6 h-6 text-[#141812]" />
+            <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#5D8C32]" />
+          </button>
+        </div>
+
+        {/* 현재 동네 선택기 */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLocationPicker((v) => !v)}
+            className="flex items-center gap-2 text-[15px] font-extrabold text-[#141812] hover:opacity-80"
+          >
+            <span className="w-4 h-4 rounded-full bg-[#2E531A] text-white flex items-center justify-center text-[10px]">
+              ●
+            </span>
+            <span>{neighborhood}</span>
+            <ChevronDown className="w-4 h-4 text-[#4A5246]" />
+          </button>
+
+          {showLocationPicker && (
+            <div className="mt-2 bg-white rounded-2xl shadow-lg border border-black/10 p-2 z-20 space-y-1">
+              {DEMO_NEIGHBORHOODS.map((area) => (
+                <button
+                  key={area}
+                  onClick={() => {
+                    setNeighborhood(area);
+                    setShowLocationPicker(false);
+                    showToast(`시연 지역이 '${area}'으로 변경되었습니다.`);
+                  }}
+                  className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold ${
+                    neighborhood === area
+                      ? 'bg-[#E7EFE1] text-[#2E531A]'
+                      : 'hover:bg-gray-50 text-[#141812]'
+                  }`}
+                >
+                  {area} (시연 지역)
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* AI에게 주문해보세요 히어로 카드 */}
+        <div className="bg-gradient-to-br from-[#E9F1E2] to-[#DCE8D1] rounded-[28px] p-5 sm:p-6 shadow-sm border border-[#CBDCC0] space-y-4">
+          <div className="flex items-center gap-4">
+            <AlleRobotMascot size="lg" />
+            <div className="space-y-1.5">
+              <h1 className="text-[22px] sm:text-2xl font-extrabold text-[#141812] tracking-tight">
+                AI에게 주문해보세요
+              </h1>
+              <p className="text-[13.5px] sm:text-sm font-medium text-[#3C4637] leading-snug">
+                “따뜻한 국물요리 추천해줘” “지금 먹을 수 있는 거?”
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2.5">
+            <span className="text-[#88A570] text-base tracking-widest select-none">ılılı</span>
+            <button
+              onClick={() => setSubView({ type: 'ai_chat' })}
+              className="flex-1 py-4 px-5 rounded-full bg-[#2E531A] hover:bg-[#234113] active:scale-[0.99] text-white font-extrabold text-[17px] flex items-center justify-center gap-2 shadow-md transition"
+            >
+              <Mic className="w-5 h-5" />
+              <span>말하고 바로 주문하기</span>
+            </button>
+            <span className="text-[#88A570] text-base tracking-widest select-none">ılılı</span>
+          </div>
+        </div>
+
+        {/* 6개 퀵 액션 아이콘 바 (모바일 3열x2줄 / 태블릿+ 6열로 가시성 확보) */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+          {quickActions.map((act) => {
+            const IconComp = act.icon;
+            return (
+              <button
+                key={act.id}
+                onClick={act.onClick}
+                className={`flex flex-col items-center justify-center gap-2 py-3.5 px-2 rounded-2xl transition shadow-2xs border ${
+                  act.active
+                    ? 'bg-[#E2ECD9] border-[#C5D8B5] text-[#244214]'
+                    : 'bg-white border-black/5 text-[#141812] hover:bg-[#F0F4EC]'
+                }`}
+              >
+                <IconComp className="w-6 h-6" />
+                <span className="text-[13px] font-bold text-center leading-tight tracking-tight">
+                  {act.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* AI가 추천하는 우리 동네 맛집 */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[19px] font-extrabold text-[#141812]">
+              AI가 추천하는 우리 동네 맛집
+            </h2>
+            <button
+              onClick={() => setActiveTab('search')}
+              className="text-[13px] text-[#4A5246] font-bold flex items-center gap-0.5 hover:text-[#2E531A]"
+            >
+              전체보기 <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {menus.slice(0, 3).map((item) => (
+              <button
+                key={item.id}
+                onClick={() => openMenuDetail(item.id)}
+                className="bg-white rounded-2xl p-3 shadow-2xs border border-black/5 text-left hover:shadow-md transition flex sm:flex-col items-center sm:items-stretch gap-3 sm:gap-0"
+              >
+                <div className="w-24 h-24 sm:w-full sm:h-28 rounded-xl overflow-hidden shrink-0">
+                  <DishIllustration art={item.dishArt} className="w-full h-full" />
+                </div>
+                <div className="flex-1 min-w-0 sm:mt-2.5">
+                  <div className="font-extrabold text-[15px] text-[#141812] truncate">
+                    {item.name}
+                  </div>
+                  <div className="text-xs text-[#4A5246] mt-0.5">{item.storeName}</div>
+                  <div className="flex items-center gap-1 text-[13px] text-[#4A5246] mt-1">
+                    <Star className="w-3.5 h-3.5 fill-[#2E531A] text-[#2E531A] shrink-0" />
+                    <span className="font-extrabold text-[#141812]">{item.rating}</span>
+                    <span>({item.reviewCount.toLocaleString()})</span>
+                    <span className="shrink-0">· {item.deliveryMinutes}분</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 단일가격 보증 & 공동구매 바로가기 배너 */}
+        <div className="bg-white rounded-2xl p-4 border border-black/5 shadow-2xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#E7EFE1] text-[#2E531A] flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-extrabold text-[#141812]">
+                중개수수료 0% · 매장 단일가격 보증제
+              </div>
+              <div className="text-xs text-[#4A5246] mt-0.5">
+                모든 입점 가게가 매장 식사가격과 100% 동일하게 제공됩니다.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setSubView({ type: 'group_buy' })}
+            className="shrink-0 text-[13px] font-extrabold text-[#2E531A] bg-[#E7EFE1] hover:bg-[#D8E6CD] px-3.5 py-2 rounded-xl transition"
+          >
+            공동구매
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // [탭 2] 검색 화면 (‘지금 바로 주문 가능한 맛집만 보기’ 실시간 필터링)
+  const renderSearchTab = () => {
+    const categories = ['전체', '한식/국물', '치킨', '중식', '카페/디저트', '샐러드/분식'];
+    const filteredMenus = menus.filter((m) => {
+      if (onlyAvailableNow && !m.isAvailableNow) return false;
+      if (selectedCategory !== '전체' && m.category !== selectedCategory) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const hay = `${m.name} ${m.storeName} ${m.category} ${m.tags.join(' ')}`.toLowerCase();
+        return hay.includes(q);
+      }
+      return true;
+    });
+
+    return (
+      <div className="px-4 pt-3 pb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-extrabold text-[#1E241B]">동네 맛집 검색</h1>
+          <span className="text-[11px] font-semibold text-[#486B28] bg-[#EAF1E1] px-2.5 py-1 rounded-full">
+            실시간 조리가능 필터
+          </span>
+        </div>
+
+        {/* 검색창 */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="메뉴명, 가게명, '국물', '치킨' 검색..."
+            className="w-full bg-white pl-10 pr-9 py-3 rounded-2xl text-sm border border-black/10 outline-none focus:ring-2 focus:ring-[#567C32]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* 지금 바로 주문 가능 토글 */}
+        <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-2xl border border-black/5">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#1E241B]">
+            <SlidersHorizontal className="w-4 h-4 text-[#486B28]" />
+            <span>지금 바로 주문 가능한 맛집만 보기 (품절·브레이크 제외)</span>
+          </div>
+          <button
+            onClick={() => setOnlyAvailableNow((v) => !v)}
+            className={`w-11 h-6 rounded-full p-0.5 transition ${
+              onlyAvailableNow ? 'bg-[#486B28]' : 'bg-gray-300'
+            }`}
+          >
+            <div
+              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                onlyAvailableNow ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* 카테고리 칩 */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition ${
+                selectedCategory === cat
+                  ? 'bg-[#486B28] text-white'
+                  : 'bg-white text-gray-600 border border-black/5'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* 결과 리스트 */}
+        <div className="space-y-3">
+          {filteredMenus.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 text-center text-sm text-gray-500">
+              조건에 맞는 매장이 없습니다. 필터를 조정해보세요.
+            </div>
+          ) : (
+            filteredMenus.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => openMenuDetail(item.id)}
+                className="bg-white rounded-2xl p-3 shadow-2xs border border-black/5 flex items-center gap-3 cursor-pointer hover:shadow-sm transition"
+              >
+                <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0">
+                  <DishIllustration art={item.dishArt} className="w-full h-full" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-sm text-[#1E241B] truncate">
+                      {item.name}
+                    </span>
+                    {item.isSinglePriceGuaranteed && (
+                      <span className="shrink-0 text-[10px] font-bold bg-[#EAF1E1] text-[#486B28] px-1.5 py-0.5 rounded">
+                        단일가
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{item.storeName}</div>
+                  <div className="flex items-center gap-2 text-xs mt-1.5">
+                    <span className="font-bold text-[#1E241B]">{formatKRW(item.price)}</span>
+                    <span className="text-gray-400">·</span>
+                    <span className="text-gray-600">
+                      ★ {item.rating} · {item.deliveryMinutes}분
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleWishlist(item.id);
+                  }}
+                  className="p-2"
+                >
+                  <Heart
+                    className={`w-4 h-4 ${
+                      wishlistIds.includes(item.id)
+                        ? 'fill-red-500 text-red-500'
+                        : 'text-gray-400'
+                    }`}
+                  />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // [탭 3] 주문내역 (주문현황 라이브 관제 + 주문기록 달력 - 첨부 이미지 4번 정밀 반영)
+  const renderOrdersTab = () => {
+    // 2월 달력 (2026-02-01 ~ 28, 1일이 일요일 또는 첨부 이미지 레이아웃 기준 28일 그리드)
+    const daysInMonth = Array.from({ length: 28 }, (_, i) => i + 1);
+    const ordersByDay = new Map<number, OrderRecord[]>();
+    orders.forEach((o) => {
+      const parts = o.dateStr.split('-');
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (m === selectedMonth) {
+        const list = ordersByDay.get(d) || [];
+        list.push(o);
+        ordersByDay.set(d, list);
+      }
+    });
+
+    const selectedDayNum = parseInt(selectedDateStr.split('-')[2] || '22', 10);
+    const dayOrders = ordersByDay.get(selectedDayNum) || [];
+    const dayTotalAmount = dayOrders.reduce((sum, o) => sum + o.totalPaid, 0);
+
+    const activeOrder = orders[0];
+
+    // AI 10초 무인 CS 자동 중재 시연 (제안서 §7)
+    const handleRunAutoCS = (orderId: string) => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                csResolved:
+                  'AI 4중 크로스체크 완료 (8.4초): 점주 실링 정상 + 배달원 IMU 충격 로그 확인 → 고객 전액 보상 쿠폰 즉시 발급 & 점주 100% 정상 정산 처리됨',
+              }
+            : o
+        )
+      );
+      showToast('⚡ AI 10초 무인 CS 판정 및 자동 보상이 완료되었습니다!');
+    };
+
+    return (
+      <div className="px-4 pt-3 pb-6 space-y-4">
+        <h1 className="text-2xl font-extrabold text-[#1E241B]">주문내역</h1>
+
+        {/* 주문현황 / 주문기록 세그먼트 탭 */}
+        <div className="grid grid-cols-2 bg-[#ECEEE9] p-1 rounded-2xl">
+          <button
+            onClick={() => setOrdersSubTab('status')}
+            className={`py-2.5 rounded-xl text-sm font-bold transition ${
+              ordersSubTab === 'status'
+                ? 'bg-[#DCE8CF] text-[#283B17] shadow-2xs'
+                : 'text-gray-500'
+            }`}
+          >
+            주문현황
+          </button>
+          <button
+            onClick={() => setOrdersSubTab('history')}
+            className={`py-2.5 rounded-xl text-sm font-bold transition ${
+              ordersSubTab === 'history'
+                ? 'bg-[#DCE8CF] text-[#283B17] shadow-2xs'
+                : 'text-gray-500'
+            }`}
+          >
+            주문기록
+          </button>
+        </div>
+
+        {ordersSubTab === 'status' ? (
+          /* 실시간 4단계 라이브 관제 & AI 10초 무인 CS */
+          <div className="space-y-4">
+            {activeOrder && (
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-black/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-[#486B28] bg-[#EAF1E1] px-2.5 py-0.5 rounded-full">
+                      {activeOrder.deliveryMode}
+                    </span>
+                    <h2 className="text-lg font-extrabold text-[#1E241B] mt-1.5">
+                      {activeOrder.storeName} · {activeOrder.menuName}
+                    </h2>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-400">Dynamic ETA</div>
+                    <div className="text-base font-extrabold text-[#486B28]">약 14분 후 도착</div>
+                  </div>
+                </div>
+
+                {/* 4단계 진행 바 */}
+                <div className="grid grid-cols-4 gap-1.5 pt-1">
+                  {[
+                    { step: 1, label: '주문 접수' },
+                    { step: 2, label: '조리 중' },
+                    { step: 3, label: '픽업 완료' },
+                    { step: 4, label: '배송 완료' },
+                  ].map((s) => {
+                    const done = activeOrder.statusStep >= s.step;
+                    return (
+                      <div key={s.step} className="space-y-1.5 text-center">
+                        <div
+                          className={`h-2 rounded-full ${
+                            done ? 'bg-[#486B28]' : 'bg-gray-200'
+                          }`}
+                        />
+                        <div
+                          className={`text-[11px] font-bold ${
+                            done ? 'text-[#486B28]' : 'text-gray-400'
+                          }`}
+                        >
+                          {s.label}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 지오펜싱 마스킹 안내 (제안서 §5) */}
+                <div className="bg-[#F7F7F5] rounded-2xl p-3 text-xs text-gray-600 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-[#486B28] animate-pulse" />
+                    <span>지오펜싱 마스킹 활성: 이웃 파트너 자택 동선 비공개 보호중</span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setOrders((prev) =>
+                        prev.map((o, i) =>
+                          i === 0
+                            ? {
+                                ...o,
+                                statusStep: ((o.statusStep % 4) + 1) as 1 | 2 | 3 | 4,
+                              }
+                            : o
+                        )
+                      )
+                    }
+                    className="text-[11px] font-bold text-[#486B28] underline shrink-0"
+                  >
+                    단계 진행
+                  </button>
+                </div>
+
+                {/* AI 10초 무인 CS 중재 버튼 */}
+                <div className="pt-1 border-t border-gray-100 space-y-2">
+                  <button
+                    onClick={() => handleRunAutoCS(activeOrder.id)}
+                    className="w-full py-2.5 rounded-xl bg-[#F3F6EE] hover:bg-[#E6EEDD] text-[#3B5920] font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>AI 10초 무인 CS 자동 판정 시연 (파손/누락 크로스체크)</span>
+                  </button>
+                  {activeOrder.csResolved && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 leading-relaxed">
+                      {activeOrder.csResolved}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* 주문기록 월별 음식 달력 (첨부 이미지 4번 디자인 구현) */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-white p-1 rounded-full border border-black/5">
+                <button
+                  onClick={() => setCalendarMode('monthly')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    calendarMode === 'monthly'
+                      ? 'bg-[#DCE8CF] text-[#283B17]'
+                      : 'text-gray-500'
+                  }`}
+                >
+                  월별
+                </button>
+                <button
+                  onClick={() => setCalendarMode('yearly')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    calendarMode === 'yearly'
+                      ? 'bg-[#DCE8CF] text-[#283B17]'
+                      : 'text-gray-500'
+                  }`}
+                >
+                  연간
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 font-extrabold text-lg text-[#1E241B]">
+                <button
+                  onClick={() => setSelectedMonth((m) => (m === 1 ? 12 : m - 1))}
+                  className="p-1 hover:bg-black/5 rounded-full"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span>{selectedMonth}월</span>
+                <button
+                  onClick={() => setSelectedMonth((m) => (m === 12 ? 1 : m + 1))}
+                  className="p-1 hover:bg-black/5 rounded-full"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  setSelectedMonth(2);
+                  setSelectedDateStr('2026-02-22');
+                }}
+                className="p-2 rounded-xl bg-white border border-black/5 text-gray-600"
+                title="2월 22일로 이동"
+              >
+                <CalendarIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {calendarMode === 'yearly' ? (
+              <div className="bg-white rounded-3xl p-4 border border-black/5 grid grid-cols-3 gap-2.5">
+                {Array.from({ length: 12 }, (_, idx) => idx + 1).map((m) => {
+                  const count = orders.filter(
+                    (o) => parseInt(o.dateStr.split('-')[1], 10) === m
+                  ).length;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        setSelectedMonth(m);
+                        setCalendarMode('monthly');
+                      }}
+                      className={`p-3 rounded-2xl border text-center ${
+                        m === selectedMonth
+                          ? 'bg-[#EAF1E1] border-[#486B28] font-bold'
+                          : 'bg-[#F7F7F5] border-transparent'
+                      }`}
+                    >
+                      <div className="text-sm font-bold text-[#1E241B]">{m}월</div>
+                      <div className="text-xs text-[#486B28] mt-0.5">{count}건 주문</div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                {/* 요일 헤더 & 달력 그리드 */}
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-7 text-center text-xs font-medium text-gray-400">
+                    {['월', '화', '수', '목', '금', '토', '일'].map((w) => (
+                      <div key={w} className="py-1">
+                        {w}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {daysInMonth.map((day) => {
+                      const dayList = ordersByDay.get(day) || [];
+                      const isSelected = day === selectedDayNum;
+                      const formattedDate = `2026-${String(selectedMonth).padStart(
+                        2,
+                        '0'
+                      )}-${String(day).padStart(2, '0')}`;
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => setSelectedDateStr(formattedDate)}
+                          className={`aspect-[1/1.18] rounded-2xl p-1 flex flex-col items-center justify-between transition border ${
+                            isSelected
+                              ? 'bg-[#EAF1E1] border-[#486B28] shadow-2xs'
+                              : 'bg-[#EFEFEA]/70 border-transparent hover:bg-white'
+                          }`}
+                        >
+                          <span
+                            className={`text-[11px] font-bold ${
+                              isSelected ? 'text-[#283B17]' : 'text-gray-700'
+                            }`}
+                          >
+                            {day}
+                          </span>
+                          {dayList.length > 0 ? (
+                            <div className="w-8 h-8 rounded-full overflow-hidden border border-white shadow-2xs">
+                              <DishIllustration
+                                art={dayList[0].dishArt}
+                                className="w-full h-full"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 선택된 날짜의 주문 상세 & 1초 결제 재주문 카드 (첨부 이미지 4번 하단 시트) */}
+                <div className="bg-white rounded-3xl p-4 shadow-sm border border-black/5 space-y-3.5">
+                  <div className="w-8 h-1 bg-gray-200 rounded-full mx-auto" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-extrabold text-[#1E241B]">
+                      {selectedMonth}월 {selectedDayNum}일
+                    </span>
+                    <span className="text-xs font-bold text-[#486B28]">
+                      총 {dayOrders.length}건 · {formatKRW(dayTotalAmount)}
+                    </span>
+                  </div>
+
+                  {dayOrders.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-gray-400">
+                      선택한 날짜의 시연 주문 내역이 없습니다. (2월 22일 등을 눌러보세요)
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {dayOrders.map((ord, idx) => {
+                        const targetMenu =
+                          menus.find((m) => m.id === ord.menuId) || menus[0];
+                        return (
+                          <div key={ord.id} className="space-y-2.5">
+                            <div className="flex items-center justify-between gap-2.5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-black/5">
+                                  <DishIllustration
+                                    art={ord.dishArt}
+                                    className="w-full h-full"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="font-extrabold text-sm text-[#1E241B]">
+                                    {ord.storeName}
+                                  </div>
+                                  <div className="text-xs text-gray-500">{ord.menuName}</div>
+                                  <div className="text-[11px] text-gray-400 mt-0.5">
+                                    {ord.timeStr}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right space-y-1.5">
+                                <div className="font-extrabold text-sm text-[#1E241B]">
+                                  {formatKRW(ord.totalPaid)}
+                                </div>
+                                {idx > 0 && (
+                                  <button
+                                    onClick={() =>
+                                      triggerOrderConfirmation({
+                                        menu: targetMenu,
+                                        optionName: ord.optionName,
+                                        unitPrice: ord.itemsSubtotal / ord.quantity,
+                                        quantity: ord.quantity,
+                                        deliveryFee: ord.deliveryFee,
+                                        deliveryMode: '이웃 도보 (Track 1)',
+                                      })
+                                    }
+                                    className="px-3 py-1.5 rounded-full bg-[#EAF1E1] text-[#3B5920] font-bold text-xs flex items-center gap-1"
+                                  >
+                                    <Zap className="w-3 h-3 fill-current" /> 1초 결제
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {idx === 0 && (
+                              <button
+                                onClick={() =>
+                                  triggerOrderConfirmation({
+                                    menu: targetMenu,
+                                    optionName: ord.optionName,
+                                    unitPrice: ord.itemsSubtotal / ord.quantity,
+                                    quantity: ord.quantity,
+                                    deliveryFee: ord.deliveryFee,
+                                    deliveryMode: '이웃 도보 (Track 1)',
+                                  })
+                                }
+                                className="w-full py-3 rounded-2xl bg-[#486B28] hover:bg-[#3A5720] text-white font-bold text-sm flex items-center justify-center gap-1.5 shadow-sm transition"
+                              >
+                                <Zap className="w-4 h-4 fill-current" /> 1초 결제
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // [탭 4] 찜 화면
+  const renderWishlistTab = () => {
+    const wishedMenus = menus.filter((m) => wishlistIds.includes(m.id));
+    return (
+      <div className="px-4 pt-3 pb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-extrabold text-[#1E241B]">찜한 단골 메뉴</h1>
+          <span className="text-xs font-bold text-[#486B28]">{wishedMenus.length}개</span>
+        </div>
+
+        {wishedMenus.length === 0 ? (
+          <div className="bg-white rounded-3xl p-8 text-center space-y-3 border border-black/5">
+            <Heart className="w-8 h-8 text-gray-300 mx-auto" />
+            <p className="text-sm text-gray-500">아직 찜한 메뉴가 없어요.</p>
+            <button
+              onClick={() => setActiveTab('search')}
+              className="px-4 py-2 rounded-xl bg-[#486B28] text-white text-xs font-bold"
+            >
+              우리 동네 맛집 둘러보기
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {wishedMenus.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-2xl p-3.5 shadow-2xs border border-black/5 flex items-center justify-between gap-3"
+              >
+                <div
+                  onClick={() => openMenuDetail(item.id)}
+                  className="flex items-center gap-3 flex-1 cursor-pointer"
+                >
+                  <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0">
+                    <DishIllustration art={item.dishArt} className="w-full h-full" />
+                  </div>
+                  <div>
+                    <div className="font-extrabold text-sm text-[#1E241B]">{item.name}</div>
+                    <div className="text-xs text-gray-500">{item.storeName}</div>
+                    <div className="text-xs font-bold text-[#486B28] mt-1">
+                      {formatKRW(item.price)} · {item.deliveryMinutes}분
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() =>
+                      triggerOrderConfirmation({
+                        menu: item,
+                        optionName: item.options[0].name,
+                        unitPrice: item.price,
+                        quantity: 1,
+                        deliveryFee: item.deliveryFee,
+                        deliveryMode: '이웃 도보 (Track 1)',
+                      })
+                    }
+                    className="px-3 py-2 rounded-xl bg-[#EAF1E1] text-[#3B5920] font-bold text-xs"
+                  >
+                    1초 주문
+                  </button>
+                  <button
+                    onClick={() => toggleWishlist(item.id)}
+                    className="p-2 text-red-500"
+                    aria-label="찜 해제"
+                  >
+                    <Heart className="w-4 h-4 fill-current" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // [탭 5] MY & 같은 브라우저 역할 전환 시연 (고객 / 점주 AI 포스 / 이웃 파트너·라이더)
+  const renderMyTab = () => {
+    const handleMockTopup = () => {
+      const topupAmount = 10000;
+      setConfirmModal({
+        isOpen: true,
+        title: '올이페이 모의 충전 10,000원',
+        subtitle: '시연용 가상 잔액 충전 (실제 계좌이체/결제가 발생하지 않습니다)',
+        itemsSubtotal: topupAmount,
+        couponDiscount: 0,
+        deliveryFee: 0,
+        finalAmount: topupAmount,
+        badgeText: '시연용 가상 충전',
+        onConfirm: () => {
+          setWalletBalance((b) => b + topupAmount);
+          setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+          showToast('모의 충전 10,000원이 완료되었습니다!');
+        },
+      });
+    };
+
+    return (
+      <div className="px-4 sm:px-6 pt-3 pb-8 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-extrabold text-[#141812]">MY 올이</h1>
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-900">
+            같은 브라우저 내 시연 모드
+          </span>
+        </div>
+
+        {/* 시연 프로필 카드 (실제 개인정보 미수집) */}
+        <div className="bg-white rounded-3xl p-5 shadow-2xs border border-black/5 space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-[#4A5246]">온디바이스 암호화 토큰 프로필 (시연)</div>
+              <div className="text-base font-extrabold text-[#141812] mt-0.5">
+                범어동 이웃 #ALLE-0941
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-[#4A5246]">시연 페이 잔액</div>
+              <div className="text-xl font-extrabold text-[#2E531A]">
+                {formatKRW(walletBalance)}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <button
+              onClick={handleMockTopup}
+              className="py-3 rounded-xl bg-[#2E531A] text-white font-extrabold text-[13px]"
+            >
+              + 10,000원 모의 충전
+            </button>
+            <button
+              onClick={() => handleShareDemo('올이 O2O 단골 멤버십')}
+              className="py-3 rounded-xl bg-[#E7EFE1] text-[#2E531A] font-extrabold text-[13px]"
+            >
+              시연 상태 공유 복사
+            </button>
+          </div>
+        </div>
+
+        {/* 같은 브라우저 역할 전환 스위처 */}
+        <div className="bg-white rounded-3xl p-5 shadow-2xs border border-black/5 space-y-3.5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-extrabold text-[15px] text-[#141812]">
+              역할 전환 시연 (같은 브라우저)
+            </h2>
+            <span className="text-xs text-[#4A5246]">상단 바에서도 전환 가능</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 bg-[#F3F5F0] p-1.5 rounded-2xl">
+            {[
+              { id: 'customer' as RoleType, label: '고객 앱' },
+              { id: 'merchant' as RoleType, label: '점주 모드' },
+              { id: 'partner' as RoleType, label: '이웃/라이더' },
+            ].map((r) => (
+              <button
+                key={r.id}
+                onClick={() => {
+                  setRole(r.id);
+                  showToast(`'${r.label}' 화면으로 전환했습니다.`);
+                }}
+                className={`py-2.5 rounded-xl text-[13px] font-extrabold transition ${
+                  role === r.id
+                    ? 'bg-[#2E531A] text-white shadow-2xs'
+                    : 'text-[#4A5246] hover:text-[#141812]'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 보유 쿠폰 안내 */}
+          <div className="space-y-2 pt-1">
+            <div className="text-[13px] font-bold text-[#141812]">
+              보유 O2O 통합 단골 쿠폰 (상품합계 초과 자동방지 적용)
+            </div>
+            {coupons.map((cp) => (
+              <div
+                key={cp.id}
+                className="p-3.5 rounded-2xl bg-[#F6F9F2] border border-[#D4E2C8] flex items-center justify-between"
+              >
+                <div>
+                  <div className="text-sm font-extrabold text-[#141812]">{cp.title}</div>
+                  <div className="text-xs text-[#4A5246] mt-0.5">
+                    {cp.source} · {formatKRW(cp.minOrderAmount)} 이상 주문 시 자동적용
+                  </div>
+                </div>
+                <span className="font-extrabold text-[15px] text-[#2E531A]">
+                  -{formatKRW(cp.discountAmount)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {role === 'partner' && (
+            <div className="space-y-2.5 pt-1">
+              <div className="p-3.5 rounded-2xl bg-[#F4F8EF] border border-[#DCE8CF] space-y-1">
+                <div className="text-[13px] font-extrabold text-[#2E531A]">
+                  🚶 하이브리드 물류 Track 1 (이웃 도보 · 반경 1.2km)
+                </div>
+                <p className="text-xs text-[#4A5246]">
+                  자택 동선 지오펜싱 마스킹 보호중 · 픽업~도착 20m 구간만 가상 아바타 표시
+                </p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-[#F6F7F4] flex items-center justify-between">
+                <div>
+                  <div className="text-[13px] font-bold text-[#141812]">
+                    진배기 사골국밥 → 범어동 302동 (650m 도보)
+                  </div>
+                  <div className="text-xs text-[#4A5246]">예상 보수 2,000원 · 소요 9분</div>
+                </div>
+                <button
+                  onClick={() =>
+                    showToast('이웃 도보 콜을 수락했습니다! 픽업 매장으로 안내합니다.')
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-[#2E531A] text-white text-xs font-extrabold"
+                >
+                  콜 수락
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // [전용 전체 화면] 점주 AI 포스 & 매장 운영 모드 (제안서 §2, §4, §8 반영)
+  const renderMerchantFullView = () => {
+    const handleAddScannedMenu = () => {
+      const exists = menus.some((m) => m.id === 'menu-tteokguk');
+      if (exists) {
+        showToast('이미 VLM 스캔으로 등록된 시연 메뉴입니다.');
+        return;
+      }
+      const scannedItem: MenuItem = {
+        id: 'menu-tteokguk',
+        storeId: 'store-jinbaegi',
+        storeName: '진배기 사골국밥',
+        name: '한우 사골떡만둣국',
+        category: '한식/국물',
+        price: 11500,
+        rating: 5.0,
+        reviewCount: 1,
+        deliveryMinutes: 25,
+        deliveryFee: 1500,
+        isAvailableNow: true,
+        isSinglePriceGuaranteed: true,
+        remainingLimited: 10,
+        tags: ['국물', '따뜻한', '한식', '떡국', '신메뉴'],
+        description: '점주 AI 포스 종이 메뉴판 1초 VLM 스캔으로 자동 등록된 단일가 메뉴 (시연 자료)',
+        aiPros: ['매장 식사가와 100% 동일한 단일가격 보증 신메뉴'],
+        aiCons: ['당일 한정 10그릇 준비'],
+        dishArt: 'galbitang',
+        options: [{ id: 'opt-tg-std', name: '한우 사골떡만둣국', price: 11500 }],
+        addons: [{ id: 'add-rice-tg', name: '공기밥 추가', price: 1000 }],
+      };
+      setMenus((prev) => [scannedItem, ...prev]);
+      setMerchantVoiceLog((prev) => [
+        '📷 VLM 종이 메뉴판 1초 스캔: "한우 사골떡만둣국 (11,500원)" 고객 앱 즉시 노출 완료',
+        ...prev,
+      ]);
+      showToast('종이 메뉴판 1초 스캔으로 고객 앱 메뉴에 즉시 등록되었습니다!');
+    };
+
+    const toggleMenuAvailability = (menuId: string) => {
+      setMenus((prev) =>
+        prev.map((m) => (m.id === menuId ? { ...m, isAvailableNow: !m.isAvailableNow } : m))
+      );
+      showToast('메뉴 실시간 주문 가능 상태가 고객 앱에 즉시 반영되었습니다.');
+    };
+
+    return (
+      <div className="px-4 sm:px-6 pt-3 pb-8 space-y-5">
+        {/* 점주 상단 헤더 */}
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-black/5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-[#E7EFE1] text-[#2E531A]">
+                점주 AI 포스 모드 (시연)
+              </span>
+              <span className="text-xs font-bold text-[#4A5246]">중개수수료 0%</span>
+            </div>
+            <h1 className="text-xl font-extrabold text-[#141812] mt-1.5">
+              진배기 사골국밥 · 범어본점
+            </h1>
+          </div>
+
+          <button
+            onClick={() => setRole('customer')}
+            className="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-[#2E531A] text-white text-xs font-extrabold shadow-2xs"
+          >
+            고객 화면으로 돌아가기
+          </button>
+        </div>
+
+        {/* 주방 혼잡도 & 오늘 매출 요약 KPI */}
+        <div className="grid grid-cols-3 gap-2.5">
+          <div className="bg-white rounded-2xl p-3.5 border border-black/5">
+            <div className="text-xs text-[#4A5246]">오늘 시연 매출</div>
+            <div className="text-base sm:text-lg font-extrabold text-[#141812] mt-1">
+              482,000원
+            </div>
+            <div className="text-[11px] font-bold text-[#2E531A] mt-0.5">수수료 0원 절감</div>
+          </div>
+          <div className="bg-white rounded-2xl p-3.5 border border-black/5">
+            <div className="text-xs text-[#4A5246]">AI 주방 혼잡도</div>
+            <div className="text-base sm:text-lg font-extrabold text-[#2E531A] mt-1">원활 (18분)</div>
+            <div className="text-[11px] text-[#4A5246] mt-0.5">조리시간 자동추천</div>
+          </div>
+          <div className="bg-white rounded-2xl p-3.5 border border-black/5">
+            <div className="text-xs text-[#4A5246]">단골 O2O 스탬프</div>
+            <div className="text-base sm:text-lg font-extrabold text-[#141812] mt-1">148명</div>
+            <div className="text-[11px] text-[#4A5246] mt-0.5">재주문율 64%</div>
+          </div>
+        </div>
+
+        {/* 점주 서브 탭 */}
+        <div className="grid grid-cols-3 bg-[#E9ECE4] p-1 rounded-2xl">
+          {[
+            { id: 'orders' as const, label: '실시간 주문·음성' },
+            { id: 'menus' as const, label: '메뉴·품절·스캔' },
+            { id: 'reviews' as const, label: 'AI 리뷰 세이프가드' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setMerchantTab(t.id)}
+              className={`py-2.5 rounded-xl text-[13px] font-extrabold transition ${
+                merchantTab === t.id ? 'bg-white text-[#2E531A] shadow-2xs' : 'text-[#4A5246]'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {merchantTab === 'orders' && (
+          <div className="space-y-4">
+            {/* 핸즈프리 음성 조작 패널 */}
+            <div className="bg-[#E7EFE1] rounded-3xl p-4 sm:p-5 border border-[#C7D9B8] space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="font-extrabold text-[15px] text-[#1F3A11] flex items-center gap-1.5">
+                  <Mic className="w-4 h-4" />
+                  <span>주방 핸즈프리 음성 조작 시연</span>
+                </div>
+                <span className="text-xs font-bold text-[#2E531A]">온디바이스 NPU</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setOrders((prev) =>
+                      prev.map((o, idx) => (idx === 0 ? { ...o, statusStep: 3 } : o))
+                    );
+                    setMerchantVoiceLog((prev) => [
+                      '🎙️ "주문 수락, 조리 20분" → 픽업 완료 단계로 즉시 갱신 및 고객 ETA 알림 전송',
+                      ...prev,
+                    ]);
+                    showToast('음성 명령으로 주문 단계가 업데이트되었습니다.');
+                  }}
+                  className="py-3 px-4 rounded-2xl bg-[#2E531A] text-white text-[13px] font-extrabold text-left flex items-center justify-between"
+                >
+                  <span>“주문 수락, 조리 20분”</span>
+                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">실행</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setOrders((prev) =>
+                      prev.map((o, idx) =>
+                        idx === 0 ? { ...o, deliveryMode: '전문 라이더 (Track 2)' } : o
+                      )
+                    );
+                    setMerchantVoiceLog((prev) => [
+                      '🛵 피크타임 즉시 전환: 일반 이웃 도보 → 전문 배달대행사(Track 2) 자동 배차 완료',
+                      ...prev,
+                    ]);
+                    showToast('전문 라이더(Track 2) 호출로 즉시 전환되었습니다.');
+                  }}
+                  className="py-3 px-4 rounded-2xl bg-white text-[#2E531A] border border-[#2E531A]/30 text-[13px] font-extrabold text-left flex items-center justify-between"
+                >
+                  <span>“전문 라이더 즉시 전환”</span>
+                  <span className="text-xs bg-[#E7EFE1] px-2 py-0.5 rounded-full">실행</span>
+                </button>
+              </div>
+              <div className="space-y-1.5 pt-1">
+                {merchantVoiceLog.slice(0, 3).map((log, i) => (
+                  <div
+                    key={i}
+                    className="text-xs bg-white/90 px-3.5 py-2.5 rounded-xl text-[#141812] font-medium"
+                  >
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 실시간 접수 주문 목록 */}
+            <div className="space-y-2.5">
+              <h2 className="font-extrabold text-base text-[#141812]">실시간 매장 접수 내역</h2>
+              {orders.slice(0, 3).map((ord) => (
+                <div
+                  key={ord.id}
+                  className="bg-white rounded-2xl p-4 border border-black/5 shadow-2xs flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-[#2E531A] bg-[#E7EFE1] px-2.5 py-0.5 rounded-full">
+                        {ord.deliveryMode}
+                      </span>
+                      <span className="text-xs text-[#4A5246]">{ord.timeStr}</span>
+                    </div>
+                    <div className="font-extrabold text-[15px] text-[#141812] mt-1">
+                      {ord.menuName} × {ord.quantity}개
+                    </div>
+                    <div className="text-xs text-[#4A5246] mt-0.5">
+                      정산 예정액 {formatKRW(ord.itemsSubtotal)} (중개수수료 0원)
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setOrders((prev) =>
+                        prev.map((item) =>
+                          item.id === ord.id
+                            ? {
+                                ...item,
+                                statusStep: ((item.statusStep % 4) + 1) as 1 | 2 | 3 | 4,
+                              }
+                            : item
+                        )
+                      );
+                      showToast('조리·배달 단계가 다음으로 전환되었습니다.');
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl bg-[#2E531A] text-white text-xs font-extrabold shrink-0"
+                  >
+                    단계 {ord.statusStep}/4 진행
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {merchantTab === 'menus' && (
+          <div className="space-y-4">
+            <button
+              onClick={handleAddScannedMenu}
+              className="w-full py-4 rounded-2xl bg-[#2E531A] hover:bg-[#234113] text-white font-extrabold text-[15px] flex items-center justify-center gap-2 shadow-sm transition"
+            >
+              <Camera className="w-5 h-5" />
+              <span>종이 메뉴판 1초 VLM 스캔 신메뉴 등록 (시연)</span>
+            </button>
+
+            <div className="space-y-2.5">
+              <div className="text-xs font-bold text-[#4A5246]">
+                품절 토글 시 고객 앱의 ‘지금 바로 주문 가능한 맛집’ 필터에 즉시 반영됩니다.
+              </div>
+              {menus.map((m) => (
+                <div
+                  key={m.id}
+                  className="bg-white rounded-2xl p-3.5 border border-black/5 flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <div className="font-extrabold text-[15px] text-[#141812]">{m.name}</div>
+                    <div className="text-xs text-[#4A5246] mt-0.5">
+                      {m.storeName} · 단일가 {formatKRW(m.price)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleMenuAvailability(m.id)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition ${
+                      m.isAvailableNow
+                        ? 'bg-[#E7EFE1] text-[#2E531A]'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {m.isAvailableNow ? '판매중 (주문가능)' : '당일 품절'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {merchantTab === 'reviews' && (
+          <div className="space-y-3">
+            {/* 악성 리뷰 AI 방어 세이프가드 */}
+            <div className="bg-white rounded-2xl p-4 border border-black/5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                  악성 별점 테러 AI 문맥 탐지
+                </span>
+                <span className="text-xs text-[#4A5246]">시연 케이스 #1</span>
+              </div>
+              <p className="text-sm text-[#141812] font-medium">
+                “이유 없이 별 1개 남깁니다. 경쟁 가게가 더 낫네요.”
+              </p>
+              {maliciousBlocked ? (
+                <div className="p-3 rounded-xl bg-emerald-50 text-xs font-bold text-emerald-900">
+                  ✅ AI 세이프가드 블라인드 처리 완료 (매장 평점 보호 적용됨)
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setMaliciousBlocked(true);
+                    showToast('허위·악성 리뷰가 AI 세이프가드로 차단되었습니다.');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-[#2E531A] text-white text-xs font-extrabold"
+                >
+                  AI 세이프가드 차단 실행
+                </button>
+              )}
+            </div>
+
+            {/* 일반 긍정 리뷰 AI 맞춤 답글 */}
+            <div className="bg-white rounded-2xl p-4 border border-black/5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-[#2E531A] bg-[#E7EFE1] px-2.5 py-0.5 rounded-full">
+                  ★ 5.0 단골 고객 리뷰
+                </span>
+                <span className="text-xs text-[#4A5246]">수성갈비탕 주문</span>
+              </div>
+              <p className="text-sm text-[#141812] font-medium">
+                “갈빗대가 정말 실하고 국물이 진해서 부모님이 너무 좋아하셨어요!”
+              </p>
+              {reviewReplySent ? (
+                <div className="p-3 rounded-xl bg-[#F6F9F2] border border-[#D4E2C8] text-xs text-[#141812] leading-relaxed">
+                  <strong>점주 AI 자동 답글 등록됨:</strong> “소중한 부모님 식사에 저희 진배기 사골국밥을 찾아주셔서 진심으로 감사합니다! 다음에도 정성껏 푹 고아 따뜻하게 보내드리겠습니다 😊”
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setReviewReplySent(true);
+                    showToast('점주 어투 맞춤 AI 답글이 등록되었습니다.');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-[#E7EFE1] text-[#2E531A] text-xs font-extrabold"
+                >
+                  점주 어투 AI 맞춤 답글 자동 등록
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // 8. 전체 레이아웃 조립 (모바일 390px ~ PC 화면 크기에 꽉 맞게 자동 적응)
+  // ============================================================================
+
+  return (
+    <div className="min-h-[100dvh] bg-[#ECEEE8] text-[#141812] flex justify-center font-sans antialiased">
+      {/* 반응형 앱 컨테이너: 모바일 390px에서 전체 너비, 태블릿/PC에서는 읽기 편한 중앙 반응형 앱 레이아웃 */}
+      <main className="w-full max-w-md md:max-w-2xl lg:max-w-3xl min-h-[100dvh] bg-[#F6F7F4] shadow-sm flex flex-col relative">
+        {/* 상단 시연 & 역할 전환 유틸리티 바 (고객 모드 / 점주 모드 / 파트너 모드 즉시 전환) */}
+        <header className="sticky top-0 z-30 bg-[#141812] text-white px-3.5 py-2 flex items-center justify-between gap-2 text-xs shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[#8BC34A] shrink-0" />
+            <span className="truncate font-semibold">
+              {storageAvailable
+                ? '시연 자료 모드'
+                : '저장 불가 환경 · 메모리 모드로 시연 계속'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* 고객 / 점주 / 파트너 빠른 모드 스위처 */}
+            <div className="flex items-center bg-white/10 rounded-full p-0.5">
+              {(
+                [
+                  { id: 'customer', label: '고객' },
+                  { id: 'merchant', label: '점주' },
+                  { id: 'partner', label: '파트너' },
+                ] as { id: RoleType; label: string }[]
+              ).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setRole(item.id);
+                    setSubView({ type: 'none' });
+                    if (item.id === 'partner') setActiveTab('my');
+                    showToast(`'${item.label} 모드'로 전환되었습니다.`);
+                  }}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold transition ${
+                    role === item.id
+                      ? 'bg-[#8BC34A] text-[#141812]'
+                      : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handleResetDemo}
+              className="flex items-center gap-1 bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-full text-[11px] font-bold transition"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>데모 초기화</span>
+            </button>
+          </div>
+        </header>
+
+        {/* 본문 영역 */}
+        <div className="flex-1 overflow-y-auto">
+          {role === 'merchant' ? (
+            renderMerchantFullView()
+          ) : (
+            <>
+              {subView.type === 'ai_chat' && renderAiChatView()}
+              {subView.type === 'menu_detail' &&
+                renderMenuDetailView(subView.menuId, subView.isGroupBuy, subView.groupBuyId)}
+              {subView.type === 'group_buy' && renderGroupBuyView()}
+              {subView.type === 'delivery_match' && renderDeliveryMatchView()}
+              {subView.type === 'errands' && renderErrandsView()}
+
+              {subView.type === 'none' && (
+                <>
+                  {activeTab === 'home' && renderHomeTab()}
+                  {activeTab === 'search' && renderSearchTab()}
+                  {activeTab === 'orders' && renderOrdersTab()}
+                  {activeTab === 'wishlist' && renderWishlistTab()}
+                  {activeTab === 'my' && renderMyTab()}
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* 하단 5개 탭 네비게이션 바 (고객/파트너 모드일 때 표시) */}
+        {role !== 'merchant' && subView.type === 'none' && (
+          <nav className="sticky bottom-0 z-20 bg-white/95 backdrop-blur border-t border-black/10 px-2 py-2 grid grid-cols-5 shrink-0">
+            {[
+              { id: 'home' as MainTab, label: '홈', icon: Home },
+              { id: 'search' as MainTab, label: '검색', icon: Search },
+              { id: 'orders' as MainTab, label: '주문내역', icon: ClipboardList },
+              { id: 'wishlist' as MainTab, label: '찜', icon: Heart },
+              { id: 'my' as MainTab, label: 'MY', icon: User },
+            ].map((tab) => {
+              const IconComp = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="flex flex-col items-center justify-center py-1 gap-1"
+                >
+                  <div
+                    className={`p-1 rounded-xl transition ${
+                      isActive ? 'text-[#2E531A]' : 'text-[#5A6256]'
+                    }`}
+                  >
+                    <IconComp
+                      className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : 'stroke-[1.9px]'}`}
+                    />
+                  </div>
+                  <span
+                    className={`text-xs font-extrabold ${
+                      isActive ? 'text-[#2E531A]' : 'text-[#5A6256]'
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
+
+        {/* 주문/예약/충전 최종 확인 모달 (마지막 확인 후에만 모의 처리) */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 bg-black/55 backdrop-blur-2xs flex items-end sm:items-center justify-center z-40 p-3">
+            <div className="w-full max-w-md bg-white rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-xs font-extrabold text-[#2E531A] bg-[#E7EFE1] px-3 py-1 rounded-full">
+                    {confirmModal.badgeText || '최종 확인 · 모의 결제'}
+                  </span>
+                  <h3 className="text-xl font-extrabold text-[#141812] mt-2">
+                    {confirmModal.title}
+                  </h3>
+                  <p className="text-[13px] text-[#4A5246] mt-0.5">{confirmModal.subtitle}</p>
+                </div>
+                <button
+                  onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="p-1.5 rounded-full hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="bg-[#F6F7F4] rounded-2xl p-4 space-y-2.5 text-sm">
+                <div className="flex justify-between text-[#4A5246]">
+                  <span>상품 합계</span>
+                  <span className="font-bold text-[#141812]">
+                    {formatKRW(confirmModal.itemsSubtotal)}
+                  </span>
+                </div>
+                {confirmModal.couponDiscount > 0 && (
+                  <div className="flex justify-between text-[#2E531A]">
+                    <span>AI 자동최적 쿠폰 ({confirmModal.couponTitle})</span>
+                    <span className="font-extrabold">
+                      -{formatKRW(confirmModal.couponDiscount)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[#4A5246]">
+                  <span>배달비 (하이브리드 매칭)</span>
+                  <span className="font-bold text-[#141812]">
+                    +{formatKRW(confirmModal.deliveryFee)}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-2.5 border-t border-gray-200 text-base font-extrabold text-[#141812]">
+                  <span>최종 모의 결제금액</span>
+                  <span className="text-[#2E531A] text-lg">
+                    {formatKRW(confirmModal.finalAmount)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#4A5246] text-center">
+                ※ 시연용 가상 처리이며 실제 카드 청구·외부 결제가 발생하지 않습니다.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="py-3.5 rounded-2xl bg-gray-100 text-[#141812] font-extrabold text-sm"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={confirmModal.onConfirm}
+                  className="py-3.5 rounded-2xl bg-[#2E531A] hover:bg-[#234113] text-white font-extrabold text-sm shadow-md"
+                >
+                  최종 확인 및 모의 처리
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 토스트 알림 배너 */}
+        {toastMsg && (
+          <div className="fixed top-12 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-50 bg-[#141812]/95 text-white text-[13px] font-bold px-4 py-3.5 rounded-2xl shadow-lg flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-[#8BC34A] shrink-0" />
+            <span>{toastMsg}</span>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;

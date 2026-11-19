@@ -1,0 +1,8 @@
+{
+  "name": "alle — 주문·점주 연결 MVP",
+  "description": "한 줄 주문 조건 추천부터 근거 있는 가격·리뷰, 점주 주문 상태 연결까지 한 브라우저에서 시연하는 음식 주문 MVP",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
