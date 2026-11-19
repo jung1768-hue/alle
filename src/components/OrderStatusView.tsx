@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import {
   DispatchMode,
+  ErrandRequest,
+  ErrandStatus,
   EvidenceRecord,
   MenuItem,
   Order,
@@ -26,6 +28,7 @@ import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
 interface OrderStatusViewProps {
   orders: Order[];
+  errands?: ErrandRequest[];
   stores: Store[];
   menus: MenuItem[];
   highlightedOrderId: string | null;
@@ -45,8 +48,15 @@ const STEPS: Array<{ status: OrderStatus; label: string }> = [
   { status: OrderStatus.PENDING, label: '접수 대기' },
   { status: OrderStatus.ACCEPTED, label: '수락됨' },
   { status: OrderStatus.COOKING, label: '조리 중' },
-  { status: OrderStatus.PICKUP, label: '픽업' },
-  { status: OrderStatus.COMPLETED, label: '완료' },
+  { status: OrderStatus.PICKUP, label: '배송 시작' },
+  { status: OrderStatus.COMPLETED, label: '도착 완료' },
+];
+
+const ERRAND_STEPS: Array<{ status: ErrandStatus; label: string }> = [
+  { status: ErrandStatus.OPEN, label: '요청 등록' },
+  { status: ErrandStatus.MATCHED, label: '파트너 매칭' },
+  { status: ErrandStatus.RECEIPT_CHECKED, label: '배송 시작' },
+  { status: ErrandStatus.COMPLETED, label: '도착 완료' },
 ];
 
 function getStepIndex(status: OrderStatus): number {
@@ -98,6 +108,7 @@ function getFaqAutoReply(order: Order, topic: 'eta' | 'note'): string {
 
 export function OrderStatusView({
   orders,
+  errands = [],
   stores,
   menus,
   highlightedOrderId,
@@ -198,6 +209,16 @@ export function OrderStatusView({
   );
 
   const visibleOrders = tab === 'active' ? activeOrders : historyOrders;
+
+  const activeErrands = useMemo(
+    () => errands.filter((e) => e.status !== ErrandStatus.COMPLETED),
+    [errands]
+  );
+  const historyErrands = useMemo(
+    () => errands.filter((e) => e.status === ErrandStatus.COMPLETED),
+    [errands]
+  );
+  const visibleErrands = tab === 'active' ? activeErrands : historyErrands;
 
   // Calendar aggregation (all orders or history+active so user sees complete monthly food log)
   const daysInCalendarMonth = new Date(calendarYear, calendarMonth, 0).getDate();
@@ -554,10 +575,10 @@ export function OrderStatusView({
             )}
           </div>
         </div>
-      ) : visibleOrders.length === 0 ? (
+      ) : visibleOrders.length === 0 && visibleErrands.length === 0 ? (
         <div className="bg-white border border-[#E8ECE4] rounded-3xl p-8 text-center text-sm text-[#687064]">
           {tab === 'active'
-            ? '현재 진행 중인 주문이 없습니다.'
+            ? '현재 진행 중인 주문이나 심부름이 없습니다.'
             : '완료되거나 취소된 주문 기록이 없습니다.'}
         </div>
       ) : (
@@ -634,6 +655,34 @@ export function OrderStatusView({
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                            {order.orderCode.startsWith('MKT-')
+                              ? '🧺 시장·골목 묶음'
+                              : order.isB2B
+                                ? '🏢 B2B 단체식'
+                                : order.sharedDeliveryApplied
+                                  ? '👥 이웃 묶음'
+                                  : '🍽️ 일반 배달'}
+                          </span>
+                          {!isCancelled && (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                order.status === OrderStatus.COMPLETED
+                                  ? 'bg-[#4E6E2A] text-white'
+                                  : order.status === OrderStatus.PICKUP
+                                    ? 'bg-amber-600 text-white'
+                                    : 'bg-[#F7F8F5] text-[#434B40] border border-[#E8ECE4]'
+                              }`}
+                            >
+                              {order.status === OrderStatus.COMPLETED
+                                ? '✅ 도착 완료'
+                                : order.status === OrderStatus.PICKUP
+                                  ? '🚚 배송 시작됨'
+                                  : `${STEPS[currentIdx]?.label ?? order.status}`}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-[#687064]">
                           <span className="font-mono font-bold text-[#1A1D1A]">
                             {order.orderCode}
@@ -1024,6 +1073,76 @@ export function OrderStatusView({
                     )}
                   </div>
                 )}
+              </article>
+            );
+          })}
+
+          {visibleErrands.map((errand) => {
+            const eIdx = ERRAND_STEPS.findIndex((s) => s.status === errand.status);
+            return (
+              <article
+                key={errand.id}
+                className="bg-white rounded-3xl border border-[#E8ECE4] p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                      <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                        🏃 장보기 · 생활 심부름
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                          errand.status === ErrandStatus.COMPLETED
+                            ? 'bg-[#4E6E2A] text-white'
+                            : errand.status === ErrandStatus.RECEIPT_CHECKED
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-[#F7F8F5] text-[#434B40] border border-[#E8ECE4]'
+                        }`}
+                      >
+                        {errand.status === ErrandStatus.COMPLETED
+                          ? '✅ 도착 완료'
+                          : errand.status === ErrandStatus.RECEIPT_CHECKED
+                            ? '🚚 배송 시작됨'
+                            : ERRAND_STEPS[eIdx]?.label ?? errand.status}
+                      </span>
+                    </div>
+                    <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
+                      {errand.title}
+                    </h2>
+                    <p className="text-xs text-[#687064] mt-0.5">
+                      {errand.pickupAlias} → {errand.dropoffAlias} · {errand.createdAt}
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right shrink-0">
+                    <div className="text-lg font-bold text-[#1A1D1A] font-mono tabular-nums">
+                      {formatWon(errand.escrowTotal)}
+                    </div>
+                    <div className="text-[11px] text-[#687064]">
+                      심부름비 {formatWon(errand.errandFee)} 포함
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5">
+                  {ERRAND_STEPS.map((st, idx) => {
+                    const reached = idx <= eIdx;
+                    const isCurrent = idx === eIdx;
+                    return (
+                      <div
+                        key={st.status}
+                        className={`py-2 px-1.5 rounded-xl text-center border text-[11px] font-semibold ${
+                          isCurrent
+                            ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                            : reached
+                              ? 'bg-[#EAF1E2] border-[#D4E1C5] text-[#3D5720]'
+                              : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064]'
+                        }`}
+                      >
+                        {st.label}
+                      </div>
+                    );
+                  })}
+                </div>
               </article>
             );
           })}

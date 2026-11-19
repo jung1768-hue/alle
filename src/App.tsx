@@ -1936,6 +1936,7 @@ export default function App() {
         ) : (
           <OrderStatusView
             orders={appState.orders}
+            errands={appState.errands}
             stores={appState.stores}
             menus={appState.menus}
             highlightedOrderId={highlightedOrderId}
