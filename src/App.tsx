@@ -1882,6 +1882,8 @@ export default function App() {
             menus={appState.menus}
             stores={appState.stores}
             wishlistIds={appState.wishlistIds}
+            reviews={INITIAL_REVIEWS}
+            reviewReplies={appState.reviewReplies}
             onToggleWishlist={handleToggleWishlist}
             onQuickSelectMenu={handleQuickSelectMenu}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
