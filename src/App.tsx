@@ -173,9 +173,72 @@ export default function App() {
 
   const orderSubmitLockRef = useRef<boolean>(false);
   const skipNextFirestorePushRef = useRef<boolean>(false);
+  const isPopstateNavRef = useRef<boolean>(false);
+  const lastHistoryKeyRef = useRef<string>(
+    `${DemoRole.CONSUMER}:${ConsumerStep.HOME}:${SuperAppTab.GROUP_BUY}`
+  );
   const lastSharedJsonRef = useRef<string>(
     JSON.stringify(extractSharedState(initialLoad.state))
   );
+
+  useEffect(() => {
+    window.history.replaceState(
+      {
+        role: DemoRole.CONSUMER,
+        step: ConsumerStep.HOME,
+        superAppTab: SuperAppTab.GROUP_BUY,
+      },
+      '',
+      window.location.href
+    );
+
+    const handlePopState = (event: PopStateEvent) => {
+      const navState = event.state as {
+        role?: DemoRole;
+        step?: ConsumerStep;
+        superAppTab?: SuperAppTab;
+      } | null;
+
+      setShowFutureModal(false);
+      setShowGeminiModal(false);
+      setShowLocationPicker(false);
+      setShowNotifications(false);
+      setShowDemoSwitcher(false);
+
+      if (navState?.role && navState?.step) {
+        isPopstateNavRef.current = true;
+        lastHistoryKeyRef.current = `${navState.role}:${navState.step}:${
+          navState.superAppTab ?? SuperAppTab.GROUP_BUY
+        }`;
+        setRole(navState.role);
+        setStep(navState.step);
+        if (navState.superAppTab) {
+          setSuperAppTab(navState.superAppTab);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const nextKey = `${role}:${step}:${superAppTab}`;
+    if (isPopstateNavRef.current) {
+      isPopstateNavRef.current = false;
+      lastHistoryKeyRef.current = nextKey;
+      return;
+    }
+    if (nextKey !== lastHistoryKeyRef.current) {
+      lastHistoryKeyRef.current = nextKey;
+      window.history.pushState(
+        { role, step, superAppTab },
+        '',
+        window.location.href
+      );
+    }
+  }, [role, step, superAppTab]);
 
   useEffect(() => {
     void checkServerGeminiAvailable();
