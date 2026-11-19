@@ -359,10 +359,55 @@ export default function App() {
     showToast('등록된 위치가 삭제되었습니다.');
   };
 
-  const recommendationResult = useMemo(
-    () => evaluateRecommendations(activeCondition, appState.stores, appState.menus),
-    [activeCondition, appState.stores, appState.menus]
-  );
+  const recommendationResult = useMemo(() => {
+    const evaluated = evaluateRecommendations(
+      activeCondition,
+      appState.stores,
+      appState.menus
+    );
+    if (
+      selectedMenuId &&
+      !evaluated.matches.some((m) => m.menu.id === selectedMenuId)
+    ) {
+      const targetMenu = appState.menus.find((m) => m.id === selectedMenuId);
+      const targetStore = targetMenu
+        ? appState.stores.find((s) => s.id === targetMenu.storeId)
+        : undefined;
+      if (targetMenu && targetStore) {
+        const servings = Math.max(1, Math.floor(activeCondition.servings || 1));
+        const unitPrice = getEffectiveMenuPrice(targetMenu);
+        const menuSubtotal = unitPrice * servings;
+        const effectiveMinutes =
+          targetMenu.estimatedMinutes + (targetStore.extraPrepMinutes ?? 0);
+        const isSameStorePrice =
+          targetMenu.storePrice !== null &&
+          targetMenu.comparisonDate !== null &&
+          targetMenu.storePrice === targetMenu.pricePerPerson;
+
+        return {
+          matches: [
+            {
+              menu: targetMenu,
+              store: targetStore,
+              servings,
+              menuSubtotal,
+              deliveryFee: targetStore.deliveryFee,
+              estimatedTotal: menuSubtotal + targetStore.deliveryFee,
+              effectiveMinutes,
+              matchedTags: targetMenu.tags.slice(0, 3),
+              isSameStorePrice,
+              aiReason: targetMenu.aiReason,
+            },
+            ...evaluated.matches.slice(0, 5),
+          ],
+          excluded: evaluated.excluded.filter(
+            (e) => e.menu.id !== selectedMenuId
+          ),
+        };
+      }
+    }
+    return evaluated;
+  }, [activeCondition, appState.stores, appState.menus, selectedMenuId]);
 
   const handleRawInputChange = (next: string) => {
     setRawInput(next);
@@ -405,7 +450,10 @@ export default function App() {
     if (!targetMenu) return;
     const wideCondition: ParsedCondition = {
       rawInput: targetMenu.name,
-      servings: parsedCondition.servings || 2,
+      servings: Math.min(
+        parsedCondition.servings || 1,
+        Math.max(1, targetMenu.stock)
+      ),
       tags: [],
       maxBudget: null,
       maxMinutes: null,
