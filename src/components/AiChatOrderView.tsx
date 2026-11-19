@@ -605,19 +605,11 @@ export function AiChatOrderView({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {onOpenAiSettings && (
-            <button
-              type="button"
-              onClick={onOpenAiSettings}
-              className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors border ${
-                aiReady
-                  ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
-                  : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:text-[#1A1D1A]'
-              }`}
-            >
+          {aiReady && (
+            <span className="min-h-[34px] px-3 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl inline-flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{aiReady ? 'alle 분석 연결됨' : 'alle 분석 설정'}</span>
-            </button>
+              <span>alle 분석</span>
+            </span>
           )}
           <button
             type="button"

@@ -2019,17 +2019,6 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setShowDemoSwitcher(false);
-                    setShowGeminiModal(true);
-                  }}
-                  className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <Sparkles className="w-3 h-3 text-[#82B440]" />
-                  <span>AI 키</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDemoSwitcher(false);
                     setShowFutureModal(true);
                   }}
                   className="px-2 py-1 rounded-lg hover:bg-white/10 inline-flex items-center gap-1 cursor-pointer"
@@ -2082,18 +2071,6 @@ export default function App() {
       <FutureScopeModal
         isOpen={showFutureModal}
         onClose={() => setShowFutureModal(false)}
-      />
-
-      <GeminiKeyModal
-        isOpen={showGeminiModal}
-        onClose={() => setShowGeminiModal(false)}
-        onSaved={(hasKey) =>
-          showToast(
-            hasKey
-              ? 'alle 분석 실시간 연동이 활성화되었습니다.'
-              : '로컬 규칙 엔진 모드로 전환되었습니다.'
-          )
-        }
       />
     </div>
   );

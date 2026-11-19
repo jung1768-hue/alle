@@ -1558,15 +1558,6 @@ export function OwnerDashboardView({
                 {ocrError && (
                   <div className="p-3 bg-[#FFFBEF] border border-[#E8D595] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
                     <span>{ocrError}</span>
-                    {onOpenAiSettings && (
-                      <button
-                        type="button"
-                        onClick={onOpenAiSettings}
-                        className="px-3 py-1 bg-[#4E6E2A] text-white font-semibold rounded-lg cursor-pointer"
-                      >
-                        AI 키 설정
-                      </button>
-                    )}
                   </div>
                 )}
 

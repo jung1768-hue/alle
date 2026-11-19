@@ -431,14 +431,14 @@ export function RecommendationView({
 
                   <div className="flex-1 min-w-0 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#687064]">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0 text-xs font-medium text-[#687064]">
                           <StoreIcon className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
                           <span className="truncate">
                             {activeMatch.store.name} · {activeMatch.store.areaLabel}
                           </span>
                         </div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] mt-0.5 tracking-tight">
+                        <h2 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] mt-0.5 tracking-tight break-keep">
                           {activeMatch.menu.name}
                         </h2>
                       </div>

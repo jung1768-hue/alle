@@ -33,7 +33,7 @@
 
   body {
     overflow-x: clip;
-    font-weight: 450;
+    font-weight: 500;
   }
 
   @media (max-width: 639px) {
@@ -65,12 +65,16 @@
   }
 }
 
+.text-\[\#555E52\] {
+  color: #343B32 !important;
+}
+
 .text-\[\#687064\] {
-  color: #434B40 !important;
+  color: #3D453B !important;
 }
 
 .text-\[\#919A8D\] {
-  color: #565E53 !important;
+  color: #50584D !important;
 }
 
 .os-card {
