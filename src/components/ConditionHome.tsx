@@ -478,7 +478,7 @@ export function ConditionHome({
       {/* 3. Compact Extension Pill Strip (Streamlined UX) */}
       <section
         aria-label="확장 서비스"
-        className="flex flex-wrap items-center gap-2"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-2"
       >
         {quickServices.map((svc) => {
           const Icon = svc.icon;
@@ -487,10 +487,10 @@ export function ConditionHome({
               key={svc.id}
               type="button"
               onClick={svc.onClick}
-              className="flex-1 min-w-[140px] min-h-[42px] px-3.5 py-2 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl shadow-2xs inline-flex items-center justify-center gap-2 text-xs font-semibold text-[#1A1D1A] transition-all cursor-pointer"
+              className="w-full min-w-0 min-h-[44px] px-3.5 py-2.5 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl shadow-2xs inline-flex items-center justify-center gap-2 text-xs font-semibold text-[#1A1D1A] transition-all cursor-pointer"
             >
               <Icon className="w-4 h-4 text-[#4E6E2A] shrink-0" strokeWidth={1.9} />
-              <span className="whitespace-nowrap">{svc.label}</span>
+              <span className="truncate">{svc.label}</span>
             </button>
           );
         })}

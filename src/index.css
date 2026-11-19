@@ -25,26 +25,28 @@
     background-color: #F7F8F5;
     color: #1A1D1A;
     letter-spacing: -0.01em;
+    overflow-x: clip;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
   }
 
-  @media (max-width: 639px) {
-    html {
-      font-size: 17px;
-    }
+  body {
+    overflow-x: clip;
+    font-weight: 450;
+  }
 
+  @media (max-width: 639px) {
     .text-xs {
       font-size: 0.8125rem;
-      line-height: 1.4;
+      line-height: 1.45;
     }
 
     .text-\[11px\],
     .text-\[10\.5px\],
     .text-\[10px\] {
-      font-size: 0.75rem;
-      line-height: 1.35;
+      font-size: 0.78rem;
+      line-height: 1.38;
     }
   }
 
@@ -61,6 +63,14 @@
     outline: 2px solid #4E6E2A;
     outline-offset: 2px;
   }
+}
+
+.text-\[\#687064\] {
+  color: #434B40 !important;
+}
+
+.text-\[\#919A8D\] {
+  color: #565E53 !important;
 }
 
 .os-card {

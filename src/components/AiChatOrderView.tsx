@@ -584,27 +584,27 @@ export function AiChatOrderView({
   return (
     <div className="max-w-3xl mx-auto os-card rounded-[32px] overflow-hidden flex flex-col min-h-[76vh]">
       {/* Calm AI Studio Header */}
-      <div className="px-5 sm:px-7 py-4 bg-white border-b border-[#E8ECE4] flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="px-4 sm:px-7 py-3.5 bg-white border-b border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <button
             type="button"
             onClick={onBackToHome}
-            className="min-w-[38px] min-h-[38px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center text-[#1A1D1A] cursor-pointer transition-colors"
+            className="min-w-[38px] min-h-[38px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center text-[#1A1D1A] cursor-pointer transition-colors shrink-0"
             aria-label="홈으로 돌아가기"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight truncate">
               AI 컨디션 주문
             </h1>
-            <p className="text-xs text-[#687064]">
-              자연스럽게 말씀하시면 실시간으로 의도를 파악해 추천해 드립니다
+            <p className="text-xs text-[#687064] truncate">
+              자연스럽게 말씀하시면 실시간으로 추천해 드립니다
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {onOpenAiSettings && (
             <button
               type="button"
