@@ -6,7 +6,7 @@ import {
   onSnapshot,
   setDoc,
 } from 'firebase/firestore';
-import { resolveBundledImage } from '../data/seedData';
+import { INITIAL_STORES, resolveBundledImage } from '../data/seedData';
 import {
   AllePersistedState,
   ErrandRequest,
@@ -50,7 +50,11 @@ export interface SharedOperationalState {
 
 export type FirebaseSyncStatus = 'connecting' | 'synced' | 'local-fallback';
 
-const SHARED_DOC_REF = doc(db, 'alle_demo', 'shared_state');
+const SHARED_DOC_REF = doc(db, 'alle_demo', 'shared_state_v7');
+
+const seedStoreRegionMap = new Map(
+  INITIAL_STORES.map((s) => [s.id, s.region])
+);
 
 export function extractSharedState(
   state: AllePersistedState
@@ -79,6 +83,7 @@ function normalizeRemoteSharedState(
   return {
     stores: raw.stores.map((s) => ({
       ...s,
+      region: s.region ?? seedStoreRegionMap.get(s.id),
       image: resolveBundledImage(s.image) || s.image,
     })),
     menus: raw.menus.map((m) => ({

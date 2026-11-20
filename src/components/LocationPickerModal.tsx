@@ -8,7 +8,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { QUICK_DAEGU_AREAS } from '../data/seedData';
+import { QUICK_NATIONWIDE_AREAS } from '../data/seedData';
 import { SavedLocation } from '../types/alle';
 
 interface LocationPickerModalProps {
@@ -52,7 +52,7 @@ export function LocationPickerModal({
     e.preventDefault();
     const cleanedArea = newAreaName.trim();
     if (!cleanedArea) {
-      setFormError('지역명(동/구)을 입력하거나 아래 대구 주요 상권을 선택해 주세요.');
+      setFormError('지역명(구/동)을 입력하거나 아래 전국 주요 지역을 선택해 주세요.');
       return;
     }
     const cleanedLabel =
@@ -238,32 +238,35 @@ export function LocationPickerModal({
                 })}
               </div>
 
-              {/* Quick Daegu Area Presets */}
+              {/* Quick Nationwide Area Presets */}
               <div>
                 <span className="block text-[11px] font-semibold text-[#687064] mb-1.5">
-                  대구 주요 지역 빠른 입력
+                  전국 주요 지역 빠른 입력
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {QUICK_DAEGU_AREAS.map((area) => (
-                    <button
-                      key={area}
-                      type="button"
-                      onClick={() => {
-                        setNewAreaName(area);
-                        if (!newDetailAddress.trim()) {
-                          setNewDetailAddress(`${area.replace(/^대구\s+/, '')} 수령지`);
-                        }
-                        setFormError(null);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium cursor-pointer transition-colors ${
-                        newAreaName === area
-                          ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#4E6E2A] font-bold'
-                          : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
-                      }`}
-                    >
-                      {area.replace(/^대구\s+/, '')}
-                    </button>
-                  ))}
+                  {QUICK_NATIONWIDE_AREAS.map((area) => {
+                    const shortArea = area.replace(/^(서울|경기|인천|부산|대구|대전|광주)\s+/, '');
+                    return (
+                      <button
+                        key={area}
+                        type="button"
+                        onClick={() => {
+                          setNewAreaName(area);
+                          if (!newDetailAddress.trim()) {
+                            setNewDetailAddress(`${shortArea} 수령지`);
+                          }
+                          setFormError(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium cursor-pointer transition-colors ${
+                          newAreaName === area
+                            ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#4E6E2A] font-bold'
+                            : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
+                        }`}
+                      >
+                        {area}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -282,7 +285,7 @@ export function LocationPickerModal({
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-[#555E52] mb-1">
-                    지역명 (구/동) *
+                    지역명 (시/구/동) *
                   </label>
                   <input
                     type="text"
@@ -291,7 +294,7 @@ export function LocationPickerModal({
                       setNewAreaName(e.target.value);
                       setFormError(null);
                     }}
-                    placeholder="예: 대구 중구 대봉동"
+                    placeholder="예: 서울 강남구 역삼동"
                     className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-xs bg-white text-[#1A1D1A]"
                   />
                 </div>
@@ -305,7 +308,7 @@ export function LocationPickerModal({
                   type="text"
                   value={newDetailAddress}
                   onChange={(e) => setNewDetailAddress(e.target.value)}
-                  placeholder="예: 대봉동 수령지 B (1층 로비)"
+                  placeholder="예: 역삼동 수령지 B (1층 로비)"
                   className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-xs bg-white text-[#1A1D1A]"
                 />
               </div>

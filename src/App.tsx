@@ -3,13 +3,14 @@ import {
   Bell,
   ChevronDown,
   ClipboardList,
+  Eye,
   Heart,
   HelpCircle,
   Home,
   MapPin,
   Presentation,
   RotateCcw,
-  Search,
+  ShoppingBag,
   Sparkles,
   Store as StoreIcon,
   Truck,
@@ -27,12 +28,18 @@ import { OrderConfirmationView } from './components/OrderConfirmationView';
 import { OrderStatusView } from './components/OrderStatusView';
 import { OwnerDashboardView } from './components/OwnerDashboardView';
 import { PartnerDashboardView } from './components/PartnerDashboardView';
+import {
+  QuickPayBottomSheet,
+  QuickPayResolvedItem,
+} from './components/QuickPayBottomSheet';
 import { RecommendationView } from './components/RecommendationView';
 import { SuperAppHubView } from './components/SuperAppHubView';
 import { WishlistView } from './components/WishlistView';
 import { INITIAL_REVIEWS, PROHIBITED_ERRAND_KEYWORDS } from './data/seedData';
 import {
   AllePersistedState,
+  CartLineItem,
+  CartState,
   ConsumerStep,
   DemoRole,
   DispatchMode,
@@ -41,6 +48,7 @@ import {
   EvidenceRecord,
   MenuItem,
   Order,
+  OrderLineItem,
   OrderStatus,
   ParsedCondition,
   PaymentMethod,
@@ -51,9 +59,14 @@ import {
 } from './types/alle';
 import {
   evaluateRecommendations,
+  formatWon,
   getEffectiveMenuPrice,
   parseConditionInput,
 } from './utils/parser';
+import {
+  estimateCompetitorSavings,
+  getLocalCurrencyLabel,
+} from './utils/pricing';
 import { checkServerGeminiAvailable } from './utils/gemini';
 import {
   extractSharedState,
@@ -151,13 +164,31 @@ export default function App() {
 
   const [selectedMenuId, setSelectedMenuId] = useState<string | null>(null);
   const [confirmDraft, setConfirmDraft] = useState<{
-    menuId: string;
-    servings: number;
-    selectedOptionIds: string[];
+    draftId: string;
+    storeId: string;
+    items: CartLineItem[];
     couponCode: string;
     sharedDeliveryApplied?: boolean;
     reservationSlot?: string;
     paymentMethod?: PaymentMethod;
+  } | null>(null);
+
+  const [cart, setCart] = useState<CartState | null>(null);
+  const [pendingCartSwitch, setPendingCartSwitch] = useState<{
+    menuId: string;
+    storeId: string;
+    storeName: string;
+    menuName: string;
+    quantity: number;
+    selectedOptionIds: string[];
+  } | null>(null);
+
+  const [quickPayDraft, setQuickPayDraft] = useState<{
+    storeId: string;
+    items: CartLineItem[];
+    paymentMethod?: PaymentMethod;
+    couponCode?: string;
+    customerNote?: string;
   } | null>(null);
 
   const [highlightedOrderId, setHighlightedOrderId] = useState<string | null>(
@@ -166,6 +197,16 @@ export default function App() {
   const [aiChatInitialPrompt, setAiChatInitialPrompt] = useState<
     string | undefined
   >(undefined);
+  const [showPresenterMode, setShowPresenterMode] = useState<boolean>(() => {
+    try {
+      return (
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('demo') === '1'
+      );
+    } catch {
+      return false;
+    }
+  });
   const [showFutureModal, setShowFutureModal] = useState<boolean>(false);
   const [showGeminiModal, setShowGeminiModal] = useState<boolean>(false);
   const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false);
@@ -312,8 +353,8 @@ export default function App() {
       appState.savedLocations[0] ?? {
         id: 'loc-home',
         label: '우리집',
-        areaName: '대구 수성구 범어동',
-        detailAddress: '수성구 범어동 수령지 A',
+        areaName: '서울 강남구 역삼동',
+        detailAddress: '강남구 역삼동 수령지 A',
         tag: 'home',
       }
     );
@@ -363,7 +404,8 @@ export default function App() {
     const evaluated = evaluateRecommendations(
       activeCondition,
       appState.stores,
-      appState.menus
+      appState.menus,
+      activeLocation
     );
     if (
       selectedMenuId &&
@@ -383,6 +425,14 @@ export default function App() {
           targetMenu.storePrice !== null &&
           targetMenu.comparisonDate !== null &&
           targetMenu.storePrice === targetMenu.pricePerPerson;
+        const savings = estimateCompetitorSavings({
+          menuSubtotal,
+          originalMenuSubtotal: targetMenu.pricePerPerson * servings,
+          deliveryFee: targetStore.deliveryFee,
+          originalDeliveryFee: targetStore.deliveryFee,
+          couponDiscount: 0,
+          isSameStorePrice,
+        });
 
         return {
           matches: [
@@ -396,6 +446,8 @@ export default function App() {
               effectiveMinutes,
               matchedTags: targetMenu.tags.slice(0, 3),
               isSameStorePrice,
+              isNearbyArea: true,
+              estimatedSavingsVsCompetitor: savings.totalSaved,
               aiReason: targetMenu.aiReason,
             },
             ...evaluated.matches.slice(0, 5),
@@ -407,7 +459,7 @@ export default function App() {
       }
     }
     return evaluated;
-  }, [activeCondition, appState.stores, appState.menus, selectedMenuId]);
+  }, [activeCondition, appState.stores, appState.menus, selectedMenuId, activeLocation]);
 
   const handleRawInputChange = (next: string) => {
     setRawInput(next);
@@ -420,7 +472,8 @@ export default function App() {
     const evaluated = evaluateRecommendations(
       confirmed,
       appState.stores,
-      appState.menus
+      appState.menus,
+      activeLocation
     );
     setSelectedMenuId(evaluated.matches[0]?.menu.id ?? null);
     setRole(DemoRole.CONSUMER);
@@ -437,7 +490,8 @@ export default function App() {
     const evaluated = evaluateRecommendations(
       condition,
       appState.stores,
-      appState.menus
+      appState.menus,
+      activeLocation
     );
     setSelectedMenuId(selectedMenuIdArg ?? evaluated.matches[0]?.menu.id ?? null);
     setRole(DemoRole.CONSUMER);
@@ -455,6 +509,7 @@ export default function App() {
         Math.max(1, targetMenu.stock)
       ),
       tags: [],
+      excludeTags: [],
       maxBudget: null,
       maxMinutes: null,
       unknownTokens: [],
@@ -467,6 +522,179 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleToggleEasyMode = () => {
+    setAppState((prev) => {
+      const nextEasy = !prev.easyMode;
+      showToast(
+        nextEasy
+          ? '큰 글씨 · 쉬운 모드가 켜졌습니다.'
+          : '기본 화면으로 전환되었습니다.'
+      );
+      return { ...prev, easyMode: nextEasy };
+    });
+  };
+
+  const mergeCartItems = (
+    existing: CartLineItem[],
+    incoming: CartLineItem,
+    maxStock: number
+  ): CartLineItem[] => {
+    const sortedIncoming = [...incoming.selectedOptionIds].sort().join(',');
+    const idx = existing.findIndex(
+      (it) =>
+        it.menuId === incoming.menuId &&
+        [...it.selectedOptionIds].sort().join(',') === sortedIncoming
+    );
+    if (idx >= 0) {
+      return existing.map((it, i) =>
+        i === idx
+          ? {
+              ...it,
+              quantity: Math.min(maxStock, it.quantity + incoming.quantity),
+            }
+          : it
+      );
+    }
+    return [
+      ...existing,
+      {
+        menuId: incoming.menuId,
+        quantity: Math.min(maxStock, Math.max(1, incoming.quantity)),
+        selectedOptionIds: [...incoming.selectedOptionIds],
+      },
+    ];
+  };
+
+  const handleAddToCart = (
+    menuId: string,
+    quantity = 1,
+    selectedOptionIds: string[] = []
+  ) => {
+    const targetMenu = appState.menus.find((m) => m.id === menuId);
+    const targetStore = targetMenu
+      ? appState.stores.find((s) => s.id === targetMenu.storeId)
+      : undefined;
+    if (
+      !targetMenu ||
+      !targetStore ||
+      !targetStore.isOpen ||
+      targetMenu.isSoldOut ||
+      targetMenu.stock < 1
+    ) {
+      showToast('해당 메뉴가 현재 품절이거나 영업 중단 상태입니다.');
+      return;
+    }
+
+    if (cart && cart.storeId !== targetStore.id && cart.items.length > 0) {
+      setPendingCartSwitch({
+        menuId: targetMenu.id,
+        storeId: targetStore.id,
+        storeName: targetStore.name,
+        menuName: targetMenu.name,
+        quantity: Math.min(Math.max(1, quantity), targetMenu.stock),
+        selectedOptionIds: [...selectedOptionIds],
+      });
+      return;
+    }
+
+    setCart((prev) => {
+      const baseItems =
+        prev && prev.storeId === targetStore.id ? prev.items : [];
+      return {
+        storeId: targetStore.id,
+        items: mergeCartItems(
+          baseItems,
+          { menuId: targetMenu.id, quantity, selectedOptionIds },
+          targetMenu.stock
+        ),
+      };
+    });
+    showToast(`'${targetMenu.name}'이(가) 장바구니에 담겼습니다.`);
+  };
+
+  const handleOpenQuickPay = (payload: {
+    menuId: string;
+    servings: number;
+    selectedOptionIds?: string[];
+    paymentMethod?: PaymentMethod;
+    customerNote?: string;
+    couponCode?: string;
+  }) => {
+    const targetMenu = appState.menus.find((m) => m.id === payload.menuId);
+    const targetStore = targetMenu
+      ? appState.stores.find((s) => s.id === targetMenu.storeId)
+      : undefined;
+    if (
+      !targetMenu ||
+      !targetStore ||
+      !targetStore.isOpen ||
+      targetMenu.isSoldOut ||
+      targetMenu.stock < 1
+    ) {
+      showToast('해당 메뉴가 현재 품절이거나 영업 중단 상태입니다.');
+      return;
+    }
+    setQuickPayDraft({
+      storeId: targetStore.id,
+      items: [
+        {
+          menuId: targetMenu.id,
+          quantity: Math.min(Math.max(1, payload.servings), targetMenu.stock),
+          selectedOptionIds: payload.selectedOptionIds ?? [],
+        },
+      ],
+      paymentMethod: payload.paymentMethod ?? 'kakaopay',
+      couponCode: payload.couponCode,
+      customerNote: payload.customerNote ?? appState.preferences.memoNote,
+    });
+  };
+
+  const handleOpenQuickPayFromOrder = (order: Order) => {
+    const targetStore = appState.stores.find((s) => s.id === order.storeId);
+    if (!targetStore || !targetStore.isOpen) {
+      showToast('해당 매장이 현재 영업 중단 상태입니다.');
+      return;
+    }
+    const rawLines: CartLineItem[] =
+      order.items && order.items.length > 0
+        ? order.items.map((it) => ({
+            menuId: it.menuId,
+            quantity: it.quantity,
+            selectedOptionIds: [...it.selectedOptionIds],
+          }))
+        : [
+            {
+              menuId: order.menuId,
+              quantity: order.servings,
+              selectedOptionIds: [...order.selectedOptionIds],
+            },
+          ];
+
+    const validLines = rawLines
+      .map((line) => {
+        const m = appState.menus.find((item) => item.id === line.menuId);
+        if (!m || m.isSoldOut || m.stock < 1) return null;
+        return {
+          ...line,
+          quantity: Math.min(Math.max(1, line.quantity), m.stock),
+        };
+      })
+      .filter((x): x is CartLineItem => x !== null);
+
+    if (validLines.length === 0) {
+      showToast('이전 주문 메뉴가 현재 품절 상태입니다.');
+      return;
+    }
+
+    setQuickPayDraft({
+      storeId: targetStore.id,
+      items: validLines,
+      paymentMethod: order.paymentMethod ?? 'kakaopay',
+      couponCode: order.couponCode ?? undefined,
+      customerNote: order.customerNote || appState.preferences.memoNote,
+    });
+  };
+
   const handleQuickReorderToConfirm = (
     menuId: string,
     servings: number,
@@ -474,6 +702,9 @@ export default function App() {
       sharedDeliveryApplied?: boolean;
       reservationSlot?: string;
       couponCode?: string;
+      selectedOptionIds?: string[];
+      paymentMethod?: PaymentMethod;
+      customerNote?: string;
     }
   ) => {
     const targetMenu = appState.menus.find((m) => m.id === menuId);
@@ -491,12 +722,19 @@ export default function App() {
       return;
     }
     setConfirmDraft({
-      menuId,
-      servings: Math.min(Math.max(1, servings), targetMenu.stock),
-      selectedOptionIds: [],
+      draftId: `draft-${Date.now()}`,
+      storeId: targetStore.id,
+      items: [
+        {
+          menuId,
+          quantity: Math.min(Math.max(1, servings), targetMenu.stock),
+          selectedOptionIds: options?.selectedOptionIds ?? [],
+        },
+      ],
       couponCode: options?.couponCode ?? 'NONE',
       sharedDeliveryApplied: options?.sharedDeliveryApplied ?? false,
       reservationSlot: options?.reservationSlot ?? 'now',
+      paymentMethod: options?.paymentMethod,
     });
     setRole(DemoRole.CONSUMER);
     setStep(ConsumerStep.CONFIRM);
@@ -574,7 +812,8 @@ export default function App() {
     const evaluated = evaluateRecommendations(
       next,
       appState.stores,
-      appState.menus
+      appState.menus,
+      activeLocation
     );
     setSelectedMenuId(evaluated.matches[0]?.menu.id ?? null);
   };
@@ -603,7 +842,20 @@ export default function App() {
     selectedOptionIds: string[];
     couponCode: string;
   }) => {
-    setConfirmDraft(payload);
+    const targetMenu = appState.menus.find((m) => m.id === payload.menuId);
+    if (!targetMenu) return;
+    setConfirmDraft({
+      draftId: `draft-${Date.now()}`,
+      storeId: targetMenu.storeId,
+      items: [
+        {
+          menuId: payload.menuId,
+          quantity: Math.max(1, payload.servings),
+          selectedOptionIds: payload.selectedOptionIds,
+        },
+      ],
+      couponCode: payload.couponCode,
+    });
     setStep(ConsumerStep.CONFIRM);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -612,6 +864,7 @@ export default function App() {
     menuId: string;
     servings: number;
     selectedOptionIds: string[];
+    items?: OrderLineItem[];
     couponCode: string;
     couponDiscount: number;
     sharedDeliveryApplied: boolean;
@@ -621,43 +874,81 @@ export default function App() {
     customerNote: string;
     paymentMethod?: PaymentMethod;
     paymentMethodLabel?: string;
+    estimatedSavings?: number;
   }): { ok: boolean; error?: string } => {
     if (orderSubmitLockRef.current) {
       return { ok: false, error: '주문이 이미 처리 중입니다.' };
     }
 
-    const targetMenu = appState.menus.find((m) => m.id === payload.menuId);
-    const targetStore = targetMenu
-      ? appState.stores.find((s) => s.id === targetMenu.storeId)
+    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
+    const leadMenu = menuMap.get(payload.menuId);
+    const targetStore = leadMenu
+      ? appState.stores.find((s) => s.id === leadMenu.storeId)
       : undefined;
 
-    if (!targetMenu || !targetStore) {
+    if (!leadMenu || !targetStore) {
       return { ok: false, error: '선택한 메뉴 정보를 찾을 수 없습니다.' };
     }
     if (!targetStore.isOpen) {
       return { ok: false, error: '현재 영업 중단 상태인 가게입니다.' };
     }
-    if (targetMenu.isSoldOut || targetMenu.stock <= 0) {
-      return { ok: false, error: '품절된 메뉴입니다.' };
-    }
-    if (!Number.isInteger(payload.servings) || payload.servings < 1) {
-      return { ok: false, error: '수량은 1 이상의 양의 정수여야 합니다.' };
-    }
-    if (targetMenu.stock < payload.servings) {
-      return {
-        ok: false,
-        error: `남은 재고(${targetMenu.stock}개)가 부족합니다.`,
-      };
+
+    const orderLines: OrderLineItem[] =
+      payload.items && payload.items.length > 0
+        ? payload.items
+        : (() => {
+            const unitPrice = getEffectiveMenuPrice(leadMenu);
+            const selectedOpts = leadMenu.options.filter((o) =>
+              payload.selectedOptionIds.includes(o.id)
+            );
+            const optSum =
+              selectedOpts.reduce((s, o) => s + o.priceDelta, 0) *
+              payload.servings;
+            return [
+              {
+                menuId: leadMenu.id,
+                menuName: leadMenu.name,
+                unitPrice,
+                originalUnitPrice: leadMenu.pricePerPerson,
+                quantity: payload.servings,
+                selectedOptionIds: selectedOpts.map((o) => o.id),
+                selectedOptionNames: selectedOpts.map((o) => o.name),
+                optionsSubtotal: optSum,
+                lineSubtotal: unitPrice * payload.servings,
+              },
+            ];
+          })();
+
+    const qtyByMenu = new Map<string, number>();
+    for (const line of orderLines) {
+      if (!Number.isInteger(line.quantity) || line.quantity < 1) {
+        return { ok: false, error: '수량은 1 이상의 양의 정수여야 합니다.' };
+      }
+      qtyByMenu.set(line.menuId, (qtyByMenu.get(line.menuId) ?? 0) + line.quantity);
     }
 
-    orderSubmitLockRef.current = true;
+    for (const [mId, totalQty] of qtyByMenu.entries()) {
+      const m = menuMap.get(mId);
+      if (!m || m.isSoldOut || m.stock <= 0) {
+        return {
+          ok: false,
+          error: `'${m?.name ?? '선택 메뉴'}'가 품절되었습니다.`,
+        };
+      }
+      if (m.stock < totalQty) {
+        return {
+          ok: false,
+          error: `'${m.name}' 남은 재고(${m.stock}개)가 부족합니다.`,
+        };
+      }
+    }
 
-    const effectiveUnitPrice = getEffectiveMenuPrice(targetMenu);
-    const menuSubtotal = effectiveUnitPrice * payload.servings;
-    const selectedOpts = targetMenu.options.filter((o) =>
-      payload.selectedOptionIds.includes(o.id)
+    const menuSubtotal = orderLines.reduce((sum, l) => sum + l.lineSubtotal, 0);
+    const optionsSubtotal = orderLines.reduce(
+      (sum, l) => sum + l.optionsSubtotal,
+      0
     );
-    const optionsSubtotal = selectedOpts.reduce((sum, o) => sum + o.priceDelta, 0);
+    const totalServings = orderLines.reduce((sum, l) => sum + l.quantity, 0);
     const effectiveDeliveryFee = payload.sharedDeliveryApplied
       ? Math.round(targetStore.deliveryFee / 2)
       : targetStore.deliveryFee;
@@ -668,34 +959,54 @@ export default function App() {
     const totalAmount =
       menuSubtotal + optionsSubtotal + effectiveDeliveryFee - cappedCoupon;
 
+    const chosenPayMethod = payload.paymentMethod ?? 'kakaopay';
+    if (chosenPayMethod === 'alle_pay' && appState.walletBalance < totalAmount) {
+      return {
+        ok: false,
+        error: `alle페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
+      };
+    }
+
+    orderSubmitLockRef.current = true;
+
     const nowStr = formatNowTime();
     const nextNumber = 101 + appState.orders.length;
     const newOrderId = `ord-${Date.now()}`;
+    const firstLine = orderLines[0];
+    const localCur = getLocalCurrencyLabel(activeLocation.areaName);
 
     const newOrder: Order = {
       id: newOrderId,
       orderCode: `ALLE-${nextNumber}`,
       storeId: targetStore.id,
-      menuId: targetMenu.id,
-      menuName: targetMenu.name,
+      menuId: firstLine.menuId,
+      menuName:
+        orderLines.length > 1
+          ? `${firstLine.menuName} 외 ${orderLines.length - 1}건`
+          : firstLine.menuName,
       storeName: targetStore.name,
       customerAlias: payload.customerAlias,
       addressAlias: payload.addressAlias,
-      servings: payload.servings,
-      selectedOptionIds: selectedOpts.map((o) => o.id),
-      selectedOptionNames: selectedOpts.map((o) => o.name),
+      servings: totalServings,
+      selectedOptionIds: firstLine.selectedOptionIds,
+      selectedOptionNames: firstLine.selectedOptionNames,
+      items: orderLines,
       menuSubtotal,
       optionsSubtotal,
       deliveryFee: effectiveDeliveryFee,
       sharedDeliveryApplied: payload.sharedDeliveryApplied,
       reservationSlot: payload.reservationSlot,
-      isB2B: payload.paymentMethod === 'b2b_meal_point',
-      paymentMethod: payload.paymentMethod ?? 'local_currency',
+      isB2B: chosenPayMethod === 'b2b_meal_point',
+      paymentMethod: chosenPayMethod,
       paymentMethodLabel:
-        payload.paymentMethodLabel ?? '대구로페이 / 지역화폐',
+        payload.paymentMethodLabel ??
+        (chosenPayMethod === 'local_currency'
+          ? localCur.fullLabel
+          : '간편결제'),
       couponCode: payload.couponCode === 'NONE' ? null : payload.couponCode,
       couponDiscount: cappedCoupon,
       totalAmount,
+      estimatedSavings: payload.estimatedSavings,
       status: OrderStatus.PENDING,
       createdAt: nowStr,
       updatedAt: nowStr,
@@ -710,13 +1021,14 @@ export default function App() {
 
     setAppState((prev) => ({
       ...prev,
-      stampCount:
-        payload.paymentMethod === 'alle_regular_pass'
-          ? prev.stampCount + 1
-          : prev.stampCount,
+      walletBalance:
+        chosenPayMethod === 'alle_pay'
+          ? Math.max(0, prev.walletBalance - totalAmount)
+          : prev.walletBalance,
       menus: prev.menus.map((m) => {
-        if (m.id !== targetMenu.id) return m;
-        const nextStock = Math.max(0, m.stock - payload.servings);
+        const deduct = qtyByMenu.get(m.id);
+        if (!deduct) return m;
+        const nextStock = Math.max(0, m.stock - deduct);
         return {
           ...m,
           stock: nextStock,
@@ -726,8 +1038,13 @@ export default function App() {
       orders: [newOrder, ...prev.orders],
     }));
 
+    if (cart && cart.storeId === targetStore.id) {
+      setCart(null);
+    }
+
     setHighlightedOrderId(newOrderId);
     setConfirmDraft(null);
+    setQuickPayDraft(null);
     setStep(ConsumerStep.STATUS);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast(`${newOrder.orderCode} 주문이 접수되었습니다.`);
@@ -947,12 +1264,33 @@ export default function App() {
       const shouldRestoreStock =
         targetOrder.stockDeducted && !targetOrder.stockRestored;
 
+      const restoreQtyByMenu = new Map<string, number>();
+      if (shouldRestoreStock) {
+        const lines =
+          targetOrder.items && targetOrder.items.length > 0
+            ? targetOrder.items
+            : [{ menuId: targetOrder.menuId, quantity: targetOrder.servings }];
+        for (const line of lines) {
+          restoreQtyByMenu.set(
+            line.menuId,
+            (restoreQtyByMenu.get(line.menuId) ?? 0) + line.quantity
+          );
+        }
+      }
+
+      const shouldRefundAllePay =
+        targetOrder.paymentMethod === 'alle_pay' && !targetOrder.mockRefunded;
+
       return {
         ...prev,
+        walletBalance: shouldRefundAllePay
+          ? prev.walletBalance + targetOrder.totalAmount
+          : prev.walletBalance,
         menus: shouldRestoreStock
           ? prev.menus.map((m) => {
-              if (m.id !== targetOrder.menuId) return m;
-              const restoredStock = m.stock + targetOrder.servings;
+              const restoreAmt = restoreQtyByMenu.get(m.id);
+              if (!restoreAmt) return m;
+              const restoredStock = m.stock + restoreAmt;
               return {
                 ...m,
                 stock: restoredStock,
@@ -973,7 +1311,7 @@ export default function App() {
         ),
       };
     });
-    showToast('조리 전 취소가 확정되어 재고 복구 및 모의 환불 처리되었습니다.');
+    showToast('조리 전 취소가 확정되어 재고 복구 및 환불 처리되었습니다.');
   };
 
   const handleRequestCancelAfterCooking = (orderId: string, reason: string) => {
@@ -1342,6 +1680,9 @@ export default function App() {
     setActiveCondition(parsed);
     setSelectedMenuId(null);
     setConfirmDraft(null);
+    setCart(null);
+    setQuickPayDraft(null);
+    setPendingCartSwitch(null);
     setHighlightedOrderId(null);
     setAiChatInitialPrompt(undefined);
     setRole(DemoRole.CONSUMER);
@@ -1376,9 +1717,15 @@ export default function App() {
 
       if (targetMenu) {
         setConfirmDraft({
-          menuId: targetMenu.id,
-          servings: Math.min(2, Math.max(1, targetMenu.stock)),
-          selectedOptionIds: [],
+          draftId: `draft-demo-${Date.now()}`,
+          storeId: targetMenu.storeId,
+          items: [
+            {
+              menuId: targetMenu.id,
+              quantity: Math.min(2, Math.max(1, targetMenu.stock)),
+              selectedOptionIds: [],
+            },
+          ],
           couponCode: 'NONE',
           sharedDeliveryApplied: false,
           reservationSlot: 'now',
@@ -1401,12 +1748,64 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const confirmMenu = confirmDraft
-    ? appState.menus.find((m) => m.id === confirmDraft.menuId)
+  const confirmMenu = confirmDraft?.items[0]
+    ? appState.menus.find((m) => m.id === confirmDraft.items[0].menuId)
     : undefined;
-  const confirmStore = confirmMenu
-    ? appState.stores.find((s) => s.id === confirmMenu.storeId)
-    : undefined;
+  const confirmStore = confirmDraft
+    ? appState.stores.find((s) => s.id === confirmDraft.storeId)
+    : confirmMenu
+      ? appState.stores.find((s) => s.id === confirmMenu.storeId)
+      : undefined;
+
+  const cartStore = cart
+    ? appState.stores.find((s) => s.id === cart.storeId) ?? null
+    : null;
+
+  const cartSummary = useMemo(() => {
+    if (!cart || cart.items.length === 0) {
+      return { totalCount: 0, totalAmount: 0, label: '' };
+    }
+    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
+    let totalCount = 0;
+    let totalAmount = 0;
+    let firstName = '';
+    for (const item of cart.items) {
+      const m = menuMap.get(item.menuId);
+      if (!m) continue;
+      if (!firstName) firstName = m.name;
+      const unit = getEffectiveMenuPrice(m);
+      const optDelta = m.options
+        .filter((o) => item.selectedOptionIds.includes(o.id))
+        .reduce((s, o) => s + o.priceDelta, 0);
+      totalCount += item.quantity;
+      totalAmount += (unit + optDelta) * item.quantity;
+    }
+    const label =
+      cart.items.length > 1
+        ? `${firstName} 외 ${cart.items.length - 1}건`
+        : firstName;
+    return { totalCount, totalAmount, label };
+  }, [cart, appState.menus]);
+
+  const quickPayStore = quickPayDraft
+    ? appState.stores.find((s) => s.id === quickPayDraft.storeId) ?? null
+    : null;
+
+  const quickPayItems: QuickPayResolvedItem[] = useMemo(() => {
+    if (!quickPayDraft) return [];
+    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
+    return quickPayDraft.items
+      .map((line) => {
+        const menu = menuMap.get(line.menuId);
+        if (!menu) return null;
+        return {
+          menu,
+          quantity: line.quantity,
+          selectedOptionIds: line.selectedOptionIds,
+        };
+      })
+      .filter((x): x is QuickPayResolvedItem => x !== null);
+  }, [quickPayDraft, appState.menus]);
 
   const pendingOrderCount = appState.orders.filter(
     (o) => o.status === OrderStatus.PENDING
@@ -1416,7 +1815,11 @@ export default function App() {
   ).length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F8F5] text-[#1A1D1A]">
+    <div
+      className={`min-h-screen flex flex-col bg-[#F7F8F5] text-[#1A1D1A] ${
+        appState.easyMode ? 'alle-easy-mode' : ''
+      }`}
+    >
       {/* Contextual Role Strip (Only visible in Owner / Partner mode) */}
       {role !== DemoRole.CONSUMER && (
         <div className="bg-[#1A1D1A] text-white border-b border-white/10">
@@ -1481,17 +1884,33 @@ export default function App() {
             </button>
           </div>
 
-          {/* Right Demo Mode Quick Switcher + Notification Bell */}
+          {/* Right Easy Mode Toggle + Presenter Demo Switcher + Notification Bell */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNotifications(false);
-                  setShowDemoSwitcher((prev) => !prev);
-                }}
-                aria-expanded={showDemoSwitcher}
-                aria-label="Demo Mode 발표자 시연 전환 열기"
+            <button
+              type="button"
+              onClick={handleToggleEasyMode}
+              aria-pressed={appState.easyMode}
+              aria-label="큰 글씨 쉬운 모드 전환"
+              className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 transition-all cursor-pointer ${
+                appState.easyMode
+                  ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
+                  : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5 text-[#4E6E2A]" />
+              <span>{appState.easyMode ? '쉬운 모드 ON' : '가+ 쉬운 모드'}</span>
+            </button>
+
+            {showPresenterMode && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNotifications(false);
+                    setShowDemoSwitcher((prev) => !prev);
+                  }}
+                  aria-expanded={showDemoSwitcher}
+                  aria-label="Demo Mode 발표자 시연 전환 열기"
                 className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1.5 transition-all cursor-pointer ${
                   showDemoSwitcher
                     ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
@@ -1648,6 +2067,7 @@ export default function App() {
                 </div>
               )}
             </div>
+            )}
 
             <div className="relative shrink-0">
               <button
@@ -1803,6 +2223,8 @@ export default function App() {
             orders={appState.orders}
             stampCount={appState.stampCount}
             wishlistIds={appState.wishlistIds}
+            easyMode={appState.easyMode}
+            onToggleEasyMode={handleToggleEasyMode}
             onToggleWishlist={handleToggleWishlist}
             onOpenAiChat={(prompt) => {
               setAiChatInitialPrompt(prompt);
@@ -1816,6 +2238,8 @@ export default function App() {
             onSubmitSearch={handleSubmitSearch}
             onQuickSelectMenu={handleQuickSelectMenu}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
+            onOpenQuickPay={handleOpenQuickPay}
+            onAddToCart={handleAddToCart}
             onOpenSuperApp={handleOpenSuperApp}
             onSavePreferences={handleSavePreferences}
             onApplyPreferencesToInput={handleApplyPreferencesToInput}
@@ -1827,16 +2251,19 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             wishlistIds={appState.wishlistIds}
+            activeLocation={activeLocation}
             initialPrompt={aiChatInitialPrompt}
             onToggleWishlist={handleToggleWishlist}
             onBackToHome={() => {
               setAiChatInitialPrompt(undefined);
               setStep(ConsumerStep.HOME);
             }}
+            onOpenAiSettings={() => setShowGeminiModal(true)}
             onOpenSuperApp={handleOpenSuperApp}
             onUseRelayCoupon={(menuId) =>
               handleQuickReorderToConfirm(menuId, 1, { couponCode: 'RELAY1000' })
             }
+            onAddToCart={handleAddToCart}
             onOpenRecommendationWithCondition={handleOpenRecommendationWithCondition}
             onProceedToConfirm={handleProceedToConfirm}
           />
@@ -1847,6 +2274,7 @@ export default function App() {
             excluded={recommendationResult.excluded}
             reviews={INITIAL_REVIEWS}
             reviewReplies={appState.reviewReplies}
+            allMenus={appState.menus}
             selectedMenuId={selectedMenuId}
             wishlistIds={appState.wishlistIds}
             onToggleWishlist={handleToggleWishlist}
@@ -1854,6 +2282,7 @@ export default function App() {
             onBackToHome={() => setStep(ConsumerStep.HOME)}
             onQuickRelaxCondition={handleQuickRelaxCondition}
             onReportPriceDifference={handleReportPriceDifference}
+            onAddToCart={handleAddToCart}
             onProceedToConfirm={handleProceedToConfirm}
           />
         ) : step === ConsumerStep.CONFIRM &&
@@ -1861,18 +2290,25 @@ export default function App() {
           confirmMenu &&
           confirmStore ? (
           <OrderConfirmationView
-            key={`${confirmDraft.menuId}-${confirmDraft.paymentMethod ?? 'local_currency'}`}
+            key={confirmDraft.draftId}
             menu={confirmMenu}
             store={confirmStore}
-            initialServings={confirmDraft.servings}
-            initialOptionIds={confirmDraft.selectedOptionIds}
+            storeMenus={appState.menus.filter(
+              (m) => m.storeId === confirmStore.id
+            )}
+            initialItems={confirmDraft.items}
+            initialServings={confirmDraft.items[0]?.quantity ?? 1}
+            initialOptionIds={confirmDraft.items[0]?.selectedOptionIds ?? []}
             initialCouponCode={confirmDraft.couponCode}
             initialSharedDelivery={confirmDraft.sharedDeliveryApplied}
             initialReservationSlot={confirmDraft.reservationSlot}
             initialPaymentMethod={confirmDraft.paymentMethod}
+            activeAreaName={activeLocation.areaName}
             defaultAddressAlias={activeLocation.detailAddress}
+            walletBalance={appState.walletBalance}
             stampCount={appState.stampCount}
             defaultNote={appState.preferences.memoNote}
+            onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onOpenLocationPicker={() => setShowLocationPicker(true)}
             onBack={() => setStep(ConsumerStep.RECOMMEND)}
             onConfirmOrder={handleConfirmOrder}
@@ -1886,6 +2322,7 @@ export default function App() {
             reviewReplies={appState.reviewReplies}
             onToggleWishlist={handleToggleWishlist}
             onQuickSelectMenu={handleQuickSelectMenu}
+            onAddToCart={handleAddToCart}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
             onGoToBrowse={() => setStep(ConsumerStep.HOME)}
           />
@@ -1897,16 +2334,23 @@ export default function App() {
             preferences={appState.preferences}
             wishlistCount={appState.wishlistIds.length}
             orderCount={appState.orders.length}
+            orders={appState.orders}
+            menus={appState.menus}
+            easyMode={appState.easyMode}
+            showPresenterMode={showPresenterMode}
             regularMenuId={appState.orders[0]?.menuId ?? 'm1'}
             regularMenuName={appState.orders[0]?.menuName ?? '얼큰 소고기국밥'}
             regularStoreName={
-              appState.orders[0]?.storeName ?? '수성 범어 소고기국밥'
+              appState.orders[0]?.storeName ?? '역삼 진국 소고기국밥'
             }
             regularServings={appState.orders[0]?.servings ?? 2}
             activeLocation={activeLocation}
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onEarnStamp={handleEarnStamp}
             onChangeRole={setRole}
+            onToggleEasyMode={handleToggleEasyMode}
+            onTogglePresenterMode={() => setShowPresenterMode((prev) => !prev)}
+            onOpenAiSettings={() => setShowGeminiModal(true)}
             onShareDemoSummary={handleShareDemoSummary}
             onGoToHomePrefs={() => setStep(ConsumerStep.HOME)}
             onQuickReorderToConfirm={(menuId, servings) =>
@@ -1942,10 +2386,12 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             highlightedOrderId={highlightedOrderId}
+            showPresenterMode={showPresenterMode}
             onCancelBeforeCooking={handleCancelBeforeCooking}
             onRequestCancelAfterCooking={handleRequestCancelAfterCooking}
             onAttachEvidence={handleAttachEvidence}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
+            onQuickReorderOrder={handleOpenQuickPayFromOrder}
             onUseRelayCoupon={(menuId) =>
               handleQuickReorderToConfirm(menuId, 1, { couponCode: 'RELAY1000' })
             }
@@ -1989,7 +2435,67 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Bottom Navigation Bar: 홈 / 검색 / 주문내역 / 찜 / MY */}
+      {/* Floating Cart Bar (same-store multi-item cart) */}
+      {role === DemoRole.CONSUMER &&
+        cart &&
+        cartStore &&
+        cartSummary.totalCount > 0 &&
+        (step === ConsumerStep.HOME ||
+          step === ConsumerStep.AI_CHAT ||
+          step === ConsumerStep.RECOMMEND ||
+          step === ConsumerStep.WISHLIST) && (
+          <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-xl">
+            <div className="rounded-2xl bg-[#1A1D1A] text-white border border-[#4E6E2A]/60 shadow-[0_14px_34px_rgba(26,29,26,0.28)] px-3.5 py-2.5 flex items-center justify-between gap-2.5">
+              <div className="min-w-0 flex items-center gap-2.5">
+                <div className="relative w-9 h-9 rounded-xl bg-[#4E6E2A] text-white flex items-center justify-center shrink-0">
+                  <ShoppingBag className="w-4 h-4" />
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#EAF1E2] text-[#1A1D1A] text-[10px] font-bold flex items-center justify-center">
+                    {cartSummary.totalCount}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-[#B8C4B2] truncate">
+                    {cartStore.name}
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-white truncate">
+                    {cartSummary.label} · {formatWon(cartSummary.totalAmount)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDraft({
+                      draftId: `draft-cart-${Date.now()}`,
+                      storeId: cart.storeId,
+                      items: cart.items,
+                      couponCode: 'NONE',
+                      sharedDeliveryApplied: false,
+                      reservationSlot: 'now',
+                    });
+                    setRole(DemoRole.CONSUMER);
+                    setStep(ConsumerStep.CONFIRM);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#82B440] hover:bg-[#72A135] text-[#111411] text-xs sm:text-sm font-bold whitespace-nowrap cursor-pointer"
+                >
+                  주문하기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCart(null)}
+                  aria-label="장바구니 비우기"
+                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-[#DCE2D9] flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* Bottom Navigation Bar: 홈 / AI 주문 / 주문내역 / 찜 / MY */}
       <nav
         aria-label="하단 탭 네비게이션"
         className="fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#FFFFFF] border-t border-[#E8ECE4]"
@@ -2032,7 +2538,7 @@ export default function App() {
                 : 'text-[#687064] hover:text-[#1A1D1A]'
             }`}
           >
-            <Search
+            <Sparkles
               className="w-5 h-5"
               strokeWidth={
                 role === DemoRole.CONSUMER &&
@@ -2043,7 +2549,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">검색</span>
+            <span className="text-[11px] leading-none">AI 주문</span>
           </button>
 
           <button
@@ -2119,6 +2625,122 @@ export default function App() {
         </div>
       </nav>
 
+      {pendingCartSwitch && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="장바구니 매장 변경 확인"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white border border-[#E8ECE4] p-5 shadow-2xl space-y-4">
+            <div className="space-y-1.5">
+              <p className="text-base font-bold text-[#1A1D1A]">
+                장바구니 매장을 바꿀까요?
+              </p>
+              <p className="text-xs sm:text-sm text-[#687064] leading-relaxed">
+                현재{' '}
+                <strong className="text-[#1A1D1A]">
+                  {cartStore?.name ?? '다른 매장'}
+                </strong>{' '}
+                메뉴가 담겨 있습니다. 비우고{' '}
+                <strong className="text-[#1A1D1A]">
+                  {pendingCartSwitch.storeName} · {pendingCartSwitch.menuName}
+                </strong>
+                을(를) 담을까요?
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingCartSwitch(null)}
+                className="min-h-[44px] px-3 py-2 rounded-2xl border border-[#DCE2D9] text-sm font-semibold text-[#1A1D1A] hover:bg-[#F7F8F5] cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = pendingCartSwitch;
+                  setCart({
+                    storeId: next.storeId,
+                    items: [
+                      {
+                        menuId: next.menuId,
+                        quantity: next.quantity,
+                        selectedOptionIds: next.selectedOptionIds,
+                      },
+                    ],
+                  });
+                  setPendingCartSwitch(null);
+                  showToast(`'${next.menuName}'을(를) 장바구니에 담았습니다.`);
+                }}
+                className="min-h-[44px] px-3 py-2 rounded-2xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold cursor-pointer"
+              >
+                비우고 담기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <QuickPayBottomSheet
+        isOpen={Boolean(
+          quickPayDraft && quickPayStore && quickPayItems.length > 0
+        )}
+        store={quickPayStore}
+        items={quickPayItems}
+        defaultPaymentMethod={quickPayDraft?.paymentMethod}
+        defaultCouponCode={quickPayDraft?.couponCode}
+        walletBalance={appState.walletBalance}
+        stampCount={appState.stampCount}
+        activeLocation={activeLocation}
+        customerNote={
+          quickPayDraft?.customerNote ?? appState.preferences.memoNote
+        }
+        easyMode={appState.easyMode}
+        onTopupWallet={handleTopupWalletConfirmed}
+        onOpenFullCheckout={({ paymentMethod, couponCode }) => {
+          if (!quickPayDraft) return;
+          setConfirmDraft({
+            draftId: `draft-quick-${Date.now()}`,
+            storeId: quickPayDraft.storeId,
+            items: quickPayDraft.items,
+            couponCode,
+            sharedDeliveryApplied: false,
+            reservationSlot: 'now',
+            paymentMethod,
+          });
+          setQuickPayDraft(null);
+          setRole(DemoRole.CONSUMER);
+          setStep(ConsumerStep.CONFIRM);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onConfirmQuickPay={(payload) => {
+          const firstItem = payload.items[0];
+          const totalServings = payload.items.reduce(
+            (sum, it) => sum + it.quantity,
+            0
+          );
+          return handleConfirmOrder({
+            menuId: firstItem?.menuId ?? '',
+            servings: Math.max(1, totalServings),
+            selectedOptionIds: firstItem?.selectedOptionIds ?? [],
+            items: payload.items,
+            couponCode: payload.couponCode,
+            couponDiscount: payload.couponDiscount,
+            sharedDeliveryApplied: false,
+            reservationSlot: null,
+            customerAlias: '단골 고객',
+            addressAlias: activeLocation.detailAddress,
+            customerNote: payload.customerNote,
+            paymentMethod: payload.paymentMethod,
+            paymentMethodLabel: payload.paymentMethodLabel,
+            estimatedSavings: payload.estimatedSavings,
+          });
+        }}
+        onClose={() => setQuickPayDraft(null)}
+      />
+
       <LocationPickerModal
         isOpen={showLocationPicker}
         locations={appState.savedLocations}
@@ -2127,6 +2749,11 @@ export default function App() {
         onAddLocation={handleAddLocation}
         onDeleteLocation={handleDeleteLocation}
         onClose={() => setShowLocationPicker(false)}
+      />
+
+      <GeminiKeyModal
+        isOpen={showGeminiModal}
+        onClose={() => setShowGeminiModal(false)}
       />
 
       <FutureScopeModal

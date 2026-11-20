@@ -128,7 +128,7 @@ export function OwnerDashboardView({
 
   const [newMenuStoreId, setNewMenuStoreId] = useState(stores[0]?.id ?? 's1');
   const [newMenuLine, setNewMenuLine] = useState(
-    '대구식 차돌 된장찌개 10000원 얼큰한 국물 한식'
+    '우리동네 차돌 된장찌개 10000원 얼큰한 국물 한식'
   );
   const [menuAddNotice, setMenuAddNotice] = useState<string | null>(null);
   const [ocrImagePreview, setOcrImagePreview] = useState<string | null>(null);
@@ -227,21 +227,34 @@ export function OwnerDashboardView({
     const tagDemandMap = new Map<string, number>();
 
     for (const o of validOrders) {
-      const prev = menuStatsMap.get(o.menuId) ?? {
-        servings: 0,
-        revenue: 0,
-        ordersCount: 0,
-      };
-      menuStatsMap.set(o.menuId, {
-        servings: prev.servings + o.servings,
-        revenue: prev.revenue + o.totalAmount,
-        ordersCount: prev.ordersCount + 1,
-      });
+      const orderLines =
+        o.items && o.items.length > 0
+          ? o.items
+          : [
+              {
+                menuId: o.menuId,
+                quantity: o.servings,
+                lineSubtotal: o.totalAmount,
+              },
+            ];
 
-      const menuObj = menus.find((m) => m.id === o.menuId);
-      if (menuObj) {
-        for (const tag of menuObj.tags) {
-          tagDemandMap.set(tag, (tagDemandMap.get(tag) ?? 0) + o.servings);
+      for (const line of orderLines) {
+        const prev = menuStatsMap.get(line.menuId) ?? {
+          servings: 0,
+          revenue: 0,
+          ordersCount: 0,
+        };
+        menuStatsMap.set(line.menuId, {
+          servings: prev.servings + line.quantity,
+          revenue: prev.revenue + line.lineSubtotal,
+          ordersCount: prev.ordersCount + 1,
+        });
+
+        const menuObj = menus.find((m) => m.id === line.menuId);
+        if (menuObj) {
+          for (const tag of menuObj.tags) {
+            tagDemandMap.set(tag, (tagDemandMap.get(tag) ?? 0) + line.quantity);
+          }
         }
       }
     }
@@ -466,7 +479,7 @@ export function OwnerDashboardView({
             : undefined) ?? stores.find((s) => cmd.includes(s.name));
         if (!targetStore) {
           setCommandFeedback(
-            '매장명을 함께 입력해 주세요. 예: "수성 범어 소고기국밥 영업 중단"'
+            '매장명을 함께 입력해 주세요. 예: "역삼 진국 소고기국밥 영업 중단"'
           );
           return true;
         }
@@ -664,7 +677,7 @@ export function OwnerDashboardView({
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[#4E6E2A]">
               <Sparkles className="w-4 h-4 shrink-0" />
-              <span>{analytics.profitComparison.periodLabel} · 대구 입점 매장 기준</span>
+              <span>{analytics.profitComparison.periodLabel} · 전국 입점 매장 기준</span>
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-[#1A1D1A] tracking-tight text-balance">
               광고비 부담은 없애고, AI 단골 매칭으로 순증 매출을 만들었습니다
@@ -999,6 +1012,14 @@ export function OwnerDashboardView({
                             {order.storeName} · {order.menuName} ×{' '}
                             <span className="tabular-nums">{order.servings}인</span>
                           </h3>
+                          {order.items && order.items.length > 1 && (
+                            <p className="text-xs text-[#555E52]">
+                              구성:{' '}
+                              {order.items
+                                .map((it) => `${it.menuName}×${it.quantity}`)
+                                .join(', ')}
+                            </p>
+                          )}
                           {order.reservationSlot && (
                             <p className="text-xs font-semibold text-[#4E6E2A]">
                               예약 도착: {order.reservationSlot}
@@ -1473,6 +1494,19 @@ export function OwnerDashboardView({
       {/* 3. Store & Menu Operations Tab */}
       {ownerSection === 'ops' && (
         <div className="space-y-6">
+          <div className="p-4 bg-[#FFFBEF] border border-[#E8D595] rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-amber-900">
+              🔥 현재 마감 30% 특가 진행 중{' '}
+              <strong className="font-mono text-sm">
+                {menus.filter((m) => (m.closingDiscountPercent ?? 0) > 0).length}개
+              </strong>{' '}
+              메뉴
+            </span>
+            <span className="text-amber-800">
+              아래 각 매장 메뉴에서 1탭으로 마감 특가를 바로 켜거나 끌 수 있습니다.
+            </span>
+          </div>
+
           <section className="os-card rounded-3xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -1482,6 +1516,15 @@ export function OwnerDashboardView({
                 </h2>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {onOpenAiSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenAiSettings}
+                    className="min-h-[36px] px-3 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    AI 키 설정
+                  </button>
+                )}
                 <input
                   ref={ocrFileInputRef}
                   type="file"
@@ -1558,6 +1601,15 @@ export function OwnerDashboardView({
                 {ocrError && (
                   <div className="p-3 bg-[#FFFBEF] border border-[#E8D595] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
                     <span>{ocrError}</span>
+                    {onOpenAiSettings && (
+                      <button
+                        type="button"
+                        onClick={onOpenAiSettings}
+                        className="px-3 py-1.5 bg-white border border-[#D4E1C5] hover:bg-[#EAF1E2] text-[#3D5720] font-bold rounded-lg cursor-pointer shrink-0"
+                      >
+                        AI 키 설정 열기
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1766,6 +1818,19 @@ export function OwnerDashboardView({
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => onToggleMenuClosingSale(menu.id, 30)}
+                              className={`min-h-[32px] px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
+                                (menu.closingDiscountPercent ?? 0) > 0
+                                  ? 'bg-amber-600 border-amber-600 text-white'
+                                  : 'bg-[#FFFBEF] border-[#E8D595] text-amber-900 hover:bg-amber-100'
+                              }`}
+                            >
+                              {(menu.closingDiscountPercent ?? 0) > 0
+                                ? `마감 -${menu.closingDiscountPercent}% ON`
+                                : '마감 30%'}
+                            </button>
                             <button
                               type="button"
                               onClick={() => onAdjustMenuStock(menu.id, -1)}

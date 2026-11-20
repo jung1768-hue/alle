@@ -141,7 +141,7 @@ export async function parseConditionWithAI(
   }
 
   try {
-    const prompt = `당신은 한국 로컬 배달앱 'alle'의 AI 주문 파서입니다.
+    const prompt = `당신은 전국 매장 동일가 배달앱 'alle'의 AI 주문 파서입니다.
 사용자의 자연어 주문 요청을 분석해 아래 JSON 형식으로만 응답하세요.
 
 사용 가능한 표준 태그 목록:
@@ -153,6 +153,7 @@ ${
     ? JSON.stringify({
         servings: previousCondition.servings,
         tags: previousCondition.tags,
+        excludeTags: previousCondition.excludeTags ?? [],
         maxBudget: previousCondition.maxBudget,
         maxMinutes: previousCondition.maxMinutes,
       })
@@ -165,6 +166,7 @@ ${
 {
   "servings": number (기본 1, 인원 언급 없으면 이전 조건 또는 1),
   "tags": string[] (반드시 위 표준 태그 목록 중에서 의미상 가장 잘 맞는 태그 1~4개 선택. 예: "어제 회식해서 속 쓰린데 안 맵고 따뜻한 거" -> ["해장", "국물", "순한맛", "담백한"]),
+  "excludeTags": string[] (제외해야 할 표준 태그 목록. 예: "안 매운", "매운거 빼고" -> ["얼큰한"], 없으면 빈 배열),
   "maxBudget": number | null (총액 예산 원 단위, 언급 없으면 null),
   "maxMinutes": number | null (도착 제한 시간 분 단위, 언급 없으면 null),
   "conversationalReply": string (사용자의 상황과 컨디션에 공감하며 메뉴를 제안하는 1~2문장의 자연스러운 한국어 안내)
@@ -175,6 +177,7 @@ ${
     const data = extractJsonObject<{
       servings?: number;
       tags?: string[];
+      excludeTags?: string[];
       maxBudget?: number | null;
       maxMinutes?: number | null;
       conversationalReply?: string;
@@ -188,13 +191,26 @@ ${
       ? data.tags.filter((t) => (AVAILABLE_TAGS as readonly string[]).includes(t))
       : ruleFallback.tags;
 
+    const validExcludeTags = Array.isArray(data.excludeTags)
+      ? data.excludeTags.filter((t) =>
+          (AVAILABLE_TAGS as readonly string[]).includes(t)
+        )
+      : ruleFallback.excludeTags ?? [];
+
+    const mergedExcludeTags = Array.from(
+      new Set([...(ruleFallback.excludeTags ?? []), ...validExcludeTags])
+    );
+
     const condition: ParsedCondition = {
       rawInput: rawInput.trim(),
       servings:
         typeof data.servings === 'number' && data.servings >= 1
           ? Math.round(data.servings)
           : ruleFallback.servings,
-      tags: validTags.length > 0 ? validTags : ruleFallback.tags,
+      tags: (validTags.length > 0 ? validTags : ruleFallback.tags).filter(
+        (t) => !mergedExcludeTags.includes(t)
+      ),
+      excludeTags: mergedExcludeTags,
       maxBudget:
         typeof data.maxBudget === 'number' && data.maxBudget > 0
           ? Math.round(data.maxBudget)
@@ -208,7 +224,10 @@ ${
           ? null
           : ruleFallback.maxMinutes,
       unknownTokens: [],
-      needsConfirmation: validTags.length === 0 && ruleFallback.needsConfirmation,
+      needsConfirmation:
+        validTags.length === 0 &&
+        mergedExcludeTags.length === 0 &&
+        ruleFallback.needsConfirmation,
     };
 
     return {

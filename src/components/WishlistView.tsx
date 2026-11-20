@@ -4,6 +4,7 @@ import {
   Heart,
   MessageSquare,
   Search,
+  ShoppingBag,
   Sparkles,
   Star,
   Store as StoreIcon,
@@ -24,6 +25,11 @@ interface WishlistViewProps {
   reviewReplies?: Record<string, ReviewReply>;
   onToggleWishlist: (menuId: string) => void;
   onQuickSelectMenu?: (menuId: string) => void;
+  onAddToCart?: (
+    menuId: string,
+    quantity?: number,
+    selectedOptionIds?: string[]
+  ) => void;
   onQuickReorderToConfirm: (menuId: string, servings: number) => void;
   onGoToBrowse: () => void;
 }
@@ -35,6 +41,7 @@ export function WishlistView({
   reviews = INITIAL_REVIEWS,
   reviewReplies = {},
   onToggleWishlist,
+  onAddToCart,
   onQuickReorderToConfirm,
   onGoToBrowse,
 }: WishlistViewProps) {
@@ -130,8 +137,13 @@ export function WishlistView({
 
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs mt-1.5">
                       <span className="font-mono tabular-nums font-bold text-sm text-[#1A1D1A]">
-                        {formatWon(item.pricePerPerson)}
+                        {formatWon(getEffectiveMenuPrice(item))}
                       </span>
+                      {(item.closingDiscountPercent ?? 0) > 0 && (
+                        <span className="text-[11px] font-bold text-amber-800">
+                          (-{item.closingDiscountPercent}%)
+                        </span>
+                      )}
                       <span aria-hidden="true" className="text-[#D4E1C5]">
                         ·
                       </span>
@@ -162,19 +174,32 @@ export function WishlistView({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E8ECE4]">
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#E8ECE4]">
                   <button
                     type="button"
                     onClick={() => setDetailMenuId(item.id)}
-                    className="min-h-[42px] px-3 py-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
+                    className="min-h-[42px] px-2.5 py-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
                   >
                     상세 · 리뷰
                   </button>
+                  {onAddToCart && (
+                    <button
+                      type="button"
+                      disabled={unavailable}
+                      onClick={() => onAddToCart(item.id, 1, [])}
+                      className="min-h-[42px] px-2.5 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] disabled:bg-[#F7F8F5] disabled:text-[#687064] text-[#3D5720] text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <span>담기</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={unavailable}
                     onClick={() => onQuickReorderToConfirm(item.id, 1)}
-                    className="min-h-[42px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] disabled:text-[#687064] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed"
+                    className={`${
+                      onAddToCart ? '' : 'col-span-2'
+                    } min-h-[42px] px-2.5 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] disabled:text-[#687064] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
                   >
                     <Zap className="w-3.5 h-3.5" />
                     <span>{unavailable ? '주문 불가' : '바로 주문'}</span>

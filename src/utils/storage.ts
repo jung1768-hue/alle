@@ -1,5 +1,5 @@
 import {
-  EXAMPLE_CONDITION_QUERY,
+  INITIAL_CONDITION_INPUT,
   INITIAL_ERRANDS,
   INITIAL_MENUS,
   INITIAL_ORDERS,
@@ -10,7 +10,7 @@ import {
 } from '../data/seedData';
 import { AllePersistedState, MenuItem, Store } from '../types/alle';
 
-const STORAGE_KEY = 'alle_mvp_demo_state_v6_full_catalog';
+const STORAGE_KEY = 'alle_mvp_nationwide_v7';
 
 export type StorageMode = 'localStorage' | 'memory';
 
@@ -24,16 +24,17 @@ export function getDefaultState(): AllePersistedState {
     walletBalance: 35000,
     wishlistIds: ['m1', 'm15', 'm32'],
     preferences: structuredClone(INITIAL_PREFERENCES),
-    lastConditionInput: EXAMPLE_CONDITION_QUERY,
+    lastConditionInput: INITIAL_CONDITION_INPUT,
     reviewReplies: {
       r2: {
-        text: '[시연 점주 답글] 간이 조금 세게 느껴지셨다니 죄송합니다. 다음 주문 시 메모 남겨주시면 육수를 따로 챙겨드리겠습니다.',
+        text: '[점주 답글] 간이 조금 세게 느껴지셨다니 죄송합니다. 다음 주문 시 메모 남겨주시면 육수를 따로 챙겨드리겠습니다.',
         updatedAt: '2026-11-04',
       },
     },
     priceReports: [],
     savedLocations: structuredClone(INITIAL_SAVED_LOCATIONS),
     selectedLocationId: INITIAL_SAVED_LOCATIONS[0].id,
+    easyMode: false,
   };
 }
 
@@ -94,6 +95,7 @@ export function loadDemoState(): {
         ...seedStore,
         ...store,
         categoryGroup: store.categoryGroup ?? seedStore?.categoryGroup,
+        region: store.region ?? seedStore?.region,
         minOrderAmount: store.minOrderAmount ?? seedStore?.minOrderAmount,
         rating: store.rating ?? seedStore?.rating,
         reviewCount: store.reviewCount ?? seedStore?.reviewCount,
@@ -144,7 +146,7 @@ export function loadDemoState(): {
         lastConditionInput:
           typeof parsed.lastConditionInput === 'string'
             ? parsed.lastConditionInput
-            : EXAMPLE_CONDITION_QUERY,
+            : INITIAL_CONDITION_INPUT,
         reviewReplies: parsed.reviewReplies ?? {},
         priceReports: Array.isArray(parsed.priceReports) ? parsed.priceReports : [],
         savedLocations:
@@ -159,6 +161,7 @@ export function loadDemoState(): {
           ).some((loc) => loc.id === parsed.selectedLocationId)
             ? parsed.selectedLocationId
             : INITIAL_SAVED_LOCATIONS[0].id,
+        easyMode: typeof parsed.easyMode === 'boolean' ? parsed.easyMode : false,
       },
       storageMode: 'localStorage',
     };

@@ -33,6 +33,7 @@ interface OrderStatusViewProps {
   stores: Store[];
   menus: MenuItem[];
   highlightedOrderId: string | null;
+  showPresenterMode?: boolean;
   onCancelBeforeCooking: (orderId: string) => void;
   onRequestCancelAfterCooking: (orderId: string, reason: string) => void;
   onAttachEvidence: (
@@ -40,6 +41,7 @@ interface OrderStatusViewProps {
     payload: Omit<EvidenceRecord, 'recordedAt'>
   ) => void;
   onQuickReorderToConfirm: (menuId: string, servings: number) => void;
+  onQuickReorderOrder?: (order: Order) => void;
   onUseRelayCoupon?: (menuId: string) => void;
   onGoToOwnerDemo: () => void;
   onNewOrder: () => void;
@@ -113,10 +115,12 @@ export function OrderStatusView({
   stores,
   menus,
   highlightedOrderId,
+  showPresenterMode = false,
   onCancelBeforeCooking,
   onRequestCancelAfterCooking,
   onAttachEvidence,
   onQuickReorderToConfirm,
+  onQuickReorderOrder,
   onUseRelayCoupon,
   onGoToOwnerDemo,
   onNewOrder,
@@ -310,8 +314,11 @@ export function OrderStatusView({
   );
   const visibleErrands = tab === 'active' ? activeErrands : historyErrands;
 
-  // Calendar aggregation (all orders or history+active so user sees complete monthly food log)
+  // Calendar aggregation
   const daysInCalendarMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+  const leadingEmptyCells =
+    (new Date(calendarYear, calendarMonth - 1, 1).getDay() + 6) % 7;
+  const clampedSelectedDay = Math.min(selectedDay, daysInCalendarMonth);
   const ordersByDay = useMemo(() => {
     const map = new Map<number, Order[]>();
     for (const o of orders) {
@@ -325,7 +332,7 @@ export function OrderStatusView({
     return map;
   }, [orders, calendarYear, calendarMonth]);
 
-  const selectedDayOrders = ordersByDay.get(selectedDay) ?? [];
+  const selectedDayOrders = ordersByDay.get(clampedSelectedDay) ?? [];
   const selectedDayTotal = selectedDayOrders.reduce(
     (sum, o) => sum + (o.status === OrderStatus.CANCELLED ? 0 : o.totalAmount),
     0
@@ -339,14 +346,16 @@ export function OrderStatusView({
             <h1 className="text-2xl font-bold text-[#1A1D1A]">주문내역</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onGoToOwnerDemo}
-              className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <StoreIcon className="w-4 h-4" />
-              <span>점주 · 관리자</span>
-            </button>
+            {showPresenterMode && (
+              <button
+                type="button"
+                onClick={onGoToOwnerDemo}
+                className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <StoreIcon className="w-4 h-4" />
+                <span>점주 · 관리자</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onNewOrder}
@@ -545,11 +554,18 @@ export function OrderStatusView({
                   ))}
                 </div>
                 <div className="grid grid-cols-7 gap-1.5">
+                  {Array.from({ length: leadingEmptyCells }, (_, idx) => (
+                    <div
+                      key={`empty-${idx}`}
+                      aria-hidden="true"
+                      className="min-h-[60px] sm:min-h-[74px]"
+                    />
+                  ))}
                   {Array.from({ length: daysInCalendarMonth }, (_, i) => i + 1).map(
                     (day) => {
                       const dayList = ordersByDay.get(day) ?? [];
                       const hasOrders = dayList.length > 0;
-                      const isSelected = day === selectedDay;
+                      const isSelected = day === clampedSelectedDay;
                       const firstMenu = dayList[0]
                         ? menuMap.get(dayList[0].menuId)
                         : undefined;
@@ -600,7 +616,7 @@ export function OrderStatusView({
           <div className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-3.5 shadow-[0_2px_10px_rgba(26,29,26,0.03)]">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-[#1A1D1A] tabular-nums">
-                {calendarMonth}월 {selectedDay}일 주문 내역
+                {calendarMonth}월 {clampedSelectedDay}일 주문 내역
               </h2>
               <span className="text-xs font-bold text-[#4E6E2A] font-mono tabular-nums">
                 총 {selectedDayOrders.length}건 · {formatWon(selectedDayTotal)}
@@ -651,7 +667,9 @@ export function OrderStatusView({
                           type="button"
                           disabled={!canReorder}
                           onClick={() =>
-                            onQuickReorderToConfirm(ord.menuId, ord.servings)
+                            onQuickReorderOrder
+                              ? onQuickReorderOrder(ord)
+                              : onQuickReorderToConfirm(ord.menuId, ord.servings)
                           }
                           className="min-h-[38px] px-3.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition-colors"
                         >
@@ -796,6 +814,17 @@ export function OrderStatusView({
                         <p className="text-sm font-medium text-[#555E52]">
                           {order.menuName} ({order.servings}인)
                         </p>
+                        {order.items && order.items.length > 1 && (
+                          <ul className="mt-1 space-y-0.5 text-xs text-[#687064]">
+                            {order.items.map((it, idx) => (
+                              <li key={`${it.menuId}-${idx}`}>
+                                · {it.menuName} × {it.quantity}
+                                {it.selectedOptionNames.length > 0 &&
+                                  ` (${it.selectedOptionNames.join(', ')})`}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
 
                       <div className="text-left sm:text-right shrink-0">
@@ -1053,7 +1082,9 @@ export function OrderStatusView({
                           type="button"
                           disabled={!canReorder}
                           onClick={() =>
-                            onQuickReorderToConfirm(order.menuId, order.servings)
+                            onQuickReorderOrder
+                              ? onQuickReorderOrder(order)
+                              : onQuickReorderToConfirm(order.menuId, order.servings)
                           }
                           className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
                         >

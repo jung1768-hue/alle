@@ -11,14 +11,17 @@ import {
   Mic,
   MicOff,
   Search,
+  ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   Star,
   Users,
+  X,
   Zap,
 } from 'lucide-react';
 import {
   AVAILABLE_TAGS,
+  DAILY_WEATHER_CURATIONS,
   INITIAL_REVIEWS,
   PRESET_QUERIES,
   VOICE_TRANSCRIPT_SAMPLES,
@@ -27,6 +30,8 @@ import {
   MenuItem,
   Order,
   ParsedCondition,
+  PaymentMethod,
+  RecommendationMatch,
   SavedLocation,
   Store,
   SuperAppTab,
@@ -37,6 +42,7 @@ import {
   formatWon,
   getEffectiveMenuPrice,
 } from '../utils/parser';
+import { estimateCompetitorSavings } from '../utils/pricing';
 import { startKoreanVoiceInput } from '../utils/voice';
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
@@ -50,6 +56,8 @@ interface ConditionHomeProps {
   orders: Order[];
   stampCount: number;
   wishlistIds: string[];
+  easyMode?: boolean;
+  onToggleEasyMode?: () => void;
   onToggleWishlist: (menuId: string) => void;
   onOpenAiChat: (initialPrompt?: string) => void;
   onEarnStamp: () => void;
@@ -60,13 +68,93 @@ interface ConditionHomeProps {
   onQuickReorderToConfirm: (
     menuId: string,
     servings: number,
-    options?: { sharedDeliveryApplied?: boolean; reservationSlot?: string }
+    options?: {
+      sharedDeliveryApplied?: boolean;
+      reservationSlot?: string;
+      selectedOptionIds?: string[];
+      paymentMethod?: PaymentMethod;
+      customerNote?: string;
+    }
+  ) => void;
+  onOpenQuickPay?: (payload: {
+    menuId: string;
+    servings: number;
+    selectedOptionIds?: string[];
+    paymentMethod?: PaymentMethod;
+    customerNote?: string;
+  }) => void;
+  onAddToCart?: (
+    menuId: string,
+    quantity?: number,
+    selectedOptionIds?: string[]
   ) => void;
   onOpenSuperApp: (tab: SuperAppTab) => void;
   onSavePreferences: (next: UserPreferences) => void;
   onApplyPreferencesToInput: (prefs: UserPreferences) => void;
   activeLocation?: SavedLocation;
   onOpenLocationPicker?: () => void;
+}
+
+const QUICK_CATEGORY_CHIPS = [
+  { id: 'all', label: '전체' },
+  { id: 'closing', label: '🔥 마감특가' },
+  { id: 'korean', label: '한식·국밥' },
+  { id: 'chicken', label: '치킨' },
+  { id: 'chinese', label: '중식·마라' },
+  { id: 'japanese', label: '일식·돈까스' },
+  { id: 'western', label: '피자·샐러드' },
+  { id: 'snack', label: '분식·야식' },
+  { id: 'cafe', label: '카페·디저트' },
+  { id: 'market', label: '전통시장' },
+] as const;
+
+type QuickCategoryId = (typeof QUICK_CATEGORY_CHIPS)[number]['id'];
+
+const EASY_CATEGORIES = [
+  { id: 'korean' as QuickCategoryId, emoji: '🍲', label: '따뜻한 국물' },
+  { id: 'chicken' as QuickCategoryId, emoji: '🍗', label: '바삭 치킨' },
+  { id: 'chinese' as QuickCategoryId, emoji: '🍜', label: '중식·분식' },
+  { id: 'cafe' as QuickCategoryId, emoji: '☕', label: '커피·간식' },
+];
+
+function matchesCategoryChip(
+  chipId: QuickCategoryId,
+  store: Store,
+  menu: MenuItem
+): boolean {
+  if (chipId === 'all') return true;
+  if (chipId === 'closing') return (menu.closingDiscountPercent ?? 0) > 0;
+  const grp = store.categoryGroup ?? '';
+  if (chipId === 'korean') {
+    return grp.includes('한식') || menu.tags.includes('한식');
+  }
+  if (chipId === 'chicken') {
+    return grp === '치킨' || menu.tags.includes('치킨');
+  }
+  if (chipId === 'chinese') {
+    return grp === '중식' || menu.tags.includes('중식');
+  }
+  if (chipId === 'japanese') {
+    return grp.includes('일식') || menu.tags.includes('일식');
+  }
+  if (chipId === 'western') {
+    return (
+      grp.includes('피자') ||
+      grp.includes('양식') ||
+      menu.tags.includes('양식') ||
+      menu.tags.includes('샐러드')
+    );
+  }
+  if (chipId === 'snack') {
+    return grp.includes('분식') || grp.includes('야식') || menu.tags.includes('분식');
+  }
+  if (chipId === 'cafe') {
+    return grp.includes('카페') || menu.tags.includes('카페') || menu.tags.includes('디저트');
+  }
+  if (chipId === 'market') {
+    return grp.includes('전통시장') || store.minOrderAmount === 0;
+  }
+  return true;
 }
 
 function VoiceWaveformIcon({ className = '' }: { className?: string }) {
@@ -98,6 +186,8 @@ export function ConditionHome({
   orders,
   stampCount,
   wishlistIds,
+  easyMode = false,
+  onToggleEasyMode,
   onToggleWishlist,
   onOpenAiChat,
   onRawInputChange,
@@ -105,11 +195,15 @@ export function ConditionHome({
   onSubmitSearch,
   onQuickSelectMenu,
   onQuickReorderToConfirm,
+  onOpenQuickPay,
+  onAddToCart,
   onOpenSuperApp,
   onSavePreferences,
   onApplyPreferencesToInput,
   activeLocation,
 }: ConditionHomeProps) {
+  const [activeCategoryChip, setActiveCategoryChip] =
+    useState<QuickCategoryId>('all');
   const [showAdvancedInput, setShowAdvancedInput] = useState(false);
   const [editingPrefs, setEditingPrefs] = useState(false);
   const [draftPrefs, setDraftPrefs] = useState<UserPreferences>(preferences);
@@ -117,6 +211,7 @@ export function ConditionHome({
   const [showVoiceFallback, setShowVoiceFallback] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const stopVoiceRef = useRef<(() => void) | null>(null);
+  const recommendationSectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -126,17 +221,89 @@ export function ConditionHome({
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
 
-  const autoRecommendations = useMemo(
-    () => evaluateRecommendations(parsedCondition, stores, menus),
-    [parsedCondition, stores, menus]
+  const autoRecommendations = useMemo(() => {
+    const baseCondition: ParsedCondition =
+      rawInput.trim().length > 0
+        ? parsedCondition
+        : {
+            rawInput: '',
+            servings: 1,
+            tags: [],
+            excludeTags: [],
+            maxBudget: null,
+            maxMinutes: null,
+            unknownTokens: [],
+            needsConfirmation: false,
+          };
+    return evaluateRecommendations(baseCondition, stores, menus, activeLocation);
+  }, [rawInput, parsedCondition, stores, menus, activeLocation]);
+
+  const allAvailableByLocation = useMemo(
+    () =>
+      evaluateRecommendations(
+        {
+          rawInput: '',
+          servings: 1,
+          tags: [],
+          excludeTags: [],
+          maxBudget: null,
+          maxMinutes: null,
+          unknownTokens: [],
+          needsConfirmation: false,
+        },
+        stores,
+        menus,
+        activeLocation
+      ).matches,
+    [stores, menus, activeLocation]
   );
+
+  const displayedRecommendations: RecommendationMatch[] = useMemo(() => {
+    if (activeCategoryChip === 'all') {
+      return autoRecommendations.matches.slice(0, 6);
+    }
+    const wideList = evaluateRecommendations(
+      {
+        rawInput: '',
+        servings: 1,
+        tags: [],
+        excludeTags: [],
+        maxBudget: null,
+        maxMinutes: null,
+        unknownTokens: [],
+        needsConfirmation: false,
+      },
+      stores,
+      menus.filter((m) => {
+        const st = storeMap.get(m.storeId);
+        return Boolean(st && matchesCategoryChip(activeCategoryChip, st, m));
+      }),
+      activeLocation
+    );
+    return wideList.matches.slice(0, 6);
+  }, [
+    activeCategoryChip,
+    autoRecommendations.matches,
+    stores,
+    menus,
+    storeMap,
+    activeLocation,
+  ]);
 
   const quickReorderCandidate = useMemo(() => {
     for (const ord of orders) {
       const m = menus.find((item) => item.id === ord.menuId);
       const st = m ? storeMap.get(m.storeId) : undefined;
       if (m && st && st.isOpen && !m.isSoldOut && m.stock >= 1) {
-        return { menu: m, store: st, servings: Math.min(ord.servings, m.stock) };
+        return {
+          menu: m,
+          store: st,
+          servings: Math.min(ord.servings, m.stock),
+          selectedOptionIds: ord.selectedOptionIds,
+          selectedOptionNames: ord.selectedOptionNames,
+          paymentMethod: ord.paymentMethod,
+          customerNote: ord.customerNote,
+        };
       }
     }
     const fallbackMenu = menus.find((m) => {
@@ -146,8 +313,34 @@ export function ConditionHome({
     if (!fallbackMenu) return null;
     const fallbackStore = storeMap.get(fallbackMenu.storeId);
     if (!fallbackStore) return null;
-    return { menu: fallbackMenu, store: fallbackStore, servings: 1 };
-  }, [orders, menus, storeMap]);
+    return {
+      menu: fallbackMenu,
+      store: fallbackStore,
+      servings: 1,
+      selectedOptionIds: [] as string[],
+      selectedOptionNames: [] as string[],
+      paymentMethod: undefined,
+      customerNote: preferences.memoNote,
+    };
+  }, [orders, menus, storeMap, preferences.memoNote]);
+
+  const triggerQuickPay = (payload: {
+    menuId: string;
+    servings: number;
+    selectedOptionIds?: string[];
+    paymentMethod?: PaymentMethod;
+    customerNote?: string;
+  }) => {
+    if (onOpenQuickPay) {
+      onOpenQuickPay(payload);
+    } else {
+      onQuickReorderToConfirm(payload.menuId, payload.servings, {
+        selectedOptionIds: payload.selectedOptionIds,
+        paymentMethod: payload.paymentMethod,
+        customerNote: payload.customerNote,
+      });
+    }
+  };
 
   const handleVoiceTrigger = () => {
     if (isListening) {
@@ -231,10 +424,7 @@ export function ConditionHome({
     window.setTimeout(() => setPrefsSavedNotice(false), 2500);
   };
 
-  const topPicks = autoRecommendations.matches.slice(0, 3);
-
   const closingSaleItems = useMemo(() => {
-    const storeMap = new Map(stores.map((s) => [s.id, s]));
     return menus
       .filter((m) => {
         const st = storeMap.get(m.storeId);
@@ -251,7 +441,7 @@ export function ConditionHome({
         store: storeMap.get(m.storeId)!,
         discountedPrice: getEffectiveMenuPrice(m),
       }));
-  }, [menus, stores]);
+  }, [menus, storeMap]);
 
   const quickServices = [
     {
@@ -280,6 +470,227 @@ export function ConditionHome({
     },
   ];
 
+  // ============================================================================
+  // EASY MODE HOME (Large Text, Voice-First, Max 2~3 Clear Choices)
+  // ============================================================================
+  if (easyMode) {
+    const easyPicks = (
+      activeCategoryChip === 'all'
+        ? allAvailableByLocation
+        : displayedRecommendations
+    ).slice(0, 3);
+
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        <section className="bg-[#EAF1E2] border-2 border-[#82B440] rounded-3xl p-6 space-y-5 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold text-[#3D5720]">
+              큰 글씨 · 쉬운 주문 모드 ({activeLocation?.areaName ?? '서울 강남구 역삼동'})
+            </span>
+            {onToggleEasyMode && (
+              <button
+                type="button"
+                onClick={onToggleEasyMode}
+                className="px-4 py-2 rounded-xl bg-white border border-[#D4E1C5] text-sm font-bold text-[#1A1D1A] cursor-pointer"
+              >
+                일반 화면으로
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleVoiceTrigger}
+            className={`w-full min-h-[84px] px-6 py-5 rounded-3xl font-extrabold text-lg sm:text-xl flex items-center justify-center gap-3 shadow-md transition-colors cursor-pointer ${
+              isListening
+                ? 'bg-red-600 text-white'
+                : 'bg-[#4E6E2A] hover:bg-[#3F5A21] text-white'
+            }`}
+          >
+            {isListening ? (
+              <MicOff className="w-7 h-7 shrink-0" />
+            ) : (
+              <Mic className="w-7 h-7 shrink-0" />
+            )}
+            <span>
+              {isListening
+                ? '말씀하세요... 듣고 있어요 (누르면 중지)'
+                : '🎙️ 누르고 먹고 싶은 음식을 말하세요'}
+            </span>
+          </button>
+
+          {showVoiceFallback && (
+            <div className="p-4 bg-white border border-[#D4E1C5] rounded-2xl space-y-2.5">
+              <p className="text-sm font-bold text-[#1A1D1A]">
+                마이크 대신 아래 글자를 눌러도 바로 찾아드려요
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
+                  <button
+                    key={sample.label}
+                    type="button"
+                    onClick={() => {
+                      setShowVoiceFallback(false);
+                      onOpenAiChat(sample.text);
+                    }}
+                    className="w-full px-4 py-3 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] rounded-2xl text-left text-base font-bold text-[#1A1D1A] cursor-pointer"
+                  >
+                    “{sample.text}”
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {EASY_CATEGORIES.map((cat) => {
+              const active = activeCategoryChip === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() =>
+                    setActiveCategoryChip((prev) =>
+                      prev === cat.id ? 'all' : cat.id
+                    )
+                  }
+                  className={`min-h-[72px] px-4 py-3 rounded-2xl border-2 text-base font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                    active
+                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                      : 'bg-white border-[#D4E1C5] text-[#1A1D1A] hover:bg-[#F7F8F5]'
+                  }`}
+                >
+                  <span className="text-2xl">{cat.emoji}</span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {quickReorderCandidate && (
+          <section className="bg-white border-2 border-[#4E6E2A] rounded-3xl p-5 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-bold text-[#4E6E2A]">
+              <Zap className="w-5 h-5 fill-[#82B440]" />
+              <span>자주 시키던 메뉴 바로 시키기</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                <FoodImage
+                  src={quickReorderCandidate.menu.image}
+                  alt={quickReorderCandidate.menu.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-[#4E6E2A] truncate">
+                  {quickReorderCandidate.store.name}
+                </p>
+                <p className="text-lg font-extrabold text-[#1A1D1A] truncate">
+                  {quickReorderCandidate.menu.name}
+                </p>
+                <p className="text-base font-bold text-[#1A1D1A] mt-1 tabular-nums">
+                  {quickReorderCandidate.servings}인분 ·{' '}
+                  {formatWon(
+                    getEffectiveMenuPrice(quickReorderCandidate.menu) *
+                      quickReorderCandidate.servings +
+                      quickReorderCandidate.store.deliveryFee
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                triggerQuickPay({
+                  menuId: quickReorderCandidate.menu.id,
+                  servings: quickReorderCandidate.servings,
+                  selectedOptionIds: quickReorderCandidate.selectedOptionIds,
+                  paymentMethod: quickReorderCandidate.paymentMethod,
+                  customerNote: quickReorderCandidate.customerNote,
+                })
+              }
+              className="w-full min-h-[58px] px-5 py-3 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-lg font-extrabold rounded-2xl cursor-pointer"
+            >
+              ⚡ 지난번 그대로 바로 주문하기
+            </button>
+          </section>
+        )}
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-extrabold text-[#1A1D1A]">
+              지금 바로 배달되는 근처 맛집
+            </h2>
+            {activeCategoryChip !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setActiveCategoryChip('all')}
+                className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] text-sm font-bold text-[#3D5720] cursor-pointer"
+              >
+                전체 보기
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {easyPicks.map((item) => (
+              <article
+                key={item.menu.id}
+                className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                    <FoodImage
+                      src={item.menu.image}
+                      alt={item.menu.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-sm font-bold text-[#4E6E2A] truncate">
+                      {item.store.name} · 약 {item.effectiveMinutes}분
+                    </p>
+                    <h3 className="text-lg font-extrabold text-[#1A1D1A] truncate">
+                      {item.menu.name}
+                    </h3>
+                    <p className="text-base font-extrabold text-[#1A1D1A] tabular-nums">
+                      배달비 포함 {formatWon(item.estimatedTotal)}
+                      {item.isSameStorePrice && ' (매장가 그대로)'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerQuickPay({
+                      menuId: item.menu.id,
+                      servings: item.servings,
+                    })
+                  }
+                  className="w-full min-h-[56px] bg-[#EAF1E2] hover:bg-[#DCE7CF] border-2 border-[#4E6E2A] text-[#3D5720] text-lg font-extrabold rounded-2xl cursor-pointer"
+                >
+                  바로 시키기
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // STANDARD MODE HOME
+  // ============================================================================
+  const quickReorderUnitPrice = quickReorderCandidate
+    ? getEffectiveMenuPrice(quickReorderCandidate.menu)
+    : 0;
+  const quickReorderTotal = quickReorderCandidate
+    ? quickReorderUnitPrice * quickReorderCandidate.servings +
+      quickReorderCandidate.store.deliveryFee
+    : 0;
+
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       {/* 1. Soft Sage Green Hero Card: 'AI에게 주문해보세요' */}
@@ -291,7 +702,7 @@ export function ConditionHome({
           <span className="inline-flex items-center gap-1.5 font-semibold text-[#3D5720]">
             <Sparkles className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
             <span>
-              Zero-UI 1줄 주문 · {activeLocation?.areaName ?? '대구 수성구 범어동'}
+              Zero-UI 1줄 주문 · {activeLocation?.areaName ?? '서울 강남구 역삼동'}
             </span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#687064] tabular-nums">
@@ -321,23 +732,23 @@ export function ConditionHome({
               </button>
               <button
                 type="button"
+                onClick={() => onOpenAiChat('안 매운 국물 20분 이내')}
+                className="hover:text-[#3D5720] transition-colors cursor-pointer"
+              >
+                “안 매운 국물 20분 이내”
+              </button>
+              <button
+                type="button"
                 onClick={() => onOpenAiChat('치킨 시켜줘')}
                 className="hover:text-[#3D5720] transition-colors cursor-pointer"
               >
                 “치킨 시켜줘”
               </button>
-              <button
-                type="button"
-                onClick={() => onOpenAiChat('달달한 커피랑 케이크')}
-                className="hover:text-[#3D5720] transition-colors cursor-pointer"
-              >
-                “달달한 커피랑 케이크”
-              </button>
             </div>
           </div>
         </div>
 
-        {/* Direct 1-Line Zero-UI Input + Voice CTA */}
+        {/* Direct 1-Line Zero-UI Input + Clear X + Voice CTA */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -356,9 +767,19 @@ export function ConditionHome({
               type="text"
               value={rawInput}
               onChange={(e) => onRawInputChange(e.target.value)}
-              placeholder="예: 어제 과음해서 속 쓰린데 안 맵고 25분 내로"
-              className="w-full min-h-[48px] pl-10 pr-4 py-2.5 bg-white border border-[#D4E1C5] rounded-full text-sm text-[#1A1D1A] placeholder:text-[#687064] shadow-2xs"
+              placeholder="예: 어제 야근해서 안 매운 따뜻한 국물 2인, 25분 이내"
+              className="w-full min-h-[48px] pl-10 pr-10 py-2.5 bg-white border border-[#D4E1C5] rounded-full text-sm text-[#1A1D1A] placeholder:text-[#687064] shadow-2xs"
             />
+            {rawInput.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => onRawInputChange('')}
+                aria-label="입력 지우기"
+                className="absolute right-3 w-7 h-7 rounded-full hover:bg-[#F0F3EC] text-[#687064] flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -398,7 +819,7 @@ export function ConditionHome({
           </button>
           <span aria-hidden="true">·</span>
           <span className="tabular-nums">
-            대구 인기 매장 {stores.filter((s) => s.isOpen).length}곳 영업 중 · 스탬프 {stampCount}개
+            전국 매장 {stores.filter((s) => s.isOpen).length}곳 영업 중 · 스탬프 {stampCount}개
           </span>
         </div>
 
@@ -456,7 +877,42 @@ export function ConditionHome({
         )}
       </section>
 
-      {/* 2. White Card Bar: '⚡ 단골 1초결제' */}
+      {/* 1-1. 1-Tap Weather / Time / Situation Curation Strip */}
+      <section
+        aria-label="상황별 1탭 추천"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2.5"
+      >
+        {DAILY_WEATHER_CURATIONS.map((curation) => (
+          <button
+            key={curation.id}
+            type="button"
+            onClick={() => {
+              if (curation.isClosingSaleFilter) {
+                setActiveCategoryChip('closing');
+                recommendationSectionRef.current?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              } else {
+                onOpenAiChat(curation.query);
+              }
+            }}
+            className="p-3.5 bg-white hover:bg-[#EAF1E2]/70 border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl text-left space-y-1 transition-all cursor-pointer shadow-2xs"
+          >
+            <span className="inline-block text-[11px] font-bold text-[#4E6E2A]">
+              {curation.badge}
+            </span>
+            <p className="text-xs sm:text-sm font-bold text-[#1A1D1A] truncate">
+              {curation.situation}
+            </p>
+            <p className="text-[11px] text-[#687064] line-clamp-1">
+              {curation.summary}
+            </p>
+          </button>
+        ))}
+      </section>
+
+      {/* 2. White Card Bar: '⚡ 단골 1초결제' (Opens QuickPay BottomSheet) */}
       {quickReorderCandidate && (
         <section
           aria-label="단골 1초결제"
@@ -486,12 +942,9 @@ export function ConditionHome({
                 {quickReorderCandidate.menu.name}
               </p>
               <p className="text-xs text-[#687064] truncate tabular-nums">
-                {quickReorderCandidate.servings}인 ·{' '}
-                {formatWon(
-                  quickReorderCandidate.menu.pricePerPerson *
-                    quickReorderCandidate.servings +
-                    quickReorderCandidate.store.deliveryFee
-                )}
+                {quickReorderCandidate.servings}인 · {formatWon(quickReorderTotal)}
+                {quickReorderCandidate.selectedOptionNames.length > 0 &&
+                  ` · ${quickReorderCandidate.selectedOptionNames[0]}`}
               </p>
             </div>
           </div>
@@ -499,10 +952,13 @@ export function ConditionHome({
           <button
             type="button"
             onClick={() =>
-              onQuickReorderToConfirm(
-                quickReorderCandidate.menu.id,
-                quickReorderCandidate.servings
-              )
+              triggerQuickPay({
+                menuId: quickReorderCandidate.menu.id,
+                servings: quickReorderCandidate.servings,
+                selectedOptionIds: quickReorderCandidate.selectedOptionIds,
+                paymentMethod: quickReorderCandidate.paymentMethod,
+                customerNote: quickReorderCandidate.customerNote,
+              })
             }
             className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#D4E1C5] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
           >
@@ -533,7 +989,7 @@ export function ConditionHome({
         })}
       </section>
 
-      {/* 3-1. Closing Time-Sale Strip (Neighborhood Food Waste Reduction & Traffic Boost) */}
+      {/* 3-1. Closing Time-Sale Strip */}
       {closingSaleItems.length > 0 && (
         <section
           aria-label="동네 마감 특가"
@@ -586,7 +1042,9 @@ export function ConditionHome({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onQuickReorderToConfirm(menu.id, 1)}
+                  onClick={() =>
+                    triggerQuickPay({ menuId: menu.id, servings: 1 })
+                  }
                   className="min-h-[38px] px-3 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl shrink-0 cursor-pointer"
                 >
                   특가 주문
@@ -597,15 +1055,15 @@ export function ConditionHome({
         </section>
       )}
 
-      {/* 4. 'AI가 추천하는 우리 동네 맛집' Cards */}
-      <section className="space-y-4">
+      {/* 4. 'AI가 추천하는 내 주변 맛집' + Horizontal Category Chips */}
+      <section ref={recommendationSectionRef} className="space-y-4 scroll-mt-20">
         <div className="flex items-center justify-between gap-3 px-0.5">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-[#1A1D1A]">
-              AI가 추천하는 우리 동네 맛집
+              AI가 추천하는 내 주변 맛집
             </h2>
             <p className="text-xs text-[#687064] mt-0.5">
-              현재 컨디션과 도착 시간을 계산해 선별한 대구 단골 맛집
+              {activeLocation?.areaName ?? '선택 지역'} 기준 · 매장 동일가 검증 맛집
             </p>
           </div>
           <button
@@ -618,7 +1076,34 @@ export function ConditionHome({
           </button>
         </div>
 
-        {topPicks.length === 0 ? (
+        {/* Horizontal 1-Row Quick Category Chips */}
+        <div
+          role="tablist"
+          aria-label="빠른 카테고리 둘러보기"
+          className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar"
+        >
+          {QUICK_CATEGORY_CHIPS.map((chip) => {
+            const active = activeCategoryChip === chip.id;
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveCategoryChip(chip.id)}
+                className={`min-h-[36px] px-3.5 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                  active
+                    ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                    : 'bg-white border-[#E8ECE4] text-[#434B40] hover:border-[#82B440]'
+                }`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {displayedRecommendations.length === 0 ? (
           <div className="os-card rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span className="text-sm text-[#687064]">
               현재 조건에 맞는 메뉴가 없습니다. AI 상담으로 조건을 가볍게
@@ -634,7 +1119,7 @@ export function ConditionHome({
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {topPicks.map((item) => {
+            {displayedRecommendations.map((item) => {
               const wished = wishlistIds.includes(item.menu.id);
               const reasonText =
                 item.aiReason ??
@@ -648,6 +1133,16 @@ export function ConditionHome({
                 (r) => r.menuId === item.menu.id
               );
               const topReview = menuReviews[0];
+              const estimatedSavings =
+                item.estimatedSavingsVsCompetitor ??
+                estimateCompetitorSavings({
+                  menuSubtotal: item.menuSubtotal,
+                  originalMenuSubtotal: item.menu.pricePerPerson * item.servings,
+                  deliveryFee: item.deliveryFee,
+                  originalDeliveryFee: item.deliveryFee,
+                  couponDiscount: 0,
+                  isSameStorePrice: item.isSameStorePrice,
+                }).totalSaved;
 
               return (
                 <article
@@ -655,7 +1150,6 @@ export function ConditionHome({
                   className="os-card hover:border-[#82B440] rounded-3xl overflow-hidden flex flex-col justify-between transition-all"
                 >
                   <div>
-                    {/* Clean Food Photo Top */}
                     <div className="relative aspect-4/3 w-full overflow-hidden bg-[#F0F3EC]">
                       <button
                         type="button"
@@ -686,20 +1180,24 @@ export function ConditionHome({
                       </button>
 
                       <div className="absolute bottom-2.5 left-2.5 flex flex-wrap items-center gap-1">
+                        {item.isNearbyArea && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#1A1D1A]/85 text-white text-[10.5px] font-bold">
+                            내 주변
+                          </span>
+                        )}
                         {item.isSameStorePrice && (
-                          <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#3D5720] border border-[#D4E1C5] text-[11px] font-bold shadow-2xs">
+                          <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#3D5720] border border-[#D4E1C5] text-[10.5px] font-bold shadow-2xs">
                             매장 동일가 ✓
                           </span>
                         )}
                         {(item.menu.closingDiscountPercent ?? 0) > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold shadow-2xs">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10.5px] font-bold shadow-2xs">
                             마감 -{item.menu.closingDiscountPercent}%
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Crisp White Lower Area */}
                     <div className="p-4 space-y-2">
                       <button
                         type="button"
@@ -714,22 +1212,27 @@ export function ConditionHome({
                         </p>
                       </button>
 
-                      {/* Lime Green Star Rating & Delivery ETA */}
-                      <div className="flex items-center gap-1.5 text-xs tabular-nums">
-                        <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440] shrink-0" />
-                        <span className="font-bold text-[#1A1D1A]">
-                          {storeRating}
-                        </span>
-                        <span className="text-[#687064]">({storeReviewCount})</span>
-                        <span className="text-[#687064]" aria-hidden="true">
-                          ·
-                        </span>
-                        <span className="font-semibold text-[#1A1D1A]">
-                          {item.effectiveMinutes}분
-                        </span>
+                      <div className="flex items-center justify-between gap-1.5 text-xs tabular-nums">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440] shrink-0" />
+                          <span className="font-bold text-[#1A1D1A]">
+                            {storeRating}
+                          </span>
+                          <span className="text-[#687064]">({storeReviewCount})</span>
+                          <span className="text-[#687064]" aria-hidden="true">
+                            ·
+                          </span>
+                          <span className="font-semibold text-[#1A1D1A]">
+                            {item.effectiveMinutes}분
+                          </span>
+                        </div>
+                        {estimatedSavings > 0 && (
+                          <span className="text-[10.5px] font-bold text-[#4E6E2A]">
+                            약 {formatWon(estimatedSavings)}↓
+                          </span>
+                        )}
                       </div>
 
-                      {/* Soft Sage AI Reason Line */}
                       <div className="px-2.5 py-2 rounded-xl bg-[#EAF1E2] text-[11px] font-medium text-[#3D5720] line-clamp-2 leading-snug">
                         ✨ {reasonText}
                       </div>
@@ -749,15 +1252,23 @@ export function ConditionHome({
                   <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => onQuickSelectMenu(item.menu.id)}
-                      className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-xs font-semibold rounded-xl cursor-pointer transition-colors"
+                      onClick={() =>
+                        onAddToCart
+                          ? onAddToCart(item.menu.id, item.servings, [])
+                          : onQuickSelectMenu(item.menu.id)
+                      }
+                      className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
                     >
-                      리뷰 보기
+                      <ShoppingBag className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                      <span>담기</span>
                     </button>
                     <button
                       type="button"
                       onClick={() =>
-                        onQuickReorderToConfirm(item.menu.id, item.servings)
+                        triggerQuickPay({
+                          menuId: item.menu.id,
+                          servings: item.servings,
+                        })
                       }
                       className="min-h-[38px] px-2.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
                     >
@@ -801,7 +1312,7 @@ export function ConditionHome({
                     type="text"
                     value={rawInput}
                     onChange={(e) => onRawInputChange(e.target.value)}
-                    placeholder="예: 성인 2명, 얼큰한 국물, 총액 25,000원 이하, 30분 이내"
+                    placeholder="예: 성인 2명, 안 매운 국물, 총액 25,000원 이하, 30분 이내"
                     className="w-full min-h-[44px] pl-10 pr-4 py-2 text-sm bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-[#1A1D1A] placeholder:text-[#687064]"
                   />
                 </div>

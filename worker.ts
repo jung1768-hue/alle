@@ -74,7 +74,7 @@ async function handleGeminiApi(request: Request, env: WorkerEnv): Promise<Respon
         contents: [{ parts }],
         generationConfig: {
           responseMimeType: 'application/json',
-          maxOutputTokens: 280,
+          maxOutputTokens: 1536,
           temperature:
             typeof body.temperature === 'number' ? body.temperature : 0.2,
         },

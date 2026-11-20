@@ -1,6 +1,6 @@
 {
-  "name": "alle — 주문·점주 연결 MVP",
-  "description": "한 줄 주문 조건 추천부터 근거 있는 가격·리뷰, 점주 주문 상태 연결까지 한 브라우저에서 시연하는 음식 주문 MVP",
+  "name": "alle — 말 한마디로 10초 주문, 전국 매장 동일가 배달",
+  "description": "말 한마디로 10초 만에 주문하고, 전국 매장 동일가와 수수료 0% 상생을 누리는 AI 배달 앱 alle",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

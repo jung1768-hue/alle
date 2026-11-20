@@ -10,6 +10,7 @@ import {
   Info,
   MessageSquare,
   RotateCcw,
+  ShoppingBag,
   Sparkles,
   Store as StoreIcon,
   Zap,
@@ -17,12 +18,14 @@ import {
 import { MOCK_COUPONS } from '../data/seedData';
 import {
   ExcludedCandidate,
+  MenuItem,
   ParsedCondition,
   RecommendationMatch,
   Review,
   ReviewReply,
 } from '../types/alle';
-import { formatWon } from '../utils/parser';
+import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
+import { estimateCompetitorSavings } from '../utils/pricing';
 import {
   buildRuleReviewSummary,
   hasGeminiApiKey,
@@ -38,6 +41,7 @@ interface RecommendationViewProps {
   excluded: ExcludedCandidate[];
   reviews: Review[];
   reviewReplies: Record<string, ReviewReply>;
+  allMenus?: MenuItem[];
   selectedMenuId: string | null;
   wishlistIds?: string[];
   onToggleWishlist?: (menuId: string) => void;
@@ -51,6 +55,11 @@ interface RecommendationViewProps {
     appPrice: number;
     storePrice: number;
   }) => void;
+  onAddToCart?: (
+    menuId: string,
+    quantity?: number,
+    selectedOptionIds?: string[]
+  ) => void;
   onProceedToConfirm: (payload: {
     menuId: string;
     servings: number;
@@ -65,6 +74,7 @@ export function RecommendationView({
   excluded,
   reviews,
   reviewReplies,
+  allMenus = [],
   selectedMenuId,
   wishlistIds = [],
   onToggleWishlist,
@@ -72,6 +82,7 @@ export function RecommendationView({
   onBackToHome,
   onQuickRelaxCondition,
   onReportPriceDifference,
+  onAddToCart,
   onProceedToConfirm,
 }: RecommendationViewProps) {
   const [selectedOptionsByMenu, setSelectedOptionsByMenu] = useState<
@@ -165,25 +176,60 @@ export function RecommendationView({
   const activeOptionIds = activeMatch
     ? selectedOptionsByMenu[activeMatch.menu.id] ?? []
     : [];
-  const optionsSubtotal = activeMatch
+  const unitOptionsSubtotal = activeMatch
     ? activeMatch.menu.options
         .filter((o) => activeOptionIds.includes(o.id))
         .reduce((sum, o) => sum + o.priceDelta, 0)
+    : 0;
+  const optionsSubtotal = activeMatch
+    ? unitOptionsSubtotal * activeMatch.servings
+    : 0;
+
+  const effectiveUnitPrice = activeMatch
+    ? getEffectiveMenuPrice(activeMatch.menu)
+    : 0;
+  const effectiveMenuSubtotal = activeMatch
+    ? effectiveUnitPrice * activeMatch.servings
+    : 0;
+  const originalMenuSubtotal = activeMatch
+    ? activeMatch.menu.pricePerPerson * activeMatch.servings
     : 0;
 
   const selectedCoupon =
     MOCK_COUPONS.find((c) => c.code === selectedCouponCode) ?? MOCK_COUPONS[0];
   const rawCouponDiscount = selectedCoupon.discountAmount;
   const effectiveCouponDiscount = activeMatch
-    ? Math.min(rawCouponDiscount, activeMatch.menuSubtotal)
+    ? Math.min(rawCouponDiscount, effectiveMenuSubtotal)
     : 0;
 
   const finalEstimatedTotal = activeMatch
-    ? activeMatch.menuSubtotal +
+    ? effectiveMenuSubtotal +
       optionsSubtotal +
       activeMatch.deliveryFee -
       effectiveCouponDiscount
     : 0;
+
+  const savingsBreakdown = activeMatch
+    ? estimateCompetitorSavings({
+        menuSubtotal: effectiveMenuSubtotal,
+        originalMenuSubtotal,
+        deliveryFee: activeMatch.deliveryFee,
+        originalDeliveryFee: activeMatch.deliveryFee,
+        couponDiscount: effectiveCouponDiscount,
+        isSameStorePrice: activeMatch.isSameStorePrice,
+      })
+    : null;
+
+  const sameStoreOtherMenus = useMemo(() => {
+    if (!activeMatch || allMenus.length === 0) return [];
+    return allMenus.filter(
+      (m) =>
+        m.storeId === activeMatch.store.id &&
+        m.id !== activeMatch.menu.id &&
+        !m.isSoldOut &&
+        m.stock >= 1
+    );
+  }, [activeMatch, allMenus]);
 
   const conditionSummaryText = [
     `${condition.servings}인`,
@@ -524,11 +570,21 @@ export function RecommendationView({
                     </div>
                     <div className="flex items-center justify-between text-[#1A1D1A]">
                       <dt>
-                        메뉴 금액 ({formatWon(activeMatch.menu.pricePerPerson)} ×{' '}
+                        메뉴 금액 ({formatWon(effectiveUnitPrice)} ×{' '}
                         {activeMatch.servings})
+                        {(activeMatch.menu.closingDiscountPercent ?? 0) > 0 && (
+                          <span className="ml-1.5 text-[11px] font-bold text-amber-800">
+                            (마감 -{activeMatch.menu.closingDiscountPercent}%)
+                          </span>
+                        )}
                       </dt>
                       <dd className="font-mono tabular-nums font-semibold">
-                        {formatWon(activeMatch.menuSubtotal)}
+                        {(activeMatch.menu.closingDiscountPercent ?? 0) > 0 && (
+                          <span className="line-through text-[#687064] mr-1.5 font-normal text-xs">
+                            {formatWon(originalMenuSubtotal)}
+                          </span>
+                        )}
+                        {formatWon(effectiveMenuSubtotal)}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between text-[#555E52]">
@@ -556,6 +612,24 @@ export function RecommendationView({
                       </dd>
                     </div>
                   </dl>
+
+                  {savingsBreakdown && savingsBreakdown.totalSaved > 0 && (
+                    <div className="p-3 bg-white border border-[#D4E1C5] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-[#3D5720] font-semibold">
+                        타 배달앱 예상가{' '}
+                        <span className="line-through font-mono text-[#687064]">
+                          {formatWon(
+                            savingsBreakdown.competitorEstimatedTotal +
+                              optionsSubtotal
+                          )}
+                        </span>{' '}
+                        대비
+                      </span>
+                      <span className="font-mono font-extrabold text-[#4E6E2A]">
+                        총 약 {formatWon(savingsBreakdown.totalSaved)} 절약 ✓
+                      </span>
+                    </div>
+                  )}
 
                   {activeMatch.menu.storePrice !== null &&
                     activeMatch.menu.pricePerPerson !==
@@ -804,8 +878,69 @@ export function RecommendationView({
                   )}
                 </div>
 
+                {/* Same-Store Additional Menu Cross-Sell */}
+                {sameStoreOtherMenus.length > 0 && onAddToCart && (
+                  <div className="pt-4 border-t border-[#E8ECE4] space-y-2.5">
+                    <h3 className="text-sm font-bold text-[#1A1D1A]">
+                      이 가게 다른 메뉴 함께 담기
+                    </h3>
+                    <div className="space-y-2">
+                      {sameStoreOtherMenus.map((other) => (
+                        <div
+                          key={other.id}
+                          className="p-3 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                              <FoodImage
+                                src={other.image}
+                                alt={other.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-[#1A1D1A] truncate">
+                                {other.name}
+                              </p>
+                              <p className="text-xs font-mono font-semibold text-[#4E6E2A] tabular-nums">
+                                {formatWon(getEffectiveMenuPrice(other))}
+                                {(other.closingDiscountPercent ?? 0) > 0 &&
+                                  ` (-${other.closingDiscountPercent}%)`}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onAddToCart(other.id, 1, [])}
+                            className="min-h-[36px] px-3 py-1.5 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <span>담기</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Large Unmistakable One-Tap Primary CTA */}
-                <div className="pt-3">
+                <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {onAddToCart && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onAddToCart(
+                          activeMatch.menu.id,
+                          activeMatch.servings,
+                          activeOptionIds
+                        )
+                      }
+                      className="min-h-[58px] py-3.5 px-5 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440] text-[#3D5720] font-bold text-sm sm:text-base rounded-2xl transition-all cursor-pointer inline-flex items-center justify-center gap-2"
+                    >
+                      <ShoppingBag className="w-5 h-5 shrink-0" />
+                      <span>장바구니 담기</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() =>
@@ -816,7 +951,9 @@ export function RecommendationView({
                         couponCode: selectedCouponCode,
                       })
                     }
-                    className="w-full min-h-[58px] py-4 px-6 bg-[#4E6E2A] hover:bg-[#3F5A21] active:scale-[0.99] text-white font-bold text-base sm:text-lg rounded-2xl transition-all cursor-pointer shadow-[0_14px_30px_-8px_rgba(78,110,42,0.48)] inline-flex items-center justify-center gap-2.5"
+                    className={`${
+                      onAddToCart ? '' : 'sm:col-span-2'
+                    } w-full min-h-[58px] py-4 px-6 bg-[#4E6E2A] hover:bg-[#3F5A21] active:scale-[0.99] text-white font-bold text-base sm:text-lg rounded-2xl transition-all cursor-pointer shadow-[0_14px_30px_-8px_rgba(78,110,42,0.48)] inline-flex items-center justify-center gap-2.5`}
                   >
                     <Zap className="w-5 h-5 shrink-0" />
                     <span>원탭 바로 주문 · {formatWon(finalEstimatedTotal)}</span>

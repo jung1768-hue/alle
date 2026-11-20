@@ -48,6 +48,7 @@ export interface Store {
   name: string;
   category: string;
   categoryGroup?: string;
+  region?: string;
   isOpen: boolean;
   deliveryFee: number;
   minOrderAmount?: number;
@@ -136,9 +137,36 @@ export interface EvidenceRecord {
 }
 
 export type PaymentMethod =
+  | 'kakaopay'
+  | 'tosspay'
+  | 'naverpay'
+  | 'card_oneclick'
+  | 'alle_pay'
   | 'local_currency'
-  | 'b2b_meal_point'
-  | 'alle_regular_pass';
+  | 'b2b_meal_point';
+
+export interface CartLineItem {
+  menuId: string;
+  quantity: number;
+  selectedOptionIds: string[];
+}
+
+export interface CartState {
+  storeId: string;
+  items: CartLineItem[];
+}
+
+export interface OrderLineItem {
+  menuId: string;
+  menuName: string;
+  unitPrice: number;
+  originalUnitPrice?: number;
+  quantity: number;
+  selectedOptionIds: string[];
+  selectedOptionNames: string[];
+  optionsSubtotal: number;
+  lineSubtotal: number;
+}
 
 export interface Order {
   id: string;
@@ -152,6 +180,7 @@ export interface Order {
   servings: number;
   selectedOptionIds: string[];
   selectedOptionNames: string[];
+  items?: OrderLineItem[];
   menuSubtotal: number;
   optionsSubtotal: number;
   deliveryFee: number;
@@ -163,6 +192,7 @@ export interface Order {
   couponCode: string | null;
   couponDiscount: number;
   totalAmount: number;
+  estimatedSavings?: number;
   status: OrderStatus;
   dispatchMode?: DispatchMode;
   createdAt: string;
@@ -209,6 +239,7 @@ export interface ParsedCondition {
   rawInput: string;
   servings: number;
   tags: string[];
+  excludeTags?: string[];
   maxBudget: number | null;
   maxMinutes: number | null;
   unknownTokens: string[];
@@ -229,6 +260,9 @@ export interface MockCoupon {
   label: string;
   discountAmount: number;
   requiresStamps?: number;
+  minOrderAmount?: number;
+  paymentMethodOnly?: PaymentMethod;
+  autoSelectEligible?: boolean;
 }
 
 export interface RecommendationMatch {
@@ -241,6 +275,8 @@ export interface RecommendationMatch {
   effectiveMinutes: number;
   matchedTags: string[];
   isSameStorePrice: boolean;
+  isNearbyArea?: boolean;
+  estimatedSavingsVsCompetitor?: number;
   aiReason?: string;
 }
 
@@ -294,4 +330,5 @@ export interface AllePersistedState {
   priceReports: PriceReport[];
   savedLocations: SavedLocation[];
   selectedLocationId: string;
+  easyMode: boolean;
 }

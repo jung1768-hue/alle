@@ -7,6 +7,7 @@ import {
   Mic,
   MicOff,
   RotateCcw,
+  Search,
   Send,
   ShoppingBag,
   Sparkles,
@@ -17,13 +18,20 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
-import { MenuItem, ParsedCondition, Store, SuperAppTab } from '../types/alle';
+import {
+  MenuItem,
+  ParsedCondition,
+  SavedLocation,
+  Store,
+  SuperAppTab,
+} from '../types/alle';
 import {
   checkServerGeminiAvailable,
   hasGeminiApiKey,
   parseConditionWithAI,
 } from '../utils/gemini';
 import {
+  DISH_CATEGORY_TAGS,
   evaluateRecommendations,
   formatWon,
   getEffectiveMenuPrice,
@@ -82,6 +90,10 @@ function buildIntentChips(
     chips.push({ id: `tag-${tag}`, label: `#${tag}`, tone: 'primary' });
   }
 
+  for (const exTag of condition.excludeTags ?? []) {
+    chips.push({ id: `ex-${exTag}`, label: `#제외:${exTag}`, tone: 'accent' });
+  }
+
   if (condition.maxMinutes !== null) {
     chips.push({
       id: `min-${condition.maxMinutes}`,
@@ -136,12 +148,18 @@ interface AiChatOrderViewProps {
   stores: Store[];
   menus: MenuItem[];
   wishlistIds: string[];
+  activeLocation?: SavedLocation;
   initialPrompt?: string;
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
   onOpenAiSettings?: () => void;
   onOpenSuperApp?: (tab: SuperAppTab) => void;
   onUseRelayCoupon?: (menuId: string) => void;
+  onAddToCart?: (
+    menuId: string,
+    quantity?: number,
+    selectedOptionIds?: string[]
+  ) => void;
   onOpenRecommendationWithCondition: (
     condition: ParsedCondition,
     selectedMenuId?: string
@@ -197,13 +215,16 @@ function mergeConversationalCondition(
   const hasExplicitBudget = /(\d[\d,]*)\s*만?\s*원/.test(trimmed);
   const hasExplicitMinutes = /(\d+)\s*분/.test(trimmed);
 
-  // When the user asks for a brand-new dish/category, reset stale budget/time/servings
-  // unless they explicitly included them in the new message.
-  if (next.tags.length > 0) {
+  const hasNewDishCategory = next.tags.some((t) => DISH_CATEGORY_TAGS.has(t));
+  const nextExcludes = next.excludeTags ?? [];
+
+  // When user asks for a brand-new dish/category, replace previous category and reset stale filters unless explicit
+  if (hasNewDishCategory) {
     return {
       rawInput: trimmed,
       servings: hasExplicitServings ? next.servings : 1,
       tags: next.tags,
+      excludeTags: nextExcludes,
       maxBudget: hasExplicitBudget ? next.maxBudget : null,
       maxMinutes: hasExplicitMinutes ? next.maxMinutes : null,
       unknownTokens: next.unknownTokens,
@@ -211,33 +232,82 @@ function mergeConversationalCondition(
     };
   }
 
-  // Follow-up refinement (e.g. "2만원 이하로", "20분 이내", "3명") preserves previous tags
-  const mergedTags = /전체|아무거나|상관없/.test(trimmed) ? [] : prev.tags;
+  // Follow-up refinement with traits/exclusions/budget/time preserves previous dish category tags
+  if (/전체|아무거나|상관없/.test(trimmed)) {
+    return {
+      rawInput: trimmed,
+      servings: hasExplicitServings ? next.servings : prev.servings,
+      tags: [],
+      excludeTags: nextExcludes,
+      maxBudget: hasExplicitBudget ? next.maxBudget : prev.maxBudget,
+      maxMinutes: hasExplicitMinutes ? next.maxMinutes : prev.maxMinutes,
+      unknownTokens: next.unknownTokens,
+      needsConfirmation: false,
+    };
+  }
+
+  const mergedExcludes = Array.from(
+    new Set([...(prev.excludeTags ?? []), ...nextExcludes])
+  );
+  // Remove conflicts between '얼큰한' and '순한맛' when refining taste
+  let baseTags = [...prev.tags];
+  if (next.tags.includes('순한맛') || mergedExcludes.includes('얼큰한')) {
+    baseTags = baseTags.filter((t) => t !== '얼큰한');
+  }
+  if (next.tags.includes('얼큰한')) {
+    baseTags = baseTags.filter((t) => t !== '순한맛');
+  }
+
+  const mergedTags = Array.from(new Set([...baseTags, ...next.tags])).filter(
+    (t) => !mergedExcludes.includes(t)
+  );
 
   return {
     rawInput: trimmed,
     servings: hasExplicitServings ? next.servings : prev.servings,
     tags: mergedTags,
+    excludeTags: mergedExcludes,
     maxBudget: hasExplicitBudget ? next.maxBudget : prev.maxBudget,
     maxMinutes: hasExplicitMinutes ? next.maxMinutes : prev.maxMinutes,
     unknownTokens: next.unknownTokens,
-    needsConfirmation: next.needsConfirmation,
+    needsConfirmation:
+      mergedTags.length === 0 &&
+      mergedExcludes.length === 0 &&
+      next.needsConfirmation,
   };
 }
+
+const DIRECT_SEARCH_CATEGORIES = [
+  '전체',
+  '한식',
+  '치킨',
+  '중식',
+  '일식',
+  '양식',
+  '분식',
+  '카페',
+  '전통시장',
+] as const;
 
 export function AiChatOrderView({
   stores,
   menus,
   wishlistIds,
+  activeLocation,
   initialPrompt,
   onToggleWishlist,
   onBackToHome,
   onOpenAiSettings: _onOpenAiSettings,
   onOpenSuperApp,
   onUseRelayCoupon,
+  onAddToCart,
   onOpenRecommendationWithCondition,
   onProceedToConfirm,
 }: AiChatOrderViewProps) {
+  const [viewMode, setViewMode] = useState<'chat' | 'search'>('chat');
+  const [directSearchText, setDirectSearchText] = useState('');
+  const [directCategory, setDirectCategory] =
+    useState<(typeof DIRECT_SEARCH_CATEGORIES)[number]>('전체');
   const [input, setInput] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -275,7 +345,7 @@ export function AiChatOrderView({
     const seedQuery = initialPrompt?.trim();
     if (seedQuery) {
       const parsed = parseConditionInput(seedQuery);
-      const evaluated = evaluateRecommendations(parsed, stores, menus);
+      const evaluated = evaluateRecommendations(parsed, stores, menus, activeLocation);
       const topMatches = evaluated.matches.slice(0, 3);
       let reply = '';
       if (parsed.needsConfirmation && parsed.unknownTokens.length > 0) {
@@ -314,12 +384,12 @@ export function AiChatOrderView({
     const defaultParsed = parseConditionInput(
       '성인 2명, 얼큰한 국물, 총액 25,000원 이하, 30분 이내'
     );
-    const defaultEval = evaluateRecommendations(defaultParsed, stores, menus);
+    const defaultEval = evaluateRecommendations(defaultParsed, stores, menus, activeLocation);
     return [
       {
         id: 'welcome',
         sender: 'bot',
-        text: '어떤 음식을 찾아드릴까요?',
+        text: '어떤 음식을 찾아드릴까요? 아래 빠른 버튼을 누르거나 직접 말씀해 보세요.',
         parsed: defaultParsed,
         matchedMenuIds: defaultEval.matches.slice(0, 3).map((m) => m.menu.id),
         servings: defaultParsed.servings,
@@ -329,6 +399,46 @@ export function AiChatOrderView({
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+
+  const directSearchResults = useMemo(() => {
+    const q = directSearchText.trim().toLowerCase();
+    const filteredMenus = menus.filter((m) => {
+      const st = storeMap.get(m.storeId);
+      if (!st) return false;
+      if (directCategory !== '전체') {
+        const grp = st.categoryGroup ?? '';
+        const catHit =
+          grp.includes(directCategory) ||
+          st.category.includes(directCategory) ||
+          m.tags.includes(directCategory) ||
+          (directCategory === '전통시장' && st.minOrderAmount === 0);
+        if (!catHit) return false;
+      }
+      if (!q) return true;
+      return (
+        m.name.toLowerCase().includes(q) ||
+        st.name.toLowerCase().includes(q) ||
+        st.category.toLowerCase().includes(q) ||
+        m.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+
+    return evaluateRecommendations(
+      {
+        rawInput: directSearchText,
+        servings: 1,
+        tags: [],
+        excludeTags: [],
+        maxBudget: null,
+        maxMinutes: null,
+        unknownTokens: [],
+        needsConfirmation: false,
+      },
+      stores,
+      filteredMenus,
+      activeLocation
+    ).matches;
+  }, [directSearchText, directCategory, menus, stores, storeMap, activeLocation]);
 
   // Live intent preview updates as the user types or speaks
   const liveIntentCondition = useMemo(() => {
@@ -408,7 +518,7 @@ export function AiChatOrderView({
         unknownTokens: [],
         needsConfirmation: false,
       };
-      const evaluated = evaluateRecommendations(openParsed, stores, menus);
+      const evaluated = evaluateRecommendations(openParsed, stores, menus, activeLocation);
       const topOpen = evaluated.matches.slice(0, 3);
       setActiveCondition(openParsed);
       if (topOpen[0]) {
@@ -423,7 +533,7 @@ export function AiChatOrderView({
         {
           id: `b-${Date.now() + 1}`,
           sender: 'bot',
-          text: '반갑습니다! 지금 바로 주문할 수 있는 대구 인기 메뉴 3곳을 먼저 보여드릴게요. 치킨·마라탕·카페·야식처럼 원하시는 메뉴를 말씀해 주셔도 좋아요.',
+          text: '반갑습니다! 지금 바로 주문할 수 있는 내 주변 인기 메뉴 3곳을 먼저 보여드릴게요. 치킨·마라탕·카페·야식처럼 원하시는 메뉴를 말씀해 주셔도 좋아요.',
           parsed: openParsed,
           matchedMenuIds: topOpen.map((m) => m.menu.id),
           servings: openParsed.servings,
@@ -591,7 +701,7 @@ export function AiChatOrderView({
     }
 
     setActiveCondition(merged);
-    const evaluated = evaluateRecommendations(merged, stores, menus);
+    const evaluated = evaluateRecommendations(merged, stores, menus, activeLocation);
     const topMatches = evaluated.matches.slice(0, 3);
 
     let botText = '';
@@ -613,7 +723,7 @@ export function AiChatOrderView({
     } else {
       const tagPart =
         merged.tags.length > 0 ? ` (${merged.tags.slice(0, 3).join('·')})` : '';
-      botText = `${tagPart ? `${tagPart.trim()} ` : ''}조건에 딱 맞는 대구 인기 메뉴 ${topMatches.length}곳을 찾았어요. 1순위 메뉴는 아래에서 바로 결제하실 수 있어요.`;
+      botText = `${tagPart ? `${tagPart.trim()} ` : ''}조건에 딱 맞는 내 주변 추천 메뉴 ${topMatches.length}곳을 찾았어요. 1순위 메뉴는 아래에서 바로 담거나 결제하실 수 있어요.`;
     }
 
     const autoStaged =
@@ -657,7 +767,7 @@ export function AiChatOrderView({
       needsConfirmation: false,
     };
     setActiveCondition(confirmed);
-    const evaluated = evaluateRecommendations(confirmed, stores, menus);
+    const evaluated = evaluateRecommendations(confirmed, stores, menus, activeLocation);
 
     setMessages((prev) => [
       ...prev,
@@ -706,7 +816,7 @@ export function AiChatOrderView({
             };
 
     setActiveCondition(relaxed);
-    const evaluated = evaluateRecommendations(relaxed, stores, menus);
+    const evaluated = evaluateRecommendations(relaxed, stores, menus, activeLocation);
     const label =
       mode === 'budget'
         ? '예산 10,000원 늘려서 다시 찾아주세요'
@@ -817,16 +927,43 @@ export function AiChatOrderView({
           </button>
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight truncate">
-              AI 컨디션 주문
+              AI 주문 · 통합 검색
             </h1>
             <p className="text-xs text-[#687064] truncate">
-              자연스럽게 말씀하시면 실시간으로 추천해 드립니다
+              {activeLocation?.areaName ?? '전국'} 기준 · 대화로 추천받거나 가게명을 직접 검색하세요
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {isSpeechSynthesisSupported() && (
+          <div className="inline-flex p-0.5 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode('chat')}
+              className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
+                viewMode === 'chat'
+                  ? 'bg-[#4E6E2A] text-white'
+                  : 'text-[#555E52] hover:text-[#1A1D1A]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI 대화</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('search')}
+              className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
+                viewMode === 'search'
+                  ? 'bg-[#4E6E2A] text-white'
+                  : 'text-[#555E52] hover:text-[#1A1D1A]'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>직접 검색</span>
+            </button>
+          </div>
+
+          {viewMode === 'chat' && isSpeechSynthesisSupported() && (
             <button
               type="button"
               onClick={handleToggleVoiceReply}
@@ -842,26 +979,155 @@ export function AiChatOrderView({
               ) : (
                 <VolumeX className="w-3.5 h-3.5" />
               )}
-              <span>{voiceReplyEnabled ? '음성 안내 ON' : '음성 안내'}</span>
+              <span className="hidden sm:inline">
+                {voiceReplyEnabled ? '음성 안내 ON' : '음성 안내'}
+              </span>
             </button>
           )}
           {aiReady && (
-            <span className="hidden sm:inline-flex min-h-[36px] px-3 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1.5">
+            <span className="hidden md:inline-flex min-h-[36px] px-3 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
               <span>alle 분석</span>
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => runChatQuery('초기화')}
-            className="min-h-[36px] px-3 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>새 대화</span>
-          </button>
+          {viewMode === 'chat' && (
+            <button
+              type="button"
+              onClick={() => runChatQuery('초기화')}
+              className="min-h-[36px] px-3 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">새 대화</span>
+            </button>
+          )}
         </div>
       </div>
 
+      {viewMode === 'search' ? (
+        <div className="flex-1 bg-[#F7F8F5] p-5 sm:p-6 space-y-4 overflow-y-auto">
+          <div className="relative flex items-center">
+            <Search className="w-4 h-4 text-[#4E6E2A] absolute left-4 pointer-events-none" />
+            <input
+              type="text"
+              value={directSearchText}
+              onChange={(e) => setDirectSearchText(e.target.value)}
+              placeholder="가게명, 메뉴명 또는 태그를 입력하세요 (예: 치킨, 광장시장, 국밥)"
+              className="w-full min-h-[48px] pl-10 pr-4 bg-white border border-[#D4E1C5] rounded-2xl text-sm text-[#1A1D1A] placeholder:text-[#687064]"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            {DIRECT_SEARCH_CATEGORIES.map((cat) => {
+              const active = directCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setDirectCategory(cat)}
+                  className={`min-h-[34px] px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                    active
+                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                      : 'bg-white border-[#E8ECE4] text-[#434B40]'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="text-xs font-semibold text-[#687064]">
+            검색 결과 {directSearchResults.length}건 ({activeLocation?.areaName ?? '전국'} 우선 정렬)
+          </div>
+
+          {directSearchResults.length === 0 ? (
+            <div className="bg-white border border-[#E8ECE4] rounded-2xl p-8 text-center text-sm text-[#687064]">
+              검색 조건에 맞는 메뉴가 없습니다. 검색어를 바꾸거나 AI 대화 주문을 이용해 보세요.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {directSearchResults.map((item) => {
+                const effectivePrice = getEffectiveMenuPrice(item.menu);
+                return (
+                  <article
+                    key={item.menu.id}
+                    className="bg-white border border-[#E8ECE4] rounded-2xl p-4 flex flex-col justify-between gap-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                        <FoodImage
+                          src={item.menu.image}
+                          alt={item.menu.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-1.5 text-[11px] text-[#687064]">
+                          {item.isNearbyArea && (
+                            <span className="px-1.5 py-0.5 rounded bg-[#EAF1E2] text-[#3D5720] font-bold">
+                              내 주변
+                            </span>
+                          )}
+                          <span className="truncate font-semibold text-[#4E6E2A]">
+                            {item.store.name}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold text-[#1A1D1A] truncate">
+                          {item.menu.name}
+                        </h3>
+                        <p className="text-xs font-mono font-bold text-[#1A1D1A] tabular-nums">
+                          {formatWon(effectivePrice)}{' '}
+                          <span className="font-sans font-normal text-[#687064]">
+                            · 배달비 {formatWon(item.deliveryFee)} · 약 {item.effectiveMinutes}분
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenRecommendationWithCondition(activeCondition, item.menu.id)
+                        }
+                        className="min-h-[36px] px-2 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
+                      >
+                        상세
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAddToCart
+                            ? onAddToCart(item.menu.id, 1, [])
+                            : handleStageMenuInChat(item.menu, 1)
+                        }
+                        className="min-h-[36px] px-2 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        담기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onProceedToConfirm({
+                            menuId: item.menu.id,
+                            servings: 1,
+                            selectedOptionIds: [],
+                            couponCode: 'NONE',
+                          })
+                        }
+                        className="min-h-[36px] px-2 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        주문
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Chat Stream */}
       <div className="flex-1 bg-[#F7F8F5] p-5 sm:p-7 space-y-6 overflow-y-auto">
         {messages.map((msg) => {
@@ -1095,7 +1361,13 @@ export function AiChatOrderView({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleStageMenuInChat(item, servings)}
+                            onClick={() => {
+                              if (onAddToCart) {
+                                onAddToCart(item.id, servings, []);
+                              } else {
+                                handleStageMenuInChat(item, servings);
+                              }
+                            }}
                             className="min-h-[38px] px-2.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
                           >
                             <ShoppingBag className="w-3.5 h-3.5" />
@@ -1212,19 +1484,24 @@ export function AiChatOrderView({
                     {(() => {
                       const qty = stagedServings[stagedMenu.id] ?? 1;
                       const optIds = stagedOptions[stagedMenu.id] ?? [];
-                      const optSum = stagedMenu.options
-                        .filter((o) => optIds.includes(o.id))
-                        .reduce((s, o) => s + o.priceDelta, 0);
+                      const optSum =
+                        stagedMenu.options
+                          .filter((o) => optIds.includes(o.id))
+                          .reduce((s, o) => s + o.priceDelta, 0) * qty;
+                      const effectiveUnit = getEffectiveMenuPrice(stagedMenu);
                       const estTotal =
-                        stagedMenu.pricePerPerson * qty +
-                        optSum +
-                        stagedStore.deliveryFee;
+                        effectiveUnit * qty + optSum + stagedStore.deliveryFee;
 
                       return (
                         <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="text-xs text-[#687064]">
                               배달비 포함 최종 예상 금액
+                              {(stagedMenu.closingDiscountPercent ?? 0) > 0 && (
+                                <strong className="ml-1 text-amber-800">
+                                  (마감 -{stagedMenu.closingDiscountPercent}%)
+                                </strong>
+                              )}
                             </span>
                             <span className="text-lg font-bold font-mono tabular-nums text-[#4E6E2A]">
                               {formatWon(estTotal)}
@@ -1234,14 +1511,16 @@ export function AiChatOrderView({
                             <button
                               type="button"
                               onClick={() =>
-                                onOpenRecommendationWithCondition(
-                                  activeCondition,
-                                  stagedMenu.id
-                                )
+                                onAddToCart
+                                  ? onAddToCart(stagedMenu.id, qty, optIds)
+                                  : onOpenRecommendationWithCondition(
+                                      activeCondition,
+                                      stagedMenu.id
+                                    )
                               }
                               className="min-h-[42px] px-3 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl cursor-pointer transition-colors"
                             >
-                              다른 메뉴 보기
+                              {onAddToCart ? '장바구니 담기' : '다른 메뉴 보기'}
                             </button>
                             <button
                               type="button"
@@ -1473,6 +1752,8 @@ export function AiChatOrderView({
           </button>
         </motion.form>
       </div>
+        </>
+      )}
     </div>
   );
 }

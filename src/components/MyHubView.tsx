@@ -1,22 +1,34 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CalendarClock,
   Check,
   ChevronDown,
+  ChevronUp,
+  Eye,
+  KeyRound,
   MapPin,
+  Presentation,
   QrCode,
   Share2,
   ShieldCheck,
   Sparkles,
   Ticket,
+  TrendingDown,
   UserCheck,
   Wallet,
   X,
   Zap,
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
-import { DemoRole, SavedLocation, UserPreferences } from '../types/alle';
+import {
+  DemoRole,
+  MenuItem,
+  Order,
+  SavedLocation,
+  UserPreferences,
+} from '../types/alle';
 import { formatWon } from '../utils/parser';
+import { calculateMonthlySavings } from '../utils/pricing';
 
 interface MyHubViewProps {
   role: DemoRole;
@@ -25,6 +37,10 @@ interface MyHubViewProps {
   preferences: UserPreferences;
   wishlistCount: number;
   orderCount: number;
+  orders?: Order[];
+  menus?: MenuItem[];
+  easyMode?: boolean;
+  showPresenterMode?: boolean;
   regularMenuId?: string;
   regularMenuName?: string;
   regularStoreName?: string;
@@ -33,6 +49,9 @@ interface MyHubViewProps {
   onTopupWalletConfirmed: (amount: number) => void;
   onEarnStamp: () => void;
   onChangeRole: (nextRole: DemoRole) => void;
+  onToggleEasyMode?: () => void;
+  onTogglePresenterMode?: () => void;
+  onOpenAiSettings?: () => void;
   onShareDemoSummary: () => void;
   onGoToHomePrefs: () => void;
   onQuickReorderToConfirm?: (menuId: string, servings: number) => void;
@@ -47,14 +66,21 @@ export function MyHubView({
   preferences,
   wishlistCount,
   orderCount,
+  orders = [],
+  menus = [],
+  easyMode = false,
+  showPresenterMode = false,
   regularMenuId = 'm1',
   regularMenuName = '얼큰 소고기국밥',
-  regularStoreName = '수성 범어 소고기국밥',
+  regularStoreName = '역삼 진국 소고기국밥',
   regularServings = 2,
   activeLocation,
   onTopupWalletConfirmed,
   onEarnStamp,
   onChangeRole,
+  onToggleEasyMode,
+  onTogglePresenterMode,
+  onOpenAiSettings,
   onShareDemoSummary,
   onGoToHomePrefs,
   onQuickReorderToConfirm,
@@ -66,12 +92,19 @@ export function MyHubView({
   );
   const [fridayRoutineEnabled, setFridayRoutineEnabled] =
     useState<boolean>(true);
+  const [showOperatorSettings, setShowOperatorSettings] =
+    useState<boolean>(false);
+
+  const savingsSummary = useMemo(
+    () => calculateMonthlySavings(orders, menus),
+    [orders, menus]
+  );
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1D1A]">MY 올이</h1>
+          <h1 className="text-2xl font-bold text-[#1A1D1A]">MY alle</h1>
         </div>
         <button
           type="button"
@@ -82,13 +115,88 @@ export function MyHubView({
           <span>
             {activeLocation
               ? `${activeLocation.label} · ${activeLocation.areaName}`
-              : '고객 A · 대구 수성구 범어동'}
+              : '고객 A · 서울 강남구 역삼동'}
           </span>
           <ChevronDown className="w-3.5 h-3.5 shrink-0" />
         </button>
       </div>
 
-      {/* Encrypted Alias Profile & Mock Wallet */}
+      {/* Monthly Food Expense Savings Report Card */}
+      <section
+        aria-label="이번 달 alle로 아낀 외식비"
+        className="bg-[#EAF1E2] border border-[#82B440]/50 rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(78,110,42,0.06)]"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3D5720]">
+              <TrendingDown className="w-4 h-4 text-[#4E6E2A]" />
+              <span>이번 달 alle로 아낀 외식비</span>
+            </div>
+            <div className="os-kpi text-3xl sm:text-4xl font-extrabold text-[#4E6E2A]">
+              +{formatWon(savingsSummary.totalSaved)} 절약
+            </div>
+            <p className="text-xs text-[#3D5720]">
+              유효 주문 {savingsSummary.validOrderCount}건 · 타 배달앱 이중가격·수수료 부담 없이 매장가 그대로 이용 중
+            </p>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-white border border-[#D4E1C5] text-xs font-bold text-[#4E6E2A] shrink-0">
+            수수료 0% 혜택
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="p-3 bg-white/90 border border-[#D4E1C5] rounded-2xl">
+            <div className="text-[11px] font-semibold text-[#687064]">
+              매장 동일가로 아낀 차액
+            </div>
+            <div className="text-base font-bold font-mono tabular-nums text-[#1A1D1A] mt-0.5">
+              +{formatWon(savingsSummary.dualPriceAvoidedTotal)}
+            </div>
+          </div>
+          <div className="p-3 bg-white/90 border border-[#D4E1C5] rounded-2xl">
+            <div className="text-[11px] font-semibold text-[#687064]">
+              쿠폰 · 특가 · 묶음 절감
+            </div>
+            <div className="text-base font-bold font-mono tabular-nums text-[#4E6E2A] mt-0.5">
+              +{formatWon(savingsSummary.discountAndDeliverySavedTotal)}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Easy Mode Toggle Card */}
+      {onToggleEasyMode && (
+        <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 flex items-center justify-between gap-3 shadow-[0_2px_10px_rgba(26,29,26,0.03)]">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#EAF1E2] text-[#4E6E2A] flex items-center justify-center shrink-0">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-[#1A1D1A]">
+                큰 글씨 · 쉬운 모드
+              </h2>
+              <p className="text-xs text-[#687064] mt-0.5">
+                버튼과 글씨를 키우고, 홈에서 말로 바로 시키는 단순한 화면으로 전환합니다.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={easyMode}
+            onClick={onToggleEasyMode}
+            className={`min-h-[38px] px-4 py-1.5 rounded-xl text-xs font-bold border transition-colors shrink-0 cursor-pointer ${
+              easyMode
+                ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40]'
+            }`}
+          >
+            {easyMode ? '켜짐 ON' : '꺼짐'}
+          </button>
+        </section>
+      )}
+
+      {/* Encrypted Alias Profile & allePay Wallet */}
       <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -97,7 +205,7 @@ export function MyHubView({
               <span>안심 가명 프로필</span>
             </div>
             <div className="text-lg font-bold text-[#1A1D1A] mt-1">
-              고객 A · {activeLocation?.detailAddress ?? '수령지 A'}
+              고객 A · {activeLocation?.detailAddress ?? '역삼동 수령지 A'}
             </div>
             <p className="text-xs text-[#687064] mt-0.5 tabular-nums">
               주문 {orderCount}건 · 찜 {wishlistCount}개 · 스탬프{' '}
@@ -108,7 +216,7 @@ export function MyHubView({
           <div className="text-left sm:text-right">
             <div className="text-xs font-semibold text-[#687064] flex items-center sm:justify-end gap-1">
               <Wallet className="w-3.5 h-3.5 text-[#4E6E2A]" />
-              <span>올이페이 잔액</span>
+              <span>alle페이 잔액</span>
             </div>
             <div className="text-2xl font-bold text-[#4E6E2A] font-mono tabular-nums mt-0.5">
               {formatWon(walletBalance)}
@@ -135,7 +243,7 @@ export function MyHubView({
         </div>
       </section>
 
-      {/* 나의 Zero-Click 단골 루틴 (Retention Without Subsidy Coupons) */}
+      {/* Zero-Click Routine */}
       <section
         aria-label="나의 Zero-Click 단골 루틴"
         className="bg-white border border-[#D4E1C5] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]"
@@ -147,16 +255,12 @@ export function MyHubView({
               <span>나의 Zero-Click 단골 루틴</span>
             </h2>
             <p className="text-xs text-[#687064] mt-0.5">
-              할인 쿠폰 없이도 생활 패턴 기반 자동 제안으로 3초 재주문을 유지합니다
+              생활 패턴 맞춤 자동 제안으로 3초 만에 자주 먹던 메뉴를 시킵니다
             </p>
           </div>
-          <span className="text-xs font-bold text-[#4E6E2A] tabular-nums">
-            쿠폰 무의존 리텐션
-          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Card 1: 매주 금요일 퇴근길 자동 제안 */}
           <div className="p-4 bg-[#F7F8F5] border border-[#D4E1C5] rounded-2xl flex flex-col justify-between gap-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -204,7 +308,6 @@ export function MyHubView({
             </button>
           </div>
 
-          {/* Card 2: 원탭 3초 재주문 */}
           <div className="p-4 bg-[#EAF1E2] text-[#1A1D1A] border border-[#D4E1C5] rounded-2xl flex flex-col justify-between gap-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2 text-xs">
@@ -246,42 +349,6 @@ export function MyHubView({
         </div>
       </section>
 
-      {/* Role Switcher */}
-      <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 sm:p-6 space-y-3.5 shadow-[0_2px_12px_rgba(26,29,26,0.03)]">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-1.5">
-            <UserCheck className="w-4 h-4 text-[#4E6E2A]" />
-            <span>화면 전환</span>
-          </h2>
-          <span className="text-xs text-[#687064]">
-            상단에서도 전환 가능
-          </span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#F0F3EC] border border-[#E8ECE4] rounded-2xl">
-          {(
-            [
-              { id: DemoRole.CONSUMER, label: '고객' },
-              { id: DemoRole.OWNER, label: '점주 · 관리자' },
-              { id: DemoRole.PARTNER, label: '배달 파트너' },
-            ] as const
-          ).map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => onChangeRole(r.id)}
-              className={`min-h-[42px] px-2 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
-                role === r.id
-                  ? 'bg-[#4E6E2A] text-white shadow-2xs'
-                  : 'text-[#555E52] hover:text-[#1A1D1A]'
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
       {/* O2O Stamps & Coupons */}
       <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -291,7 +358,7 @@ export function MyHubView({
               <span>단골 스탬프 & 쿠폰함</span>
             </h2>
             <p className="text-xs text-[#687064] mt-0.5">
-              주문 시 자동 적용 한도 내에서 할인받을 수 있습니다.
+              결제 시 가장 큰 할인 쿠폰이 자동으로 적용됩니다.
             </p>
           </div>
           <button
@@ -303,7 +370,6 @@ export function MyHubView({
           </button>
         </div>
 
-        {/* Stamp Progress Bar (#EAF1E2 track + #82B440 fill) */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs tabular-nums">
             <span className="font-semibold text-[#3D5720]">
@@ -316,7 +382,9 @@ export function MyHubView({
           <div className="h-2 w-full bg-[#EAF1E2] rounded-full overflow-hidden">
             <div
               className="h-full bg-[#82B440] rounded-full transition-all duration-300"
-              style={{ width: `${Math.min(100, Math.round((stampCount / 5) * 100))}%` }}
+              style={{
+                width: `${Math.min(100, Math.round((stampCount / 5) * 100))}%`,
+              }}
             />
           </div>
         </div>
@@ -376,7 +444,85 @@ export function MyHubView({
         </button>
       </section>
 
-      {/* Final Confirmation Modal for Mock Wallet Top-Up */}
+      {/* Collapsible Operator / Demo Settings (Separated from Consumer Flow) */}
+      <section className="bg-white border border-[#E8ECE4] rounded-3xl overflow-hidden shadow-[0_2px_10px_rgba(26,29,26,0.02)]">
+        <button
+          type="button"
+          onClick={() => setShowOperatorSettings((prev) => !prev)}
+          aria-expanded={showOperatorSettings}
+          className="w-full min-h-[54px] px-5 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-[#F7F8F5] transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#434B40]">
+            <UserCheck className="w-4 h-4 text-[#4E6E2A]" />
+            <span>운영자 · 시연 설정 (점주 / 파트너 / 데모)</span>
+          </div>
+          {showOperatorSettings ? (
+            <ChevronUp className="w-4 h-4 text-[#687064]" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-[#687064]" />
+          )}
+        </button>
+
+        {showOperatorSettings && (
+          <div className="px-5 pb-5 pt-3 border-t border-[#E8ECE4] space-y-4">
+            <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#F0F3EC] border border-[#E8ECE4] rounded-2xl">
+              {(
+                [
+                  { id: DemoRole.CONSUMER, label: '고객' },
+                  { id: DemoRole.OWNER, label: '점주 · 관리자' },
+                  { id: DemoRole.PARTNER, label: '배달 파트너' },
+                ] as const
+              ).map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => onChangeRole(r.id)}
+                  className={`min-h-[42px] px-2 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
+                    role === r.id
+                      ? 'bg-[#4E6E2A] text-white shadow-2xs'
+                      : 'text-[#555E52] hover:text-[#1A1D1A]'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {onTogglePresenterMode && (
+                <button
+                  type="button"
+                  onClick={onTogglePresenterMode}
+                  className={`min-h-[42px] px-4 py-2 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 cursor-pointer ${
+                    showPresenterMode
+                      ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                      : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40]'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Presentation className="w-4 h-4 text-[#4E6E2A]" />
+                    <span>발표자 Demo Mode 헤더 표시</span>
+                  </span>
+                  <span>{showPresenterMode ? 'ON' : 'OFF'}</span>
+                </button>
+              )}
+
+              {onOpenAiSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenAiSettings}
+                  className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] text-xs font-bold text-[#1A1D1A] flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <KeyRound className="w-4 h-4 text-[#4E6E2A]" />
+                  <span>AI 연동 설정 (Gemini Key)</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Final Confirmation Modal for allePay Top-Up */}
       {confirmTopupAmount !== null && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-2xs p-0 sm:p-4"
@@ -394,7 +540,7 @@ export function MyHubView({
                   id="topup-confirm-title"
                   className="text-lg font-bold text-[#1A1D1A] mt-1"
                 >
-                  올이페이 {formatWon(confirmTopupAmount)} 충전
+                  alle페이 {formatWon(confirmTopupAmount)} 충전
                 </h2>
               </div>
               <button

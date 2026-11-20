@@ -3,8 +3,10 @@ import {
   MenuItem,
   ParsedCondition,
   RecommendationMatch,
+  SavedLocation,
   Store,
 } from '../types/alle';
+import { estimateCompetitorSavings } from './pricing';
 
 interface TagSynonymEntry {
   /** Substring or exact patterns (length >= 2) */
@@ -291,7 +293,49 @@ const MEDIUM_TAGS = new Set([
   '양식',
 ]);
 
+export const DISH_CATEGORY_TAGS = new Set([
+  ...SPECIFIC_TAGS,
+  '중식',
+  '일식',
+  '양식',
+  '분식',
+  '야식',
+  '카페',
+  '디저트',
+  '한식',
+  '편의점',
+]);
+
+export const TRAIT_TAGS = new Set([
+  '얼큰한',
+  '담백한',
+  '순한맛',
+  '바삭한',
+  '국물',
+  '달달한',
+  '다이어트',
+  '해장',
+  '고기',
+  '해물',
+  '덮밥',
+  '면',
+  '찌개',
+]);
+
 const STOPWORDS = new Set([
+  '빼고',
+  '말고',
+  '제외',
+  '제외하고',
+  '없이',
+  '안',
+  '싫어',
+  '걸로',
+  '것으로',
+  '거로',
+  '거',
+  '건',
+  '것',
   '성인',
   '어른',
   '총액',
@@ -457,8 +501,9 @@ export function parseConditionInput(rawInput: string): ParsedCondition {
     working = working.replace(/비\s*오(?:는|는데|네|니까|면)?|비오는/g, ' ');
   }
 
-  // 5. Tokenize & match synonym dictionary
+  // 4-1. Negation / exclusion parsing BEFORE positive tag matching
   const matchedTags: string[] = [];
+  const excludeTags: string[] = [];
   const addTags = (tags: string[]) => {
     for (const tag of tags) {
       if (!matchedTags.includes(tag)) {
@@ -466,7 +511,44 @@ export function parseConditionInput(rawInput: string): ParsedCondition {
       }
     }
   };
+  const addExcludeTag = (tag: string) => {
+    if (!excludeTags.includes(tag)) {
+      excludeTags.push(tag);
+    }
+  };
 
+  const nonSpicyPattern =
+    /(안\s*매운\s*(?:거|건|것|게)?|안\s*맵게|맵지\s*않\S*|매운\s*(?:거|건|것|게|음식|메뉴)?\s*(?:빼고|말고|제외하고|제외|싫\S*))/g;
+  if (nonSpicyPattern.test(working)) {
+    addExcludeTag('얼큰한');
+    addTags(['순한맛']);
+    working = working.replace(nonSpicyPattern, ' ');
+  }
+
+  const genericExcludePattern =
+    /([가-힣]{1,8})\s*(?:빼고|말고|제외하고|제외|없이|싫어|싫고|싫음)/g;
+  working = working.replace(genericExcludePattern, (fullMatch, capturedWord: string) => {
+    const cleanWord = capturedWord.trim();
+    const stem = stripKoreanParticle(cleanWord);
+    let matchedExclude = false;
+    for (const entry of TAG_SYNONYMS) {
+      const exactHit =
+        entry.exactPatterns?.some((p) => cleanWord === p || stem === p) ?? false;
+      const patternHit = entry.patterns.some(
+        (p) =>
+          cleanWord === p ||
+          stem === p ||
+          (p.length >= 2 && (cleanWord.includes(p) || stem.includes(p)))
+      );
+      if (exactHit || patternHit) {
+        addExcludeTag(entry.tags[0]);
+        matchedExclude = true;
+      }
+    }
+    return matchedExclude ? ' ' : fullMatch;
+  });
+
+  // 5. Tokenize & match synonym dictionary
   const cleanedWorking = working.replace(/[.,!?~"'()[\]]+/g, ' ');
   const rawTokens = cleanedWorking
     .split(/[\s,/·+&]+/)
@@ -503,18 +585,23 @@ export function parseConditionInput(rawInput: string): ParsedCondition {
     }
   }
 
+  // Filter out tags that were explicitly excluded
+  const finalTags = matchedTags.filter((t) => !excludeTags.includes(t));
+
   // If user only mentioned rainy weather with no specific dish, default to 전 + 국물
-  if (hasRainyContext && matchedTags.length === 0) {
-    addTags(['전', '국물']);
+  if (hasRainyContext && finalTags.length === 0) {
+    finalTags.push('전', '국물');
   }
 
-  // Only ask for confirmation if we couldn't recognize ANY known food/taste tag
-  const needsConfirmation = matchedTags.length === 0 && unknownTokens.length > 0;
+  // Only ask for confirmation if we couldn't recognize ANY known food/taste tag or exclusion
+  const needsConfirmation =
+    finalTags.length === 0 && excludeTags.length === 0 && unknownTokens.length > 0;
 
   return {
     rawInput: normalized,
     servings,
-    tags: matchedTags,
+    tags: finalTags,
+    excludeTags,
     maxBudget,
     maxMinutes,
     unknownTokens: needsConfirmation ? unknownTokens : [],
@@ -528,10 +615,51 @@ function getTagWeight(tag: string): number {
   return 2;
 }
 
+const CITY_TOKENS = ['서울', '경기', '인천', '부산', '대구', '대전', '광주'];
+
+function resolveLocationMatch(
+  store: Store,
+  activeLocation?: SavedLocation
+): { isNearbyArea: boolean; locationBoost: number } {
+  if (!activeLocation) {
+    return { isNearbyArea: true, locationBoost: 0 };
+  }
+  const area = activeLocation.areaName.trim();
+  const city = CITY_TOKENS.find((c) => area.includes(c));
+  const subTokens = area
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && t !== city);
+
+  const areaLower = store.areaLabel.toLowerCase();
+  const storeNameLower = store.name.toLowerCase();
+
+  const districtHit = subTokens.some((tok) => {
+    const tokLower = tok.toLowerCase();
+    const stem = tokLower.replace(/(구|동|시|군|읍|면)$/, '');
+    return (
+      areaLower.includes(tokLower) ||
+      storeNameLower.includes(tokLower) ||
+      (stem.length >= 2 && (areaLower.includes(stem) || storeNameLower.includes(stem)))
+    );
+  });
+
+  if (districtHit) {
+    return { isNearbyArea: true, locationBoost: 14 };
+  }
+
+  if (city && (store.region === city || store.areaLabel.includes(city))) {
+    return { isNearbyArea: true, locationBoost: 7 };
+  }
+
+  return { isNearbyArea: false, locationBoost: 0 };
+}
+
 export function evaluateRecommendations(
   condition: ParsedCondition,
   stores: Store[],
-  menus: MenuItem[]
+  menus: MenuItem[],
+  activeLocation?: SavedLocation
 ): {
   matches: RecommendationMatch[];
   excluded: ExcludedCandidate[];
@@ -542,13 +670,19 @@ export function evaluateRecommendations(
 
   const validServings = Math.max(1, Math.floor(condition.servings || 1));
   const rawLower = condition.rawInput.toLowerCase();
+  const excludeTags = condition.excludeTags ?? [];
 
   for (const menu of menus) {
     const store = storeMap.get(menu.storeId);
     if (!store) continue;
 
     const reasons: string[] = [];
-    const effectiveMinutes = menu.estimatedMinutes + (store.extraPrepMinutes ?? 0);
+    const { isNearbyArea, locationBoost } = resolveLocationMatch(
+      store,
+      activeLocation
+    );
+    const effectiveMinutes =
+      menu.estimatedMinutes + (store.extraPrepMinutes ?? 0) + (isNearbyArea ? 0 : 4);
 
     if (!store.isOpen) {
       reasons.push('영업 중단 상태');
@@ -575,6 +709,14 @@ export function evaluateRecommendations(
 
     const searchableMenuName = menu.name.toLowerCase();
     const searchableTagSet = new Set(menu.tags);
+
+    for (const exTag of excludeTags) {
+      const hitSpicy =
+        exTag === '얼큰한' && /(얼큰|매운|불족발|마라|매콤|칼칼)/.test(menu.name);
+      if (searchableTagSet.has(exTag) || menu.name.includes(exTag) || hitSpicy) {
+        reasons.push(`제외 조건(${exTag}) 포함`);
+      }
+    }
 
     const matchedTags = condition.tags.filter((tag) => {
       if (searchableTagSet.has(tag)) return true;
@@ -609,20 +751,34 @@ export function evaluateRecommendations(
       menu.comparisonDate !== null &&
       menu.storePrice === menu.pricePerPerson;
 
+    const savings = estimateCompetitorSavings({
+      menuSubtotal,
+      originalMenuSubtotal: menu.pricePerPerson * validServings,
+      deliveryFee: store.deliveryFee,
+      originalDeliveryFee: store.deliveryFee,
+      couponDiscount: 0,
+      isSameStorePrice,
+    });
+
     const aiReason =
       menu.aiReason ||
       `${store.areaLabel.split(' · ')[0]} 실시간 조리 가능 + 약 ${effectiveMinutes}분 빠른 도착${
         isSameStorePrice ? ' + 매장 동일가 검증' : ''
       }`;
 
-    // Weighted relevance score: specific dish tags + exact menu/store mentions + store quality
+    // Weighted relevance score: specific dish tags + exact menu/store mentions + location + store quality
     let score = matchedTags.reduce((sum, tag) => sum + getTagWeight(tag), 0);
+    score += locationBoost;
 
     // Bonus when menu name words appear directly in raw input (e.g., "마라탕", "케이크", "족발", "떡볶이")
     for (const token of menu.name.split(/[\s·&/()]+/)) {
       if (token.length >= 2 && rawLower.includes(token.toLowerCase())) {
         score += 6;
       }
+    }
+
+    if (rawLower.length >= 2 && store.name.toLowerCase().includes(rawLower)) {
+      score += 10;
     }
 
     // Small boost for higher rating & faster delivery
@@ -641,6 +797,8 @@ export function evaluateRecommendations(
         effectiveMinutes,
         matchedTags,
         isSameStorePrice,
+        isNearbyArea,
+        estimatedSavingsVsCompetitor: savings.totalSaved,
         aiReason,
       },
     });

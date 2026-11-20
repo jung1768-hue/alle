@@ -77,7 +77,8 @@ export function SuperAppHubView({
   onCreateErrand,
   onAdvanceErrand,
 }: SuperAppHubViewProps) {
-  const activeOrigin = activeLocation?.detailAddress ?? '범어동 수령지 A';
+  const activeOrigin =
+    activeLocation?.detailAddress ?? '강남구 역삼동 수령지 A';
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
 
@@ -233,7 +234,7 @@ export function SuperAppHubView({
   };
 
   const b2bSubtotal = selectedB2bMenu
-    ? selectedB2bMenu.pricePerPerson * Math.max(1, b2bServings)
+    ? getEffectiveMenuPrice(selectedB2bMenu) * Math.max(1, b2bServings)
     : 0;
   const b2bDeliveryFee = selectedB2bStore?.deliveryFee ?? 0;
   const b2bTotal = b2bSubtotal + b2bDeliveryFee;
@@ -388,10 +389,10 @@ export function SuperAppHubView({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-[#1A1D1A]">
-                  전통시장 · 골목 가게 한 바구니 묶음
+                  전국 전통시장 · 골목 가게 한 바구니 묶음
                 </h3>
                 <p className="text-xs text-[#687064] mt-0.5">
-                  여러 동네 점포 메뉴를 최소주문금액 없이 한 번에 담고 배달비 1회(1,500원)로 받아보세요.
+                  광장시장·부평깡통시장·서문시장 등 동네 점포 메뉴를 최소주문금액 없이 한 번에 담고 배달비 1회(1,500원)로 받아보세요.
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
@@ -754,7 +755,7 @@ export function SuperAppHubView({
                   </div>
                   <div className="flex justify-between text-[#687064]">
                     <dt>
-                      메뉴 ({formatWon(selectedB2bMenu.pricePerPerson)} ×{' '}
+                      메뉴 ({formatWon(getEffectiveMenuPrice(selectedB2bMenu))} ×{' '}
                       {b2bServings})
                     </dt>
                     <dd className="font-mono tabular-nums text-[#1A1D1A]">
