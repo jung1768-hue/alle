@@ -993,28 +993,6 @@ export function AiChatOrderView({
   }, [recommendedSpotlight]);
 
   useEffect(() => {
-    if (viewMode !== 'chat' || messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    if (
-      last.sender === 'bot' &&
-      last.id !== 'welcome' &&
-      !last.checkoutDraftSnapshot &&
-      last.matchedMenuIds &&
-      last.matchedMenuIds.length > 0 &&
-      last.id !== lastSpotlightMsgIdRef.current
-    ) {
-      lastSpotlightMsgIdRef.current = last.id;
-      setRecommendedSpotlight({
-        msgId: last.id,
-        menuIds: last.matchedMenuIds,
-        activeIndex: 0,
-        explanation: last.spokenText ?? last.text,
-        servings: last.servings ?? activeCondition.servings ?? 1,
-      });
-    }
-  }, [messages, viewMode, activeCondition.servings]);
-
-  useEffect(() => {
     if (!voiceReplyEnabled || viewMode !== 'chat' || messages.length === 0) {
       return;
     }
@@ -2096,13 +2074,15 @@ export function AiChatOrderView({
             ...prev,
             [nextMenu.id]: Math.min(servings, Math.max(1, nextMenu.stock)),
           }));
-          setRecommendedSpotlight({
-            msgId: `b-next-${Date.now() + 1}`,
-            menuIds: latestMatchedIds,
-            activeIndex: nextIdx,
-            explanation: replyText,
-            servings,
-          });
+          if (recommendedSpotlight) {
+            setRecommendedSpotlight({
+              msgId: `b-next-${Date.now() + 1}`,
+              menuIds: latestMatchedIds,
+              activeIndex: nextIdx,
+              explanation: replyText,
+              servings,
+            });
+          }
           setMessages((prev) => [
             ...prev,
             {
@@ -3479,10 +3459,13 @@ export function AiChatOrderView({
                           <button
                             type="button"
                             onClick={() =>
-                              onOpenRecommendationWithCondition(
-                                msg.parsed ?? activeCondition,
-                                item.id
-                              )
+                              switchSpotlightIndex(idx, {
+                                msgId: msg.id,
+                                menuIds: matchedMenus.map((m) => m.id),
+                                activeIndex: idx,
+                                explanation: msg.spokenText ?? msg.text,
+                                servings,
+                              })
                             }
                             className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#F0F3EC] text-[#687064] text-xs font-semibold rounded-xl cursor-pointer transition-colors"
                           >
