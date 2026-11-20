@@ -744,7 +744,7 @@ export function AiChatOrderView({
       setShowVoiceTips(true);
       return;
     }
-    if (isListeningRef.current) {
+    if (isSpeakingRef.current || isListeningRef.current) {
       return;
     }
 
@@ -866,6 +866,7 @@ export function AiChatOrderView({
           !fatalOrLoopErr &&
           elapsed >= 1500 &&
           consecutiveEmptyListenRef.current <= 1 &&
+          !isSpeakingRef.current &&
           shouldContinueListeningRef.current &&
           voiceReplyEnabledRef.current &&
           viewModeRef.current === 'chat' &&
@@ -889,10 +890,16 @@ export function AiChatOrderView({
     clearRestartListenTimer();
     if (!voiceReplyEnabledRef.current || viewModeRef.current !== 'chat') return;
     currentSpokenTextRef.current = spokenMessage;
-    shouldContinueListeningRef.current = allowAutoListen;
+    shouldContinueListeningRef.current = false;
     consecutiveEmptyListenRef.current = 0;
     isNearSpeechEndRef.current = false;
     pendingVoiceQueryRef.current = null;
+
+    // Turn OFF mic while AI speaks; auto-turns ON when AI finishes (or via "말 끊고 내가 말하기")
+    stopVoiceRef.current?.();
+    setIsListening(false);
+    isListeningRef.current = false;
+    setInterimTranscript('');
 
     speakKoreanText(spokenMessage, {
       onStart: () => {
@@ -900,20 +907,6 @@ export function AiChatOrderView({
         isSpeakingRef.current = true;
         isNearSpeechEndRef.current = false;
         setVoiceAutoplayBlocked(false);
-        // Keep mic active while bot is speaking; echo filter blocks self-voice
-        if (
-          allowAutoListen &&
-          voiceReplyEnabledRef.current &&
-          viewModeRef.current === 'chat' &&
-          !voiceCheckoutCompletedRef.current &&
-          !voiceDeniedRef.current &&
-          !isListeningRef.current &&
-          getSpeechRecognitionConstructor()
-        ) {
-          autoListenTimerRef.current = window.setTimeout(() => {
-            startListeningRef.current();
-          }, 200);
-        }
       },
       onNearEnd: () => {
         isNearSpeechEndRef.current = true;
@@ -923,6 +916,7 @@ export function AiChatOrderView({
         isSpeakingRef.current = false;
         isNearSpeechEndRef.current = false;
         lastBotSpeechEndedAtRef.current = Date.now();
+        shouldContinueListeningRef.current = allowAutoListen;
         const queuedCommand = pendingVoiceQueryRef.current;
         pendingVoiceQueryRef.current = null;
         if (queuedCommand) {
@@ -940,7 +934,7 @@ export function AiChatOrderView({
         ) {
           autoListenTimerRef.current = window.setTimeout(() => {
             startListeningRef.current();
-          }, 350);
+          }, 300);
         }
       },
       onError: () => {
@@ -3230,7 +3224,7 @@ export function AiChatOrderView({
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
             <span className="inline-flex items-center gap-2">
               <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>올이가 말씀드리고 있어요 · 지금 바로 말씀하셔도 듣고 있어요</span>
+              <span>올이가 말씀드리고 있어요 · 다 말하면 마이크가 켜져요</span>
             </span>
             <button
               type="button"
@@ -3748,15 +3742,24 @@ export function AiChatOrderView({
                   <div className="p-4 bg-[#FAFCF8] border-t border-[#E8ECE4] space-y-2.5 shrink-0">
                     <button
                       type="button"
-                      onClick={handleMicToggle}
+                      onClick={isSpeaking ? handleInterruptToListen : handleMicToggle}
                       className={`w-full px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-between gap-2 cursor-pointer transition-colors border ${
-                        isListening
-                          ? 'bg-red-50 border-red-200 text-red-700'
-                          : 'bg-[#F0F3EC] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
+                        isSpeaking
+                          ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
+                          : isListening
+                            ? 'bg-red-50 border-red-200 text-red-700'
+                            : 'bg-[#F0F3EC] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
                       }`}
                     >
                       <span className="inline-flex items-center gap-1.5 truncate">
-                        {isListening ? (
+                        {isSpeaking ? (
+                          <>
+                            <Volume2 className="w-3.5 h-3.5 animate-pulse shrink-0" />
+                            <span className="truncate">
+                              올이 설명 중 (마이크 꺼짐) · 다 말하면 자동 켜짐
+                            </span>
+                          </>
+                        ) : isListening ? (
                           <>
                             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                             <Mic className="w-3.5 h-3.5 shrink-0" />
@@ -3774,7 +3777,11 @@ export function AiChatOrderView({
                         )}
                       </span>
                       <span className="shrink-0 text-[10px] underline">
-                        {isListening ? '끄기' : '켜기'}
+                        {isSpeaking
+                          ? '말 끊고 말하기'
+                          : isListening
+                            ? '끄기'
+                            : '켜기'}
                       </span>
                     </button>
                     <div className="grid grid-cols-2 gap-2.5">
