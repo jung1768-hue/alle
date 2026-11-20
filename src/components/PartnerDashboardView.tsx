@@ -1,20 +1,24 @@
 import { useMemo, useState } from 'react';
 import {
   Bike,
+  Camera,
   CheckCircle2,
   Footprints,
   Lock,
   MapPin,
   ShieldCheck,
   Truck,
+  X,
 } from 'lucide-react';
 import {
   DispatchMode,
   ErrandRequest,
   ErrandStatus,
+  EvidencePhoto,
   Order,
   OrderStatus,
 } from '../types/alle';
+import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
@@ -31,6 +35,7 @@ interface PartnerDashboardViewProps {
     nextStatus: ErrandStatus,
     actualReceiptCost?: number
   ) => void;
+  onAttachRiderPhotos?: (orderId: string, photos: EvidencePhoto[]) => void;
   onSwitchToConsumer: () => void;
   onSwitchToOwner: () => void;
 }
@@ -40,6 +45,7 @@ export function PartnerDashboardView({
   errands,
   onAdvanceOrderStatus,
   onAdvanceErrand,
+  onAttachRiderPhotos,
   onSwitchToConsumer,
   onSwitchToOwner,
 }: PartnerDashboardViewProps) {
@@ -291,6 +297,69 @@ export function PartnerDashboardView({
                       <CheckCircle2 className="w-4 h-4 text-[#82B440]" />
                       <span>수령지 20m 도달 · 배달 완료 처리</span>
                     </button>
+                  )}
+
+                  {onAttachRiderPhotos && (
+                    <div className="p-2.5 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-[#3D5720]">
+                          라이더 픽업 · 문 앞 배송 사진 ({(order.riderDeliveryPhotos ?? []).length}/3)
+                        </span>
+                        <label className="min-h-[30px] px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] font-bold inline-flex items-center gap-1 cursor-pointer">
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>배송 사진 올리기</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            disabled={(order.riderDeliveryPhotos ?? []).length >= 3}
+                            onChange={async (e) => {
+                              const existing = order.riderDeliveryPhotos ?? [];
+                              const added = await readCompressedEvidencePhotos(
+                                e,
+                                existing.length,
+                                3
+                              );
+                              if (added.length > 0) {
+                                onAttachRiderPhotos(
+                                  order.id,
+                                  [...existing, ...added].slice(0, 3)
+                                );
+                              }
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      {(order.riderDeliveryPhotos ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {(order.riderDeliveryPhotos ?? []).map((photo, idx) => (
+                            <div key={`${photo.name}-${idx}`} className="relative">
+                              <img
+                                src={photo.dataUrl}
+                                alt={photo.name}
+                                className="w-14 h-14 rounded-lg object-cover border border-[#D4E1C5]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onAttachRiderPhotos(
+                                    order.id,
+                                    (order.riderDeliveryPhotos ?? []).filter(
+                                      (_, i) => i !== idx
+                                    )
+                                  )
+                                }
+                                aria-label="배송 사진 삭제"
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#1A1D1A] text-white flex items-center justify-center cursor-pointer"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </article>

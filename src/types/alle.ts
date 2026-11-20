@@ -234,6 +234,8 @@ export interface Order {
   cancelRequestReason: string | null;
   cancelRequestedAt: string | null;
   evidenceRecord?: EvidenceRecord | null;
+  ownerPackagingPhotos?: EvidencePhoto[];
+  riderDeliveryPhotos?: EvidencePhoto[];
   customerNote: string;
 }
 

@@ -1608,6 +1608,28 @@ export default function App() {
     showToast('안심 증적 기록이 저장되었습니다.');
   };
 
+  const handleAttachOrderPhotos = (
+    orderId: string,
+    party: 'owner' | 'rider',
+    photos: NonNullable<Order['ownerPackagingPhotos']>
+  ) => {
+    setAppState((prev) => ({
+      ...prev,
+      orders: prev.orders.map((ord) =>
+        ord.id === orderId
+          ? party === 'owner'
+            ? { ...ord, ownerPackagingPhotos: photos }
+            : { ...ord, riderDeliveryPhotos: photos }
+          : ord
+      ),
+    }));
+    showToast(
+      party === 'owner'
+        ? '점주 포장 증적 사진이 저장되었습니다.'
+        : '라이더 배송 증빙 사진이 저장되었습니다.'
+    );
+  };
+
   const handleToggleStoreOpen = (storeId: string) => {
     setAppState((prev) => ({
       ...prev,
@@ -2554,6 +2576,9 @@ export default function App() {
             onBulkAddMenusFromSample={handleBulkAddMenusFromSample}
             onSaveReviewReply={handleSaveReviewReply}
             onToggleReviewFlag={handleToggleReviewFlag}
+            onAttachOwnerPhotos={(orderId, photos) =>
+              handleAttachOrderPhotos(orderId, 'owner', photos)
+            }
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
             onOpenAiSettings={() => setShowGeminiModal(true)}
           />
@@ -2563,6 +2588,9 @@ export default function App() {
             errands={appState.errands}
             onAdvanceOrderStatus={handleAdvanceOrderStatus}
             onAdvanceErrand={handleAdvanceErrand}
+            onAttachRiderPhotos={(orderId, photos) =>
+              handleAttachOrderPhotos(orderId, 'rider', photos)
+            }
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
             onSwitchToOwner={() => setRole(DemoRole.OWNER)}
           />

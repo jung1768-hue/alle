@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  ClipboardCheck,
   Flag,
   Loader2,
   Lock,
@@ -16,9 +17,11 @@ import {
   PlusCircle,
   QrCode,
   ScanText,
+  ShieldCheck,
   Sparkles,
   Store as StoreIcon,
   TrendingUp,
+  X,
 } from 'lucide-react';
 import {
   INITIAL_OWNER_PROFIT_COMPARISON,
@@ -26,6 +29,7 @@ import {
 } from '../data/seedData';
 import {
   DispatchMode,
+  EvidencePhoto,
   MenuItem,
   Order,
   OrderStatus,
@@ -34,6 +38,7 @@ import {
   ReviewReply,
   Store,
 } from '../types/alle';
+import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
 import {
   ExtractedMenuCandidate,
@@ -73,6 +78,7 @@ interface OwnerDashboardViewProps {
   onBulkAddMenusFromSample: (storeId: string, lines: string[]) => number;
   onSaveReviewReply: (reviewId: string, replyText: string) => void;
   onToggleReviewFlag: (reviewId: string, reason: string) => void;
+  onAttachOwnerPhotos?: (orderId: string, photos: EvidencePhoto[]) => void;
   onSwitchToConsumer: () => void;
   onOpenAiSettings?: () => void;
 }
@@ -106,12 +112,16 @@ export function OwnerDashboardView({
   onBulkAddMenusFromSample,
   onSaveReviewReply,
   onToggleReviewFlag,
+  onAttachOwnerPhotos,
   onSwitchToConsumer,
   onOpenAiSettings,
 }: OwnerDashboardViewProps) {
   const [ownerSection, setOwnerSection] = useState<
     'orders' | 'dashboard' | 'ops' | 'crm'
   >('orders');
+  const [csLightboxPhoto, setCsLightboxPhoto] = useState<EvidencePhoto | null>(
+    null
+  );
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'done'>('all');
   const [showKpiBreakdown, setShowKpiBreakdown] = useState(false);
   const [showKitchenVoice, setShowKitchenVoice] = useState(false);
@@ -819,13 +829,28 @@ export function OwnerDashboardView({
           role="tab"
           aria-selected={ownerSection === 'crm'}
           onClick={() => setOwnerSection('crm')}
-          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
+          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
             ownerSection === 'crm'
               ? 'bg-[#EAF1E2] text-[#3D5720]'
               : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
           }`}
         >
-          리뷰 · 제보
+          <span>CS · 증적 · 리뷰</span>
+          {orders.filter(
+            (o) =>
+              o.evidenceRecord ||
+              (o.cancelRequested && o.status !== OrderStatus.CANCELLED)
+          ).length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-[#D9381E] text-white text-[10px] font-extrabold leading-none">
+              {
+                orders.filter(
+                  (o) =>
+                    o.evidenceRecord ||
+                    (o.cancelRequested && o.status !== OrderStatus.CANCELLED)
+                ).length
+              }
+            </span>
+          )}
         </button>
       </div>
 
@@ -1060,6 +1085,88 @@ export function OwnerDashboardView({
                             <p className="text-[#1A1D1A]">
                               사유: {order.cancelRequestReason}
                             </p>
+                          </div>
+                        )}
+
+                      {onAttachOwnerPhotos &&
+                        order.status !== OrderStatus.CANCELLED && (
+                          <div className="p-3 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2 text-xs">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-semibold text-[#3D5720] inline-flex items-center gap-1.5">
+                                <PackageCheck className="w-3.5 h-3.5" />
+                                배달 전 포장 · 실링 사진 (
+                                {(order.ownerPackagingPhotos ?? []).length}/3)
+                              </span>
+                              <label className="min-h-[30px] px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] font-bold inline-flex items-center gap-1 cursor-pointer">
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>포장 사진 찍기·올리기</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  disabled={
+                                    (order.ownerPackagingPhotos ?? []).length >= 3
+                                  }
+                                  onChange={async (e) => {
+                                    const existing =
+                                      order.ownerPackagingPhotos ?? [];
+                                    const added =
+                                      await readCompressedEvidencePhotos(
+                                        e,
+                                        existing.length,
+                                        3
+                                      );
+                                    if (added.length > 0) {
+                                      onAttachOwnerPhotos(
+                                        order.id,
+                                        [...existing, ...added].slice(0, 3)
+                                      );
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+                            {(order.ownerPackagingPhotos ?? []).length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {(order.ownerPackagingPhotos ?? []).map(
+                                  (photo, idx) => (
+                                    <div
+                                      key={`${photo.name}-${idx}`}
+                                      className="relative"
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => setCsLightboxPhoto(photo)}
+                                        className="block cursor-pointer"
+                                        aria-label={`${photo.name} 크게 보기`}
+                                      >
+                                        <img
+                                          src={photo.dataUrl}
+                                          alt={photo.name}
+                                          className="w-14 h-14 rounded-lg object-cover border border-[#D4E1C5]"
+                                        />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          onAttachOwnerPhotos(
+                                            order.id,
+                                            (
+                                              order.ownerPackagingPhotos ?? []
+                                            ).filter((_, i) => i !== idx)
+                                          )
+                                        }
+                                        aria-label="포장 사진 삭제"
+                                        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#1A1D1A] text-white flex items-center justify-center cursor-pointer"
+                                      >
+                                        <X className="w-2.5 h-2.5" />
+                                      </button>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1872,9 +1979,264 @@ export function OwnerDashboardView({
         </div>
       )}
 
-      {/* 4. Reviews & Price Reports Tab */}
+      {/* 4. CS Evidence, Reviews & Price Reports Tab */}
       {ownerSection === 'crm' && (
         <div className="space-y-6">
+          {/* 3-Party CS & Photo Evidence Vault */}
+          <section className="os-card rounded-3xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#4E6E2A]" />
+                  <span>CS 처리 · 3자 사진 증적 대조함</span>
+                </h2>
+                <p className="text-xs text-[#687064] mt-0.5">
+                  점주 배달 전 포장 사진, 라이더 배송 사진, 고객 클레임 사진 및 10초 자동 중재 결과를 한곳에서 확인합니다.
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
+                CS·증적{' '}
+                {
+                  orders.filter(
+                    (o) =>
+                      o.evidenceRecord ||
+                      o.cancelRequested ||
+                      (o.ownerPackagingPhotos?.length ?? 0) > 0 ||
+                      (o.riderDeliveryPhotos?.length ?? 0) > 0
+                  ).length
+                }
+                건
+              </span>
+            </div>
+
+            {(() => {
+              const csTargetOrders = orders.filter(
+                (o) =>
+                  o.evidenceRecord ||
+                  o.cancelRequested ||
+                  (o.ownerPackagingPhotos?.length ?? 0) > 0 ||
+                  (o.riderDeliveryPhotos?.length ?? 0) > 0
+              );
+
+              if (csTargetOrders.length === 0) {
+                return (
+                  <div className="p-5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] text-xs text-[#687064] space-y-1">
+                    <p className="font-semibold text-[#1A1D1A]">
+                      아직 접수된 CS 클레임이나 등록된 3자 증적 사진이 없습니다.
+                    </p>
+                    <p>
+                      ‘주문 처리’ 탭에서 배달 전 포장 사진을 올리거나, 라이더/고객이 사진을 제출하면 이곳에서 3자 대조가 가능합니다.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {csTargetOrders.map((ord) => {
+                    const ownerPhotos = ord.ownerPackagingPhotos ?? [];
+                    const riderPhotos = ord.riderDeliveryPhotos ?? [];
+                    const customerPhotos =
+                      ord.evidenceRecord?.evidencePhotos ?? [];
+
+                    return (
+                      <div
+                        key={ord.id}
+                        className="p-4 rounded-2xl bg-[#F7F8F5] border border-[#DCE7CF] space-y-3 text-xs"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span className="font-mono font-bold text-[#1A1D1A]">
+                              {ord.orderCode}
+                            </span>
+                            <span className="text-[#687064] mx-1.5">·</span>
+                            <span className="font-bold text-[#1A1D1A]">
+                              {ord.storeName} · {ord.menuName} ({ord.servings}인)
+                            </span>
+                            <span className="text-[#687064] ml-2">
+                              {formatWon(ord.totalAmount)}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {ord.evidenceRecord?.aiVerdict && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-[#3D5720] text-white text-[11px] font-bold inline-flex items-center gap-1">
+                                <ClipboardCheck className="w-3 h-3" />
+                                {ord.evidenceRecord.aiVerdict.faultLabel}
+                              </span>
+                            )}
+                            {ord.cancelRequested && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold">
+                                조리 후 취소 요청
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 3-Party Photo Comparison Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                          {/* 1. Owner Packaging Photos */}
+                          <div className="p-3 rounded-xl bg-white border border-[#E8ECE4] space-y-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-[#3D5720]">
+                                📦 점주 포장 사진 ({ownerPhotos.length})
+                              </span>
+                              {onAttachOwnerPhotos && (
+                                <label className="text-[11px] font-bold text-[#4E6E2A] hover:underline cursor-pointer">
+                                  + 추가
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    disabled={ownerPhotos.length >= 3}
+                                    onChange={async (e) => {
+                                      const added =
+                                        await readCompressedEvidencePhotos(
+                                          e,
+                                          ownerPhotos.length,
+                                          3
+                                        );
+                                      if (added.length > 0) {
+                                        onAttachOwnerPhotos(
+                                          ord.id,
+                                          [...ownerPhotos, ...added].slice(0, 3)
+                                        );
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                </label>
+                              )}
+                            </div>
+                            {ownerPhotos.length === 0 ? (
+                              <p className="text-[11px] text-[#919A8D]">
+                                등록된 포장 사진 없음
+                              </p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {ownerPhotos.map((p, i) => (
+                                  <button
+                                    key={`${p.name}-${i}`}
+                                    type="button"
+                                    onClick={() => setCsLightboxPhoto(p)}
+                                    className="cursor-pointer"
+                                  >
+                                    <img
+                                      src={p.dataUrl}
+                                      alt={p.name}
+                                      className="w-16 h-16 rounded-lg object-cover border border-[#D4E1C5]"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. Rider / Partner Delivery Photos */}
+                          <div className="p-3 rounded-xl bg-white border border-[#E8ECE4] space-y-2">
+                            <div className="font-bold text-[#1A1D1A]">
+                              🛵 라이더 배송 사진 ({riderPhotos.length})
+                            </div>
+                            {riderPhotos.length === 0 ? (
+                              <p className="text-[11px] text-[#919A8D]">
+                                {ord.riderName
+                                  ? `${ord.riderName} 배차됨 · 사진 대기`
+                                  : '등록된 배송 사진 없음'}
+                              </p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {riderPhotos.map((p, i) => (
+                                  <button
+                                    key={`${p.name}-${i}`}
+                                    type="button"
+                                    onClick={() => setCsLightboxPhoto(p)}
+                                    className="cursor-pointer"
+                                  >
+                                    <img
+                                      src={p.dataUrl}
+                                      alt={p.name}
+                                      className="w-16 h-16 rounded-lg object-cover border border-[#D4E1C5]"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. Customer Claim Photos */}
+                          <div className="p-3 rounded-xl bg-white border border-[#E8ECE4] space-y-2">
+                            <div className="font-bold text-[#1A1D1A]">
+                              🙋 고객 클레임 사진 ({customerPhotos.length})
+                            </div>
+                            {customerPhotos.length === 0 ? (
+                              <p className="text-[11px] text-[#919A8D]">
+                                {ord.evidenceRecord
+                                  ? `메모: ${ord.evidenceRecord.customerMemoNote}`
+                                  : '접수된 고객 사진 없음'}
+                              </p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {customerPhotos.map((p, i) => (
+                                    <button
+                                      key={`${p.name}-${i}`}
+                                      type="button"
+                                      onClick={() => setCsLightboxPhoto(p)}
+                                      className="cursor-pointer"
+                                    >
+                                      <img
+                                        src={p.dataUrl}
+                                        alt={p.name}
+                                        className="w-16 h-16 rounded-lg object-cover border border-[#D4E1C5]"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                                {ord.evidenceRecord?.customerMemoNote && (
+                                  <p className="text-[11px] text-[#555E52]">
+                                    “{ord.evidenceRecord.customerMemoNote}”
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Mediation Verdict & Settlement Breakdown */}
+                        {ord.evidenceRecord?.aiVerdict && (
+                          <div className="p-3 rounded-xl bg-white border border-[#D4E1C5] space-y-1.5">
+                            <p className="font-semibold text-[#1A1D1A]">
+                              {ord.evidenceRecord.aiVerdict.summary}
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                              <div>
+                                <span className="font-bold text-[#4E6E2A]">
+                                  점주 정산:
+                                </span>{' '}
+                                {ord.evidenceRecord.aiVerdict.ownerAction}
+                              </div>
+                              <div>
+                                <span className="font-bold text-[#4E6E2A]">
+                                  고객 보상:
+                                </span>{' '}
+                                {ord.evidenceRecord.aiVerdict.customerAction}
+                              </div>
+                              <div>
+                                <span className="font-bold text-[#4E6E2A]">
+                                  파트너 조치:
+                                </span>{' '}
+                                {ord.evidenceRecord.aiVerdict.courierAction}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </section>
+
           <section className="os-card rounded-3xl p-6 space-y-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-base font-bold text-[#1A1D1A]">
@@ -2011,6 +2373,38 @@ export function OwnerDashboardView({
               })}
             </div>
           </section>
+        </div>
+      )}
+
+      {csLightboxPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="증적 사진 확대 보기"
+          onClick={() => setCsLightboxPhoto(null)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-lg w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-[#E8ECE4]"
+          >
+            <div className="px-4 py-3 border-b border-[#E8ECE4] flex items-center justify-between text-xs font-bold text-[#1A1D1A]">
+              <span className="truncate">{csLightboxPhoto.name}</span>
+              <button
+                type="button"
+                onClick={() => setCsLightboxPhoto(null)}
+                aria-label="사진 닫기"
+                className="p-1 text-[#687064] hover:text-[#1A1D1A] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <img
+              src={csLightboxPhoto.dataUrl}
+              alt={csLightboxPhoto.name}
+              className="w-full max-h-[75vh] object-contain bg-[#F7F8F5]"
+            />
+          </div>
         </div>
       )}
     </div>

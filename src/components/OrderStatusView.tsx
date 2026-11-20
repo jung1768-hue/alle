@@ -26,6 +26,7 @@ import {
   OrderStatus,
   Store,
 } from '../types/alle';
+import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
 import { FoodImage } from './FoodImage';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
@@ -202,49 +203,10 @@ export function OrderStatusView({
   const [evidencePhotos, setEvidencePhotos] = useState<EvidencePhoto[]>([]);
 
   const handleEvidenceFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).slice(
-      0,
-      Math.max(0, 3 - evidencePhotos.length)
-    );
-    e.target.value = '';
-    if (files.length === 0) return;
-
-    const readCompressed = (file: File): Promise<EvidencePhoto | null> =>
-      new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const rawUrl = typeof reader.result === 'string' ? reader.result : '';
-          if (!rawUrl) {
-            resolve(null);
-            return;
-          }
-          const img = new Image();
-          img.onload = () => {
-            const maxDim = 720;
-            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(img.width * scale));
-            canvas.height = Math.max(1, Math.round(img.height * scale));
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              resolve({ name: file.name, dataUrl: rawUrl });
-              return;
-            }
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve({
-              name: file.name,
-              dataUrl: canvas.toDataURL('image/jpeg', 0.72),
-            });
-          };
-          img.onerror = () => resolve({ name: file.name, dataUrl: rawUrl });
-          img.src = rawUrl;
-        };
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      });
-
-    const loaded = (await Promise.all(files.map(readCompressed))).filter(
-      (item): item is EvidencePhoto => Boolean(item)
+    const loaded = await readCompressedEvidencePhotos(
+      e,
+      evidencePhotos.length,
+      3
     );
     if (loaded.length > 0) {
       setEvidencePhotos((prev) => [...prev, ...loaded].slice(0, 3));
