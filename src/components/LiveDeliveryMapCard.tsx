@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   CheckCircle2,
+  Clock,
   MapPin,
   Navigation,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { DispatchMode, OrderStatus } from '../types/alle';
+import {
+  DeliveryProgressStage,
+  DispatchMode,
+  OrderStatus,
+} from '../types/alle';
 
 interface LiveDeliveryMapCardProps {
   orderCode: string;
@@ -14,6 +19,20 @@ interface LiveDeliveryMapCardProps {
   addressAlias: string;
   status: OrderStatus;
   dispatchMode?: DispatchMode;
+  deliveryStage?: DeliveryProgressStage;
+  riderName?: string;
+  remainingMinutes?: number;
+  isFocused?: boolean;
+}
+
+function resolveStageStep(
+  status: OrderStatus,
+  deliveryStage?: DeliveryProgressStage
+): number {
+  if (deliveryStage === 'ARRIVED' || status === OrderStatus.COMPLETED) return 3;
+  if (deliveryStage === 'FIVE_MIN_LEFT') return 2;
+  if (deliveryStage === 'DEPARTED' || status === OrderStatus.PICKUP) return 1;
+  return 0;
 }
 
 export function LiveDeliveryMapCard({
@@ -22,56 +41,88 @@ export function LiveDeliveryMapCard({
   addressAlias,
   status,
   dispatchMode,
+  deliveryStage,
+  riderName,
+  remainingMinutes,
+  isFocused = false,
 }: LiveDeliveryMapCardProps) {
-  const defaultStage =
-    status === OrderStatus.COMPLETED
-      ? 2
-      : status === OrderStatus.PICKUP
-        ? 1
-        : 0;
+  const liveStep = resolveStageStep(status, deliveryStage);
+  const [previewStep, setPreviewStep] = useState<number>(liveStep);
 
-  const [previewStep, setPreviewStep] = useState<number>(defaultStage);
+  useEffect(() => {
+    setPreviewStep(liveStep);
+  }, [liveStep]);
 
-  const effectiveStep =
-    status === OrderStatus.COMPLETED
-      ? 2
-      : status === OrderStatus.PICKUP
-        ? Math.max(1, previewStep)
-        : previewStep;
+  const effectiveStep = Math.max(liveStep, previewStep);
 
-  const avatarX = effectiveStep === 0 ? 52 : effectiveStep === 1 ? 160 : 262;
-  const avatarY = effectiveStep === 0 ? 78 : effectiveStep === 1 ? 46 : 62;
+  const routePoint =
+    effectiveStep === 0
+      ? { x: 48, y: 78 }
+      : effectiveStep === 1
+        ? { x: 140, y: 52 }
+        : effectiveStep === 2
+          ? { x: 218, y: 54 }
+          : { x: 268, y: 62 };
+
+  const activeRiderLabel =
+    riderName ??
+    (dispatchMode === DispatchMode.AGENCY_RIDER
+      ? '전문 라이더'
+      : '이웃 도보 파트너');
 
   const stageLabel =
     effectiveStep === 0
       ? `${storeName} 픽업 준비 중`
       : effectiveStep === 1
-        ? `${addressAlias} 방향으로 이동 중`
-        : `${addressAlias} 인근 도착`;
+        ? `${activeRiderLabel} 출발 · ${addressAlias} 방향으로 이동 중`
+        : effectiveStep === 2
+          ? `${activeRiderLabel} · 도착 5분 전 (인근 접근)`
+          : `${addressAlias} 도착 완료`;
+
+  const etaBadgeText =
+    effectiveStep >= 3
+      ? '도착 완료'
+      : effectiveStep === 2
+        ? '도착 5분 전'
+        : typeof remainingMinutes === 'number' && remainingMinutes > 0
+          ? `약 ${remainingMinutes}분 남음`
+          : '정시 도착 신뢰도 98%';
 
   return (
-    <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-3">
+    <div
+      className={`p-4 rounded-2xl space-y-3 border transition-all ${
+        isFocused
+          ? 'bg-[#EAF1E2]/45 border-[#4E6E2A] ring-2 ring-[#82B440]/40'
+          : 'bg-[#F7F8F5] border-[#E8ECE4]'
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-xs font-bold text-[#1A1D1A]">
           <Navigation className="w-3.5 h-3.5 text-[#4E6E2A]" />
-          <span>배달 경로 ({orderCode})</span>
+          <span>실시간 배달 위치 ({orderCode})</span>
         </div>
         <span className="text-[11px] font-bold text-[#4E6E2A]">
-          {dispatchMode === DispatchMode.AGENCY_RIDER
-            ? '전문 라이더'
-            : '이웃 도보 파트너'}
+          {activeRiderLabel}
         </span>
       </div>
 
-      {/* Prominent AI Dispatch & On-Time Reliability Status Banner */}
+      {/* Prominent AI Dispatch & Live ETA Banner */}
       <div className="px-3.5 py-2.5 bg-[#EAF1E2] border border-[#DCE7CF] text-[#3D5720] rounded-xl flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs font-bold">
           <Sparkles className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
-          <span>AI 라이더 최적 동선 매칭 완료</span>
+          <span>
+            {dispatchMode
+              ? `${activeRiderLabel} 배정 완료`
+              : 'AI 라이더 최적 동선 매칭 완료'}
+          </span>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A] font-mono tabular-nums">
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
-          <span>정시 도착 신뢰도 98%</span>
+          {effectiveStep >= 3 ? (
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+          ) : (
+            <Clock className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+          )}
+          <span>{etaBadgeText}</span>
         </div>
       </div>
 
@@ -138,29 +189,33 @@ export function LiveDeliveryMapCard({
             {addressAlias}
           </text>
 
-          <g transform={`translate(${avatarX}, ${avatarY})`}>
-            <circle r="11" fill="#82B440" fillOpacity="0.35" />
-            <circle r="7" fill="#4E6E2A" stroke="#FFFFFF" strokeWidth="2" />
+          <g
+            transform={`translate(${routePoint.x}, ${routePoint.y})`}
+            style={{ transition: 'transform 450ms ease' }}
+          >
+            <circle r="12" fill="#82B440" fillOpacity="0.38" />
+            <circle r="7.5" fill="#4E6E2A" stroke="#FFFFFF" strokeWidth="2" />
           </g>
         </svg>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-bold text-[#1A1D1A] flex items-center gap-1">
-          <MapPin className="w-3.5 h-3.5 text-[#4E6E2A]" />
-          {stageLabel}
+          <MapPin className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+          <span>{stageLabel}</span>
         </span>
         <div className="flex items-center gap-1">
           {[
             { idx: 0, label: '픽업' },
-            { idx: 1, label: '이동' },
-            { idx: 2, label: '도착' },
+            { idx: 1, label: '출발' },
+            { idx: 2, label: '5분 전' },
+            { idx: 3, label: '도착' },
           ].map((btn) => (
             <button
               key={btn.idx}
               type="button"
               onClick={() => setPreviewStep(btn.idx)}
-              className={`min-h-[28px] px-2.5 py-0.5 rounded-lg border text-[11px] font-semibold cursor-pointer ${
+              className={`min-h-[28px] px-2 py-0.5 rounded-lg border text-[11px] font-semibold cursor-pointer ${
                 effectiveStep === btn.idx
                   ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
                   : 'bg-white border-[#E8ECE4] text-[#555E52]'
@@ -174,7 +229,7 @@ export function LiveDeliveryMapCard({
 
       <div className="flex items-center gap-1.5 text-[11px] text-[#687064]">
         <ShieldCheck className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
-        <span>안심 경로 안내 · 반경 20m 위치 보호 적용</span>
+        <span>안심 경로 안내 · 출발 · 도착 5분 전 · 도착 완료 실시간 알림 연동</span>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ interface SpeechRecognitionResultLike {
 }
 
 interface SpeechRecognitionEventLike {
+  resultIndex?: number;
   results: ArrayLike<SpeechRecognitionResultLike>;
 }
 
@@ -17,6 +18,7 @@ interface SpeechRecognitionErrorEventLike {
 
 interface SpeechRecognitionInstance {
   lang: string;
+  continuous?: boolean;
   interimResults: boolean;
   maxAlternatives: number;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
@@ -43,6 +45,7 @@ export function startKoreanVoiceInput(callbacks: {
   onErrorCode?: (error: string) => void;
   onUnavailableOrError: () => void;
   onEnd: () => void;
+  continuous?: boolean;
 }): () => void {
   const Ctor = getSpeechRecognitionConstructor();
   if (!Ctor) {
@@ -54,15 +57,47 @@ export function startKoreanVoiceInput(callbacks: {
 
   let stopped = false;
   let deliveredFinal = false;
+  let processedFinalCount = 0;
 
   try {
     const recognition = new Ctor();
     recognition.lang = 'ko-KR';
-    recognition.interimResults = Boolean(callbacks.onInterim);
+    recognition.continuous = Boolean(callbacks.continuous);
+    recognition.interimResults = Boolean(callbacks.onInterim || callbacks.continuous);
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
-      if (stopped || deliveredFinal) return;
+      if (stopped) return;
+
+      if (callbacks.continuous) {
+        let startIdx =
+          typeof event.resultIndex === 'number'
+            ? event.resultIndex
+            : processedFinalCount;
+        if (startIdx < processedFinalCount) {
+          startIdx = processedFinalCount;
+        }
+
+        let interimText = '';
+        for (let i = startIdx; i < event.results.length; i += 1) {
+          const res = event.results[i];
+          const part = res?.[0]?.transcript?.trim() ?? '';
+          if (!part) continue;
+          if (res.isFinal) {
+            processedFinalCount = i + 1;
+            callbacks.onTranscript(part);
+          } else {
+            interimText += `${part} `;
+          }
+        }
+
+        if (callbacks.onInterim) {
+          callbacks.onInterim(interimText.trim());
+        }
+        return;
+      }
+
+      if (deliveredFinal) return;
 
       if (!callbacks.onInterim) {
         const first = event.results[0]?.[0]?.transcript?.trim();

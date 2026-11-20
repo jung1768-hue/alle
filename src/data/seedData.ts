@@ -32,6 +32,11 @@ import IMG_JOKBAL from '../assets/images/jokbal_bossam_platter_1795098714626.jpg
 import IMG_CAFE from '../assets/images/cafe_coffee_shortcake_1795098713535.jpg';
 import IMG_CONVENIENCE from '../assets/images/convenience_bento_set_1795098713409.jpg';
 import IMG_GALBI_JJIM from '../assets/images/dongindong_galbi_jjim_1795098714219.jpg';
+import {
+  BEOMEO_MENUS,
+  BEOMEO_REVIEWS,
+  BEOMEO_STORES,
+} from './beomeoSeedData';
 
 const BUNDLED_IMAGE_ENTRIES: Array<[string, string]> = [
   ['korean_beef_haejangguk_1794615612924', IMG_HAEJANG],
@@ -897,6 +902,7 @@ export const INITIAL_STORES: Store[] = [
     areaLabel: '서울 강남구 역삼동 · 반경 0.6km',
     image: IMG_CAFE,
   },
+  ...BEOMEO_STORES,
 ];
 
 export const INITIAL_MENUS: MenuItem[] = [
@@ -1809,6 +1815,7 @@ export const INITIAL_MENUS: MenuItem[] = [
     image: IMG_CAFE,
     aiReason: '동네 로스터리 + 식후 옆집 릴레이 쿠폰 인기 매장',
   },
+  ...BEOMEO_MENUS,
 ];
 
 export const INITIAL_OWNER_PROFIT_COMPARISON: OwnerProfitComparison = {
@@ -2011,6 +2018,7 @@ export const INITIAL_REVIEWS: Review[] = [
     isComplaint: false,
     content: '딸기 쇼트케이크가 흐트러짐 없이 예쁘게 왔고 아메리카노 산미 없이 깔끔해요.',
   },
+  ...BEOMEO_REVIEWS,
 ];
 
 export const INITIAL_ORDERS: Order[] = [

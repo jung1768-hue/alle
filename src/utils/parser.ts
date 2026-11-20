@@ -655,6 +655,13 @@ function resolveLocationMatch(
   return { isNearbyArea: false, locationBoost: 0 };
 }
 
+export function isStoreDeliverableToLocation(
+  store: Store,
+  activeLocation?: SavedLocation
+): boolean {
+  return resolveLocationMatch(store, activeLocation).isNearbyArea;
+}
+
 export function evaluateRecommendations(
   condition: ParsedCondition,
   stores: Store[],
@@ -671,6 +678,9 @@ export function evaluateRecommendations(
   const validServings = Math.max(1, Math.floor(condition.servings || 1));
   const rawLower = condition.rawInput.toLowerCase();
   const excludeTags = condition.excludeTags ?? [];
+  const hasDeliverableInArea = activeLocation
+    ? stores.some((s) => resolveLocationMatch(s, activeLocation).isNearbyArea)
+    : false;
 
   for (const menu of menus) {
     const store = storeMap.get(menu.storeId);
@@ -684,6 +694,9 @@ export function evaluateRecommendations(
     const effectiveMinutes =
       menu.estimatedMinutes + (store.extraPrepMinutes ?? 0) + (isNearbyArea ? 0 : 4);
 
+    if (hasDeliverableInArea && !isNearbyArea) {
+      reasons.push('배달 가능 지역 외 매장');
+    }
     if (!store.isOpen) {
       reasons.push('영업 중단 상태');
     }

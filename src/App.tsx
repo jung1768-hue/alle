@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Home,
   MapPin,
+  Navigation,
   Presentation,
   RotateCcw,
   ShoppingBag,
@@ -41,6 +42,8 @@ import {
   CartLineItem,
   CartState,
   ConsumerStep,
+  DeliveryNotification,
+  DeliveryProgressStage,
   DemoRole,
   DispatchMode,
   ErrandRequest,
@@ -213,10 +216,35 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [showDemoSwitcher, setShowDemoSwitcher] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [deliveryNotifications, setDeliveryNotifications] = useState<
+    DeliveryNotification[]
+  >([]);
+  const [activeDeliveryAlert, setActiveDeliveryAlert] =
+    useState<DeliveryNotification | null>(null);
+  const [mapFocusRequest, setMapFocusRequest] = useState<{
+    orderId: string;
+    seq: number;
+  } | null>(null);
   const [firebaseSyncStatus, setFirebaseSyncStatus] =
     useState<FirebaseSyncStatus>('connecting');
 
   const orderSubmitLockRef = useRef<boolean>(false);
+  const deliveryTimersRef = useRef<Map<string, number[]>>(new Map());
+  const alertDismissTimerRef = useRef<number | null>(null);
+  const emittedNotifKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const timersMap = deliveryTimersRef.current;
+    return () => {
+      for (const list of timersMap.values()) {
+        for (const id of list) window.clearTimeout(id);
+      }
+      timersMap.clear();
+      if (alertDismissTimerRef.current !== null) {
+        window.clearTimeout(alertDismissTimerRef.current);
+      }
+    };
+  }, []);
   const skipNextFirestorePushRef = useRef<boolean>(false);
   const isPopstateNavRef = useRef<boolean>(false);
   const lastHistoryKeyRef = useRef<string>(
@@ -860,6 +888,173 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const clearOrderDeliveryTimers = (orderId: string) => {
+    const timers = deliveryTimersRef.current.get(orderId);
+    if (timers) {
+      for (const id of timers) window.clearTimeout(id);
+      deliveryTimersRef.current.delete(orderId);
+    }
+  };
+
+  const pushDeliveryNotification = (
+    payload: Omit<DeliveryNotification, 'id' | 'createdAt' | 'read'>
+  ) => {
+    const dedupeKey = `${payload.orderId}:${payload.stage}`;
+    if (emittedNotifKeysRef.current.has(dedupeKey)) return;
+    emittedNotifKeysRef.current.add(dedupeKey);
+
+    const notif: DeliveryNotification = {
+      ...payload,
+      id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: formatNowTime(),
+      read: false,
+    };
+
+    setDeliveryNotifications((prev) => [notif, ...prev].slice(0, 15));
+    setActiveDeliveryAlert(notif);
+
+    if (alertDismissTimerRef.current !== null) {
+      window.clearTimeout(alertDismissTimerRef.current);
+    }
+    alertDismissTimerRef.current = window.setTimeout(() => {
+      setActiveDeliveryAlert((curr) => (curr?.id === notif.id ? null : curr));
+    }, 7000);
+
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        Notification.permission === 'granted'
+      ) {
+        const sysNotif = new Notification(notif.title, { body: notif.body });
+        sysNotif.onclick = () => {
+          window.focus();
+          openOrderTrackingFromNotification(notif);
+        };
+      }
+    } catch {
+      // ignore Notification runtime limitations
+    }
+  };
+
+  const openOrderTrackingFromNotification = (notif: DeliveryNotification) => {
+    setDeliveryNotifications((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
+    );
+    setActiveDeliveryAlert(null);
+    setShowNotifications(false);
+    setRole(DemoRole.CONSUMER);
+    setStep(ConsumerStep.STATUS);
+    setHighlightedOrderId(notif.orderId);
+    setMapFocusRequest({ orderId: notif.orderId, seq: Date.now() });
+  };
+
+  const scheduleDeliveryLifecycleForOrder = (
+    order: Order,
+    estimatedMinutes: number
+  ) => {
+    clearOrderDeliveryTimers(order.id);
+    const dispatchMode =
+      order.sharedDeliveryApplied || order.deliveryFee <= 1800
+        ? DispatchMode.NEIGHBOR_WALK
+        : DispatchMode.AGENCY_RIDER;
+    const riderLabel =
+      dispatchMode === DispatchMode.AGENCY_RIDER
+        ? '김도현 전문 라이더'
+        : '박서연 이웃 배달 파트너';
+    const departEta = Math.max(8, estimatedMinutes - 6);
+
+    const tDepart = window.setTimeout(() => {
+      setAppState((prev) => ({
+        ...prev,
+        orders: prev.orders.map((ord) =>
+          ord.id === order.id && ord.status !== OrderStatus.CANCELLED
+            ? {
+                ...ord,
+                status: OrderStatus.PICKUP,
+                dispatchMode,
+                deliveryStage: 'DEPARTED',
+                riderName: riderLabel,
+                remainingMinutes: departEta,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      }));
+      pushDeliveryNotification({
+        orderId: order.id,
+        orderCode: order.orderCode,
+        storeName: order.storeName,
+        stage: 'DEPARTED',
+        title: `${riderLabel} 배정 · 배달 출발`,
+        body: `${order.storeName}에서 음식을 픽업해 출발했어요. 약 ${departEta}분 후 도착 예정입니다.`,
+        riderLabel,
+        dispatchMode,
+      });
+    }, 4000);
+
+    const tFiveMin = window.setTimeout(() => {
+      setAppState((prev) => ({
+        ...prev,
+        orders: prev.orders.map((ord) =>
+          ord.id === order.id && ord.status !== OrderStatus.CANCELLED
+            ? {
+                ...ord,
+                status: OrderStatus.PICKUP,
+                dispatchMode,
+                deliveryStage: 'FIVE_MIN_LEFT',
+                riderName: riderLabel,
+                remainingMinutes: 5,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      }));
+      pushDeliveryNotification({
+        orderId: order.id,
+        orderCode: order.orderCode,
+        storeName: order.storeName,
+        stage: 'FIVE_MIN_LEFT',
+        title: '도착 5분 전 알림',
+        body: `${riderLabel}가 ${order.addressAlias} 인근에 곧 도착합니다 (약 5분 전).`,
+        riderLabel,
+        dispatchMode,
+      });
+    }, 12000);
+
+    const tArrive = window.setTimeout(() => {
+      setAppState((prev) => ({
+        ...prev,
+        orders: prev.orders.map((ord) =>
+          ord.id === order.id && ord.status !== OrderStatus.CANCELLED
+            ? {
+                ...ord,
+                status: OrderStatus.COMPLETED,
+                dispatchMode,
+                deliveryStage: 'ARRIVED',
+                riderName: riderLabel,
+                remainingMinutes: 0,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      }));
+      pushDeliveryNotification({
+        orderId: order.id,
+        orderCode: order.orderCode,
+        storeName: order.storeName,
+        stage: 'ARRIVED',
+        title: '배달 도착 완료',
+        body: `${order.storeName} (${order.menuName}) 주문이 안전하게 도착했습니다!`,
+        riderLabel,
+        dispatchMode,
+      });
+      clearOrderDeliveryTimers(order.id);
+    }, 20000);
+
+    deliveryTimersRef.current.set(order.id, [tDepart, tFiveMin, tArrive]);
+  };
+
   const handleConfirmOrder = (payload: {
     menuId: string;
     servings: number;
@@ -1049,6 +1244,10 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast(`${newOrder.orderCode} 주문이 접수되었습니다.`);
 
+    const estimatedMin =
+      (leadMenu.estimatedMinutes ?? 20) + (targetStore.extraPrepMinutes ?? 0);
+    scheduleDeliveryLifecycleForOrder(newOrder, estimatedMin);
+
     window.setTimeout(() => {
       orderSubmitLockRef.current = false;
     }, 300);
@@ -1227,6 +1426,21 @@ export default function App() {
     nextStatus: OrderStatus,
     dispatchMode?: DispatchMode
   ) => {
+    const currentOrder = appState.orders.find((o) => o.id === orderId);
+    const chosenMode =
+      dispatchMode ?? currentOrder?.dispatchMode ?? DispatchMode.AGENCY_RIDER;
+    const riderLabel =
+      currentOrder?.riderName ??
+      (chosenMode === DispatchMode.AGENCY_RIDER
+        ? '김도현 전문 라이더'
+        : '박서연 이웃 배달 파트너');
+    const nextStage: DeliveryProgressStage | undefined =
+      nextStatus === OrderStatus.PICKUP
+        ? 'DEPARTED'
+        : nextStatus === OrderStatus.COMPLETED
+          ? 'ARRIVED'
+          : currentOrder?.deliveryStage;
+
     setAppState((prev) => ({
       ...prev,
       orders: prev.orders.map((ord) => {
@@ -1242,13 +1456,53 @@ export default function App() {
             nextStatus === OrderStatus.PICKUP && dispatchMode
               ? dispatchMode
               : ord.dispatchMode,
+          deliveryStage: nextStage,
+          riderName:
+            nextStatus === OrderStatus.PICKUP ||
+            nextStatus === OrderStatus.COMPLETED
+              ? riderLabel
+              : ord.riderName,
+          remainingMinutes:
+            nextStatus === OrderStatus.COMPLETED
+              ? 0
+              : nextStatus === OrderStatus.PICKUP
+                ? ord.remainingMinutes ?? 12
+                : ord.remainingMinutes,
           updatedAt: formatNowTime(),
         };
       }),
     }));
+
+    if (currentOrder && ALLOWED_NEXT_STATUS[currentOrder.status] === nextStatus) {
+      if (nextStatus === OrderStatus.PICKUP) {
+        pushDeliveryNotification({
+          orderId: currentOrder.id,
+          orderCode: currentOrder.orderCode,
+          storeName: currentOrder.storeName,
+          stage: 'DEPARTED',
+          title: `${riderLabel} 배정 · 배달 출발`,
+          body: `${currentOrder.storeName}에서 음식을 픽업해 출발했습니다.`,
+          riderLabel,
+          dispatchMode: chosenMode,
+        });
+      } else if (nextStatus === OrderStatus.COMPLETED) {
+        clearOrderDeliveryTimers(currentOrder.id);
+        pushDeliveryNotification({
+          orderId: currentOrder.id,
+          orderCode: currentOrder.orderCode,
+          storeName: currentOrder.storeName,
+          stage: 'ARRIVED',
+          title: '배달 도착 완료',
+          body: `${currentOrder.storeName} (${currentOrder.menuName}) 주문이 도착했습니다!`,
+          riderLabel,
+          dispatchMode: chosenMode,
+        });
+      }
+    }
   };
 
   const handleCancelBeforeCooking = (orderId: string) => {
+    clearOrderDeliveryTimers(orderId);
     setAppState((prev) => {
       const targetOrder = prev.orders.find((o) => o.id === orderId);
       if (!targetOrder) return prev;
@@ -1683,6 +1937,13 @@ export default function App() {
     setCart(null);
     setQuickPayDraft(null);
     setPendingCartSwitch(null);
+    setDeliveryNotifications([]);
+    setActiveDeliveryAlert(null);
+    setMapFocusRequest(null);
+    for (const id of deliveryTimersRef.current.keys()) {
+      clearOrderDeliveryTimers(id);
+    }
+    emittedNotifKeysRef.current.clear();
     setHighlightedOrderId(null);
     setAiChatInitialPrompt(undefined);
     setRole(DemoRole.CONSUMER);
@@ -2081,21 +2342,30 @@ export default function App() {
                 className="relative w-10 h-10 rounded-xl hover:bg-[#F7F8F5] text-[#1A1D1A] flex items-center justify-center transition-colors cursor-pointer"
               >
               <Bell className="w-5 h-5" strokeWidth={1.9} />
-              <span
-                aria-hidden="true"
-                className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#82B440] ring-2 ring-white"
-              />
+              {deliveryNotifications.some((n) => !n.read) ? (
+                <span
+                  aria-label={`읽지 않은 배달 알림 ${deliveryNotifications.filter((n) => !n.read).length}건`}
+                  className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#D9381E] text-white text-[10px] font-extrabold leading-none flex items-center justify-center ring-2 ring-white"
+                >
+                  {deliveryNotifications.filter((n) => !n.read).length}
+                </span>
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-[#82B440] ring-2 ring-white"
+                />
+              )}
             </button>
 
             {showNotifications && (
               <div
                 role="dialog"
                 aria-label="최근 알림"
-                className="absolute right-0 mt-2 w-72 sm:w-80 bg-white border border-[#E8ECE4] rounded-2xl shadow-lg p-4 space-y-3 z-50"
+                className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[75vh] overflow-y-auto bg-white border border-[#E8ECE4] rounded-2xl shadow-lg p-4 space-y-3 z-50"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1A1D1A]">
-                    alle AI 알림
+                    alle AI · 실시간 배달 알림
                   </span>
                   <button
                     type="button"
@@ -2107,6 +2377,51 @@ export default function App() {
                   </button>
                 </div>
                 <div className="space-y-2 text-xs">
+                  {deliveryNotifications.map((notif) => {
+                    const stageLabel =
+                      notif.stage === 'DEPARTED'
+                        ? '배달 출발'
+                        : notif.stage === 'FIVE_MIN_LEFT'
+                        ? '도착 5분 전'
+                        : '도착 완료';
+                    const stagePillClass =
+                      notif.stage === 'ARRIVED'
+                        ? 'bg-[#3D5720] text-white'
+                        : notif.stage === 'FIVE_MIN_LEFT'
+                        ? 'bg-[#D9381E] text-white'
+                        : 'bg-[#82B440] text-white';
+
+                    return (
+                      <button
+                        key={notif.id}
+                        type="button"
+                        onClick={() => openOrderTrackingFromNotification(notif)}
+                        className={`w-full text-left p-3 rounded-xl border transition-colors cursor-pointer ${
+                          notif.read
+                            ? 'bg-[#F7F8F5] border-[#E8ECE4] hover:bg-[#EAF1E2]'
+                            : 'bg-[#FFF9ED] border-[#F0D9A8] hover:bg-[#FFF2D6]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${stagePillClass}`}>
+                            {stageLabel}
+                          </span>
+                          <span className="text-[11px] text-[#687064]">{notif.createdAt}</span>
+                        </div>
+                        <p className="font-bold text-[#1A1D1A] leading-snug">
+                          {notif.title}
+                        </p>
+                        <p className="text-[#4A5048] mt-0.5 leading-snug">
+                          {notif.body}
+                        </p>
+                        <p className="text-[11px] font-bold text-[#3D5720] mt-1.5 inline-flex items-center gap-1">
+                          <Navigation className="w-3 h-3" />
+                          배달 위치 확인 →
+                        </p>
+                      </button>
+                    );
+                  })}
+
                   <button
                     type="button"
                     onClick={() => {
@@ -2160,6 +2475,50 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {activeDeliveryAlert && (
+        <div className="fixed top-[68px] left-1/2 -translate-x-1/2 z-50 w-[calc(100%-24px)] max-w-md">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => openOrderTrackingFromNotification(activeDeliveryAlert)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openOrderTrackingFromNotification(activeDeliveryAlert);
+              }
+            }}
+            aria-label={`${activeDeliveryAlert.title} 배달 위치 확인하기`}
+            className="w-full text-left bg-[#1A1D1A] text-white rounded-2xl shadow-xl border border-[#3D5720] p-3.5 flex items-start gap-3 cursor-pointer hover:bg-[#252A25] transition-colors"
+          >
+            <div className="w-9 h-9 rounded-xl bg-[#82B440] text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Navigation className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-extrabold text-[#DCE7CF] truncate">
+                {activeDeliveryAlert.title}
+              </p>
+              <p className="text-xs text-white/90 mt-0.5 leading-snug">
+                {activeDeliveryAlert.body}
+              </p>
+              <p className="text-[11px] font-bold text-[#BFE08C] mt-1.5">
+                배달 위치 확인 →
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveDeliveryAlert(null);
+              }}
+              aria-label="알림 배너 닫기"
+              className="p-1 text-white/70 hover:text-white shrink-0 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {storageMode === 'memory' && (
         <div
@@ -2392,6 +2751,7 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             highlightedOrderId={highlightedOrderId}
+            mapFocusRequest={mapFocusRequest}
             showPresenterMode={showPresenterMode}
             onCancelBeforeCooking={handleCancelBeforeCooking}
             onRequestCancelAfterCooking={handleRequestCancelAfterCooking}

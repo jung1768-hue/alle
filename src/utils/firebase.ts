@@ -6,7 +6,11 @@ import {
   onSnapshot,
   setDoc,
 } from 'firebase/firestore';
-import { INITIAL_STORES, resolveBundledImage } from '../data/seedData';
+import {
+  INITIAL_MENUS,
+  INITIAL_STORES,
+  resolveBundledImage,
+} from '../data/seedData';
 import {
   AllePersistedState,
   ErrandRequest,
@@ -52,9 +56,7 @@ export type FirebaseSyncStatus = 'connecting' | 'synced' | 'local-fallback';
 
 const SHARED_DOC_REF = doc(db, 'alle_demo', 'shared_state_v7');
 
-const seedStoreRegionMap = new Map(
-  INITIAL_STORES.map((s) => [s.id, s.region])
-);
+const seedStoreById = new Map(INITIAL_STORES.map((s) => [s.id, s]));
 
 export function extractSharedState(
   state: AllePersistedState
@@ -80,16 +82,40 @@ function normalizeRemoteSharedState(
     return null;
   }
 
-  return {
-    stores: raw.stores.map((s) => ({
+  const mergedStores: Store[] = raw.stores.map((s) => {
+    const seedStore = seedStoreById.get(s.id);
+    return {
+      ...seedStore,
       ...s,
-      region: s.region ?? seedStoreRegionMap.get(s.id),
-      image: resolveBundledImage(s.image) || s.image,
-    })),
-    menus: raw.menus.map((m) => ({
+      region: s.region ?? seedStore?.region,
+      image: resolveBundledImage(s.image) || seedStore?.image || s.image,
+    };
+  });
+  const remoteStoreIds = new Set(mergedStores.map((s) => s.id));
+  for (const seedStore of INITIAL_STORES) {
+    if (!remoteStoreIds.has(seedStore.id)) {
+      mergedStores.push(structuredClone(seedStore));
+    }
+  }
+
+  const seedMenuById = new Map(INITIAL_MENUS.map((m) => [m.id, m]));
+  const mergedMenus: MenuItem[] = raw.menus.map((m) => {
+    const seedMenu = seedMenuById.get(m.id);
+    return {
       ...m,
-      image: resolveBundledImage(m.image) || m.image,
-    })),
+      image: resolveBundledImage(m.image) || seedMenu?.image || m.image,
+    };
+  });
+  const remoteMenuIds = new Set(mergedMenus.map((m) => m.id));
+  for (const seedMenu of INITIAL_MENUS) {
+    if (!remoteMenuIds.has(seedMenu.id)) {
+      mergedMenus.push(structuredClone(seedMenu));
+    }
+  }
+
+  return {
+    stores: mergedStores,
+    menus: mergedMenus,
     orders: raw.orders,
     errands: Array.isArray(raw.errands) ? raw.errands : [],
     reviewReplies: raw.reviewReplies ?? {},

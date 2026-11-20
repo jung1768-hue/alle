@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -33,6 +33,7 @@ interface OrderStatusViewProps {
   stores: Store[];
   menus: MenuItem[];
   highlightedOrderId: string | null;
+  mapFocusRequest?: { orderId: string; seq: number } | null;
   showPresenterMode?: boolean;
   onCancelBeforeCooking: (orderId: string) => void;
   onRequestCancelAfterCooking: (orderId: string, reason: string) => void;
@@ -115,6 +116,7 @@ export function OrderStatusView({
   stores,
   menus,
   highlightedOrderId,
+  mapFocusRequest = null,
   showPresenterMode = false,
   onCancelBeforeCooking,
   onRequestCancelAfterCooking,
@@ -303,6 +305,21 @@ export function OrderStatusView({
   );
 
   const visibleOrders = tab === 'active' ? activeOrders : historyOrders;
+
+  useEffect(() => {
+    if (!mapFocusRequest?.orderId) return;
+    const target = orders.find((o) => o.id === mapFocusRequest.orderId);
+    if (!target) return;
+    const isHistory =
+      target.status === OrderStatus.COMPLETED ||
+      target.status === OrderStatus.CANCELLED;
+    setTab(isHistory ? 'history' : 'active');
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`order-map-${target.id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [mapFocusRequest, orders]);
 
   const activeErrands = useMemo(
     () => errands.filter((e) => e.status !== ErrandStatus.COMPLETED),
@@ -923,14 +940,29 @@ export function OrderStatusView({
                   </div>
                 )}
 
-                {showLiveMap && (
-                  <LiveDeliveryMapCard
-                    orderCode={order.orderCode}
-                    storeName={order.storeName}
-                    addressAlias={order.addressAlias}
-                    status={order.status}
-                    dispatchMode={order.dispatchMode}
-                  />
+                {!isCancelled && !showLiveMap && !order.deliveryStage && (
+                  <div className="px-3.5 py-2.5 bg-[#EAF1E2]/70 border border-[#D4E1C5] rounded-2xl flex items-center gap-2 text-xs text-[#3D5720] font-medium">
+                    <Truck className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+                    <span>
+                      전문 라이더 · 배달 파트너 배정 중 · 배정 시 출발 · 도착 5분 전 · 도착 알림을 보내드려요
+                    </span>
+                  </div>
+                )}
+
+                {(showLiveMap || Boolean(order.deliveryStage)) && (
+                  <div id={`order-map-${order.id}`}>
+                    <LiveDeliveryMapCard
+                      orderCode={order.orderCode}
+                      storeName={order.storeName}
+                      addressAlias={order.addressAlias}
+                      status={order.status}
+                      dispatchMode={order.dispatchMode}
+                      deliveryStage={order.deliveryStage}
+                      riderName={order.riderName}
+                      remainingMinutes={order.remainingMinutes}
+                      isFocused={mapFocusRequest?.orderId === order.id}
+                    />
+                  </div>
                 )}
 
                 {/* Repeated Customer FAQ Auto-Response Simulation */}

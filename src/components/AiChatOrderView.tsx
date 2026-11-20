@@ -40,6 +40,7 @@ import {
   evaluateRecommendations,
   formatWon,
   getEffectiveMenuPrice,
+  isStoreDeliverableToLocation,
   parseConditionInput,
 } from '../utils/parser';
 import {
@@ -281,6 +282,40 @@ function getVoicePaymentOptions(
   ];
 }
 
+function isLikelyBotEcho(
+  heardText: string,
+  botSpeech: string,
+  isSpeakingNow: boolean,
+  lastBotEndedAt: number
+): boolean {
+  const trimmed = heardText.trim();
+  if (!trimmed || !botSpeech.trim()) return false;
+  if (!isSpeakingNow && Date.now() - lastBotEndedAt > 700) return false;
+  if (
+    /(잠깐|아니|그만|취소|바꿔|말고|다른|결제|결재|주문|다시|싼|빠른|리뷰|인기|배달비|마이크\s*꺼|조용히)/.test(
+      trimmed
+    )
+  ) {
+    return false;
+  }
+  const cleanHeard = trimmed.toLowerCase().replace(/[^가-힣a-z0-9\s]/g, ' ');
+  const cleanBot = botSpeech.toLowerCase().replace(/[^가-힣a-z0-9\s]/g, ' ');
+  const compactHeard = cleanHeard.replace(/\s+/g, '');
+  const compactBot = cleanBot.replace(/\s+/g, '');
+  if (compactHeard.length >= 6 && compactBot.includes(compactHeard)) {
+    return true;
+  }
+  const heardTokens = cleanHeard.split(/\s+/).filter((t) => t.length >= 1);
+  const botTokens = new Set(cleanBot.split(/\s+/).filter((t) => t.length >= 1));
+  if (heardTokens.length >= 2) {
+    const overlapCount = heardTokens.filter((t) => botTokens.has(t)).length;
+    if (overlapCount / heardTokens.length >= 0.55) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const COUNSELOR_QUICK_STARTERS = [
   {
     label: '🔥 마감 30% 특가',
@@ -456,9 +491,19 @@ export function AiChatOrderView({
   const didInitialGreetRef = useRef(false);
   const keepSpeechOnUnmountRef = useRef(false);
   const autoListenTimerRef = useRef<number | null>(null);
+  const restartListenTimerRef = useRef<number | null>(null);
   const voiceReplyEnabledRef = useRef(voiceReplyEnabled);
   const viewModeRef = useRef(viewMode);
   const isListeningRef = useRef(isListening);
+  const isSpeakingRef = useRef(isSpeaking);
+  const currentSpokenTextRef = useRef('');
+  const lastBotSpeechEndedAtRef = useRef(0);
+  const lastTranscriptRef = useRef<{ text: string; at: number }>({
+    text: '',
+    at: 0,
+  });
+  const voiceDeniedRef = useRef(false);
+  const shouldContinueListeningRef = useRef(true);
   const voiceCheckoutCompletedRef = useRef(voiceCheckoutCompleted);
   const startListeningRef = useRef<() => void>(() => {});
   const runChatQueryRef = useRef<(rawText: string) => void>(() => {});
@@ -466,6 +511,7 @@ export function AiChatOrderView({
   voiceReplyEnabledRef.current = voiceReplyEnabled;
   viewModeRef.current = viewMode;
   isListeningRef.current = isListening;
+  isSpeakingRef.current = isSpeaking;
   voiceCheckoutCompletedRef.current = voiceCheckoutCompleted;
 
   const [activeCondition, setActiveCondition] = useState<ParsedCondition>(() =>
@@ -539,6 +585,14 @@ export function AiChatOrderView({
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const hasDeliverableInArea = useMemo(
+    () =>
+      Boolean(
+        activeLocation &&
+          stores.some((s) => isStoreDeliverableToLocation(s, activeLocation))
+      ),
+    [stores, activeLocation]
+  );
 
   const paymentOptions = useMemo(
     () => getVoicePaymentOptions(activeLocation?.areaName ?? '', walletBalance),
@@ -632,9 +686,21 @@ export function AiChatOrderView({
     }
   };
 
+  const clearRestartListenTimer = () => {
+    if (restartListenTimerRef.current !== null) {
+      window.clearTimeout(restartListenTimerRef.current);
+      restartListenTimerRef.current = null;
+    }
+  };
+
   const startListening = () => {
     clearAutoListenTimer();
-    if (viewModeRef.current !== 'chat' || voiceCheckoutCompletedRef.current) {
+    clearRestartListenTimer();
+    if (
+      viewModeRef.current !== 'chat' ||
+      voiceCheckoutCompletedRef.current ||
+      voiceDeniedRef.current
+    ) {
       return;
     }
     if (!getSpeechRecognitionConstructor()) {
@@ -645,8 +711,7 @@ export function AiChatOrderView({
       return;
     }
 
-    stopSpeaking();
-    setIsSpeaking(false);
+    shouldContinueListeningRef.current = true;
     setVoiceAutoplayBlocked(false);
     setShowVoiceTips(false);
     setInterimTranscript('');
@@ -655,27 +720,81 @@ export function AiChatOrderView({
 
     let lastErrCode = '';
     stopVoiceRef.current = startKoreanVoiceInput({
+      continuous: true,
       onInterim: (text) => {
-        setInterimTranscript(text);
+        const cleaned = text.trim();
+        if (!cleaned) {
+          setInterimTranscript('');
+          return;
+        }
+        if (
+          isLikelyBotEcho(
+            cleaned,
+            currentSpokenTextRef.current,
+            isSpeakingRef.current,
+            lastBotSpeechEndedAtRef.current
+          )
+        ) {
+          return;
+        }
+        setInterimTranscript(cleaned);
+        // Immediate barge-in when user clearly speaks 4+ characters while AI is talking
+        if (isSpeakingRef.current && cleaned.length >= 4) {
+          stopSpeaking();
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+        }
       },
       onTranscript: (text) => {
+        const cleaned = text.trim();
         setInterimTranscript('');
-        setIsListening(false);
-        isListeningRef.current = false;
-        void runChatQueryRef.current(text);
+        if (!cleaned) return;
+        if (
+          isLikelyBotEcho(
+            cleaned,
+            currentSpokenTextRef.current,
+            isSpeakingRef.current,
+            lastBotSpeechEndedAtRef.current
+          )
+        ) {
+          return;
+        }
+        const now = Date.now();
+        if (
+          lastTranscriptRef.current.text === cleaned &&
+          now - lastTranscriptRef.current.at < 1500
+        ) {
+          return;
+        }
+        lastTranscriptRef.current = { text: cleaned, at: now };
+
+        if (isSpeakingRef.current) {
+          stopSpeaking();
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+        }
+        void runChatQueryRef.current(cleaned);
       },
       onErrorCode: (err) => {
         lastErrCode = err;
+        if (
+          err === 'not-allowed' ||
+          err === 'service-not-allowed' ||
+          err === 'not-supported'
+        ) {
+          voiceDeniedRef.current = true;
+          shouldContinueListeningRef.current = false;
+        }
       },
       onUnavailableOrError: () => {
         setInterimTranscript('');
-        setIsListening(false);
-        isListeningRef.current = false;
         if (
           lastErrCode === 'not-allowed' ||
           lastErrCode === 'service-not-allowed' ||
           lastErrCode === 'not-supported'
         ) {
+          setIsListening(false);
+          isListeningRef.current = false;
           setShowVoiceTips(true);
         }
       },
@@ -683,6 +802,18 @@ export function AiChatOrderView({
         setInterimTranscript('');
         setIsListening(false);
         isListeningRef.current = false;
+        if (
+          shouldContinueListeningRef.current &&
+          voiceReplyEnabledRef.current &&
+          viewModeRef.current === 'chat' &&
+          !voiceCheckoutCompletedRef.current &&
+          !voiceDeniedRef.current &&
+          getSpeechRecognitionConstructor()
+        ) {
+          restartListenTimerRef.current = window.setTimeout(() => {
+            startListeningRef.current();
+          }, 350);
+        }
       },
     });
   };
@@ -691,18 +822,40 @@ export function AiChatOrderView({
   const speakBotReply = (spokenMessage: string, allowAutoListen: boolean) => {
     clearAutoListenTimer();
     if (!voiceReplyEnabledRef.current || viewModeRef.current !== 'chat') return;
+    currentSpokenTextRef.current = spokenMessage;
+    shouldContinueListeningRef.current = allowAutoListen;
+
     speakKoreanText(spokenMessage, {
       onStart: () => {
         setIsSpeaking(true);
+        isSpeakingRef.current = true;
         setVoiceAutoplayBlocked(false);
-      },
-      onEnd: () => {
-        setIsSpeaking(false);
+        // Keep continuous mic open even while AI speaks so user can interrupt naturally
         if (
           allowAutoListen &&
           voiceReplyEnabledRef.current &&
           viewModeRef.current === 'chat' &&
           !voiceCheckoutCompletedRef.current &&
+          !voiceDeniedRef.current &&
+          !isListeningRef.current &&
+          getSpeechRecognitionConstructor()
+        ) {
+          autoListenTimerRef.current = window.setTimeout(() => {
+            startListeningRef.current();
+          }, 200);
+        }
+      },
+      onEnd: () => {
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+        lastBotSpeechEndedAtRef.current = Date.now();
+        if (
+          allowAutoListen &&
+          voiceReplyEnabledRef.current &&
+          viewModeRef.current === 'chat' &&
+          !voiceCheckoutCompletedRef.current &&
+          !voiceDeniedRef.current &&
+          !isListeningRef.current &&
           getSpeechRecognitionConstructor()
         ) {
           autoListenTimerRef.current = window.setTimeout(() => {
@@ -712,6 +865,7 @@ export function AiChatOrderView({
       },
       onError: () => {
         setIsSpeaking(false);
+        isSpeakingRef.current = false;
         setVoiceAutoplayBlocked(true);
       },
     });
@@ -723,10 +877,13 @@ export function AiChatOrderView({
 
   useEffect(() => {
     if (viewMode === 'search') {
+      shouldContinueListeningRef.current = false;
       clearAutoListenTimer();
+      clearRestartListenTimer();
       stopVoiceRef.current?.();
       stopSpeaking();
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
       setIsListening(false);
       isListeningRef.current = false;
       setInterimTranscript('');
@@ -770,7 +927,9 @@ export function AiChatOrderView({
     }
 
     return () => {
+      shouldContinueListeningRef.current = false;
       clearAutoListenTimer();
+      clearRestartListenTimer();
       stopVoiceRef.current?.();
       if (!keepSpeechOnUnmountRef.current) {
         stopSpeaking();
@@ -1023,6 +1182,55 @@ export function AiChatOrderView({
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
+    // Voice control commands (stop mic / repeat)
+    if (/(마이크\s*꺼|그만\s*들|조용히\s*해|음성\s*꺼)/.test(trimmed)) {
+      shouldContinueListeningRef.current = false;
+      clearAutoListenTimer();
+      clearRestartListenTimer();
+      stopVoiceRef.current?.();
+      stopSpeaking();
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+      setIsListening(false);
+      isListeningRef.current = false;
+      setVoiceReplyEnabled(false);
+      voiceReplyEnabledRef.current = false;
+      try {
+        window.localStorage.setItem('alle_voice_reply_enabled', 'false');
+      } catch {
+        // ignore
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-voiceoff-${Date.now() + 1}`,
+          sender: 'bot',
+          text: '음성 대화를 잠시 끌게요. 필요할 때 마이크 버튼이나 음성 대화 버튼을 눌러 다시 말씀해 주세요.',
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (/(다시\s*말|뭐라고|못\s*들었|다시\s*들려)/.test(trimmed)) {
+      const prevBot = [...messages].reverse().find((m) => m.sender === 'bot');
+      const repeatText =
+        prevBot?.spokenText ?? prevBot?.text ?? '어떤 음식을 찾아드릴까요?';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-repeat-${Date.now() + 1}`,
+          sender: 'bot',
+          text: prevBot?.text ?? repeatText,
+          spokenText: repeatText,
+          matchedMenuIds: prevBot?.matchedMenuIds,
+          stagedMenuId: prevBot?.stagedMenuId,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
     const parsedInline = parseConditionInput(trimmed);
     const activeMenu = latestStagedMenuId
       ? menuMap.get(latestStagedMenuId)
@@ -1033,6 +1241,10 @@ export function AiChatOrderView({
     const hasDishCategory = parsedInline.tags.some((t) =>
       DISH_CATEGORY_TAGS.has(t)
     );
+    const hasFoodPreference =
+      hasDishCategory ||
+      parsedInline.tags.length > 0 ||
+      (parsedInline.excludeTags?.length ?? 0) > 0;
     const matchesCurrentStagedDish =
       Boolean(activeMenu) &&
       parsedInline.tags.some(
@@ -1042,6 +1254,94 @@ export function AiChatOrderView({
             activeMenu!.name.includes(t) ||
             (activeStore?.category ?? '').includes(t))
       );
+
+    // Pivot intents (cheaper / faster / higher rating / lower delivery fee)
+    const isCheaperPivot = /(더\s*싼|저렴|가성비|싸게|비싸|만원\s*이하)/.test(
+      trimmed
+    );
+    const isFasterPivot = /(더\s*빠른|빨리\s*오|배달\s*빠른|급해)/.test(trimmed);
+    const isTopRatedPivot = /(리뷰\s*좋은|평점\s*높은|인기\s*많은|별점)/.test(
+      trimmed
+    );
+    const isLowFeePivot = /(배달비\s*싼|배달비\s*적은|배달비\s*무료|배달팁\s*싼)/.test(
+      trimmed
+    );
+
+    if (
+      (isCheaperPivot || isFasterPivot || isTopRatedPivot || isLowFeePivot) &&
+      !hasDishCategory
+    ) {
+      setVoiceCheckoutDraft(null);
+      const localEval = evaluateRecommendations(
+        {
+          rawInput: '',
+          servings: Math.max(1, activeCondition.servings || 1),
+          tags: [],
+          excludeTags: activeCondition.excludeTags ?? [],
+          maxBudget: /(만원\s*이하)/.test(trimmed) ? 10000 : null,
+          maxMinutes: null,
+          unknownTokens: [],
+          needsConfirmation: false,
+        },
+        stores,
+        menus,
+        activeLocation
+      );
+
+      const sorted = [...localEval.matches];
+      let pivotLabel = '';
+      if (isCheaperPivot) {
+        sorted.sort((a, b) => a.estimatedTotal - b.estimatedTotal);
+        pivotLabel = '가성비 좋은 부담 적은';
+      } else if (isLowFeePivot) {
+        sorted.sort(
+          (a, b) =>
+            a.deliveryFee - b.deliveryFee || a.estimatedTotal - b.estimatedTotal
+        );
+        pivotLabel = '배달비가 가장 낮은';
+      } else if (isFasterPivot) {
+        sorted.sort((a, b) => a.effectiveMinutes - b.effectiveMinutes);
+        pivotLabel = '가장 빨리 도착하는';
+      } else {
+        sorted.sort(
+          (a, b) =>
+            (b.store.rating ?? 4.8) - (a.store.rating ?? 4.8) ||
+            (b.store.reviewCount ?? 0) - (a.store.reviewCount ?? 0)
+        );
+        pivotLabel = '리뷰와 평점이 가장 높은';
+      }
+
+      const topPicks = sorted.slice(0, 3);
+      if (topPicks[0]) {
+        setStagedServings((prev) => ({
+          ...prev,
+          [topPicks[0].menu.id]: Math.min(
+            topPicks[0].servings,
+            Math.max(1, topPicks[0].menu.stock)
+          ),
+        }));
+      }
+      const pivotSpoken = topPicks[0]
+        ? `${activeLocation?.areaName ?? '내 주변'}에서 ${pivotLabel} 곳 1순위는 ${topPicks[0].store.name}의 ${topPicks[0].menu.name}, 배달비 포함 ${formatWon(topPicks[0].estimatedTotal)}, 약 ${topPicks[0].effectiveMinutes}분입니다. 이 메뉴로 주문할까요, 다른 후보도 들어보실래요?`
+        : '현재 배달 가능한 매장 중에서 다시 조건을 맞춰 찾아볼까요?';
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-pivot-${Date.now() + 1}`,
+          sender: 'bot',
+          text: topPicks[0]
+            ? `${activeLocation?.areaName ?? '내 주변'} ${pivotLabel} 배달 가능 메뉴 ${topPicks.length}곳을 다시 골라드렸어요.`
+            : '현재 지역 배달 가능 매장 중 조건에 맞는 메뉴가 부족해요.',
+          spokenText: pivotSpoken,
+          matchedMenuIds: topPicks.map((m) => m.menu.id),
+          servings: topPicks[0]?.servings ?? 1,
+          stagedMenuId: topPicks[0]?.menu.id,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
 
     // 1. Active checkout voice confirmation loop
     if (voiceCheckoutDraft) {
@@ -1067,8 +1367,6 @@ export function AiChatOrderView({
           ]);
           return;
         }
-      } else if (hasDishCategory && !matchesCurrentStagedDish) {
-        setVoiceCheckoutDraft(null);
       } else {
         const spokenPay = detectPaymentMethodFromSpeech(trimmed);
         const spokenQty = extractExplicitQuantity(trimmed);
@@ -1083,47 +1381,60 @@ export function AiChatOrderView({
           trimmed
         );
 
-        let updatedDraft: VoiceCheckoutDraft = { ...voiceCheckoutDraft };
-        if (spokenPay) {
-          updatedDraft = { ...updatedDraft, paymentMethod: spokenPay };
-        }
-        if (spokenQty && currentSummary) {
-          updatedDraft = {
-            ...updatedDraft,
-            servings: Math.min(spokenQty, Math.max(1, currentSummary.menu.stock)),
-          };
-        }
-        if (isNoteEdit) {
-          updatedDraft = { ...updatedDraft, customerNote: trimmed };
-        }
+        // If user pivots back to browsing food tags/exclusions instead of confirming checkout, release checkout gracefully
+        if (
+          hasFoodPreference &&
+          !matchesCurrentStagedDish &&
+          !spokenPay &&
+          !isConfirm
+        ) {
+          setVoiceCheckoutDraft(null);
+        } else {
+          let updatedDraft: VoiceCheckoutDraft = { ...voiceCheckoutDraft };
+          if (spokenPay) {
+            updatedDraft = { ...updatedDraft, paymentMethod: spokenPay };
+          }
+          if (spokenQty && currentSummary) {
+            updatedDraft = {
+              ...updatedDraft,
+              servings: Math.min(
+                spokenQty,
+                Math.max(1, currentSummary.menu.stock)
+              ),
+            };
+          }
+          if (isNoteEdit) {
+            updatedDraft = { ...updatedDraft, customerNote: trimmed };
+          }
 
-        if (isConfirm && !spokenQty && !isNoteEdit) {
-          executeVoiceOrder(updatedDraft);
-          return;
-        }
+          if (isConfirm && !spokenQty && !isNoteEdit) {
+            executeVoiceOrder(updatedDraft);
+            return;
+          }
 
-        if (spokenPay || spokenQty || isNoteEdit) {
-          openCheckoutDraftMessage(
-            updatedDraft,
-            spokenPay ? '결제 수단을 반영했어요.' : '주문 내용을 수정했어요.'
-          );
-          return;
-        }
+          if (spokenPay || spokenQty || isNoteEdit) {
+            openCheckoutDraftMessage(
+              updatedDraft,
+              spokenPay ? '결제 수단을 반영했어요.' : '주문 내용을 수정했어요.'
+            );
+            return;
+          }
 
-        if (currentSummary) {
-          const rePrompt = `${currentSummary.paymentOption.label}로 최종 ${formatWon(currentSummary.finalTotal)} 결제할까요? '결제해줘' 또는 '취소'라고 말씀해 주세요.`;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `b-reask-${Date.now() + 1}`,
-              sender: 'bot',
-              text: rePrompt,
-              spokenText: rePrompt,
-              checkoutDraftSnapshot: voiceCheckoutDraft,
-              aiSource: 'rule',
-            },
-          ]);
-          return;
+          if (currentSummary) {
+            const rePrompt = `${currentSummary.paymentOption.label}로 최종 ${formatWon(currentSummary.finalTotal)} 결제할까요? 다른 음식을 원하시면 메뉴명을, 결제를 진행하려면 결제해줘라고 말씀해 주세요.`;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `b-reask-${Date.now() + 1}`,
+                sender: 'bot',
+                text: rePrompt,
+                spokenText: rePrompt,
+                checkoutDraftSnapshot: voiceCheckoutDraft,
+                aiSource: 'rule',
+              },
+            ]);
+            return;
+          }
         }
       }
     }
@@ -1423,7 +1734,9 @@ export function AiChatOrderView({
             Boolean(st?.isOpen) &&
             !m.isSoldOut &&
             m.stock > 0 &&
-            (m.closingDiscountPercent ?? 0) > 0
+            (m.closingDiscountPercent ?? 0) > 0 &&
+            (!hasDeliverableInArea ||
+              (st ? isStoreDeliverableToLocation(st, activeLocation) : false))
           );
         })
         .slice(0, 3);
@@ -1434,8 +1747,8 @@ export function AiChatOrderView({
         : undefined;
       const closingSpoken =
         firstClosing && firstClosingStore
-          ? `동네 마감 특가 ${closingMenus.length}곳을 찾았어요. 1순위는 ${firstClosingStore.name} ${firstClosing.name} ${formatWon(getEffectiveMenuPrice(firstClosing))}입니다. 바로 결제할까요?`
-          : '현재 마감 특가가 잠시 소진되었어요. 다른 메뉴를 찾아드릴까요?';
+          ? `${activeLocation?.areaName ?? '동네'} 마감 특가 ${closingMenus.length}곳을 찾았어요. 1순위는 ${firstClosingStore.name} ${firstClosing.name} ${formatWon(getEffectiveMenuPrice(firstClosing))}입니다. 바로 결제할까요?`
+          : '현재 지역 마감 특가가 잠시 소진되었어요. 다른 메뉴를 찾아드릴까요?';
 
       setMessages((prev) => [
         ...prev,
@@ -1444,8 +1757,8 @@ export function AiChatOrderView({
           sender: 'bot',
           text:
             closingMenus.length > 0
-              ? `지금 바로 주문 가능한 동네 마감 특가(최대 30% 할인) 메뉴 ${closingMenus.length}곳을 찾았어요! 매장 동일가 기준에서 추가 할인되어 바로 결제하실 수 있어요.`
-              : '현재 진행 중인 마감 특가 메뉴가 잠시 소진되었습니다. 대신 일반 매장 동일가 인기 메뉴를 찾아드릴까요?',
+              ? `지금 바로 배달 가능한 마감 특가(최대 30% 할인) 메뉴 ${closingMenus.length}곳을 찾았어요! 매장 동일가 기준에서 추가 할인되어 바로 결제하실 수 있어요.`
+              : '현재 진행 중인 마감 특가 메뉴가 잠시 소진되었습니다. 대신 배달 가능한 일반 매장 동일가 인기 메뉴를 찾아드릴까요?',
           spokenText: closingSpoken,
           matchedMenuIds: closingMenus.map((m) => m.id),
           servings: 1,
@@ -1523,15 +1836,31 @@ export function AiChatOrderView({
     }
 
     if (/(릴레이|옆집|쿠폰)/.test(trimmed)) {
-      const relayCandidate = menus.find((m) => {
-        const st = storeMap.get(m.storeId);
-        return (
-          Boolean(st?.isOpen) &&
-          !m.isSoldOut &&
-          m.stock > 0 &&
-          (st?.categoryGroup === '카페·디저트' || st?.categoryGroup === '분식·야식')
-        );
-      }) ?? menus.find((m) => !m.isSoldOut && m.stock > 0);
+      const relayCandidate =
+        menus.find((m) => {
+          const st = storeMap.get(m.storeId);
+          return (
+            Boolean(st?.isOpen) &&
+            !m.isSoldOut &&
+            m.stock > 0 &&
+            (st?.categoryGroup === '카페·디저트' ||
+              st?.categoryGroup === '카페/디저트' ||
+              st?.categoryGroup === '분식·야식' ||
+              st?.categoryGroup === '분식/야식') &&
+            (!hasDeliverableInArea ||
+              (st ? isStoreDeliverableToLocation(st, activeLocation) : false))
+          );
+        }) ??
+        menus.find((m) => {
+          const st = storeMap.get(m.storeId);
+          return (
+            Boolean(st?.isOpen) &&
+            !m.isSoldOut &&
+            m.stock > 0 &&
+            (!hasDeliverableInArea ||
+              (st ? isStoreDeliverableToLocation(st, activeLocation) : false))
+          );
+        });
 
       const relayStore = relayCandidate
         ? storeMap.get(relayCandidate.storeId)
@@ -1539,7 +1868,7 @@ export function AiChatOrderView({
 
       const relayText =
         relayCandidate && relayStore
-          ? `반경 200m 동네 이웃 매장 '${relayStore.name}'에서 옆집 릴레이 1,000원 할인 쿠폰을 바로 쓰실 수 있어요!`
+          ? `배달 가능한 이웃 매장 '${relayStore.name}'에서 옆집 릴레이 1,000원 할인 쿠폰을 바로 쓰실 수 있어요!`
           : '인근 골목상권 릴레이 쿠폰 적용 가능한 매장을 확인해 보세요.';
 
       setMessages((prev) => [
@@ -1577,7 +1906,7 @@ export function AiChatOrderView({
 
     if (
       needsCloudFallback &&
-      hasGeminiApiKey() &&
+      (aiReady || hasGeminiApiKey()) &&
       !/초기화|처음부터|새로/.test(trimmed)
     ) {
       setIsAnalyzing(true);
@@ -1601,17 +1930,16 @@ export function AiChatOrderView({
     if (merged.needsConfirmation && merged.unknownTokens.length > 0) {
       botText = `말씀하신 ‘${merged.unknownTokens.join(
         ', '
-      )}’에 어울리는 맛을 아래에서 선택해 주시면 바로 정확한 메뉴를 찾아드릴게요.`;
-      spokenText = `말씀하신 ${merged.unknownTokens.join(', ')}에 어울리는 맛을 화면에서 골라주세요.`;
+      )}’에 어울리는 맛을 아래에서 선택해 주시거나, 원하시는 메뉴 종류(국밥·치킨·돈까스 등)를 편하게 말씀해 주세요.`;
+      spokenText = `${activeLocation?.areaName ?? '내 주변'}에서 찾으시는 음식 종류나 더 싼 거, 안 매운 거처럼 편하게 다시 말씀해 주세요.`;
     } else if (topMatches.length === 0) {
       isEmptyRelaxPrompt = true;
-      botText = `${merged.servings}인${
+      botText = `${activeLocation?.areaName ?? '내 주변'} 배달 가능 매장 중 ${merged.servings}인${
         merged.maxBudget ? ` · ${formatWon(merged.maxBudget)} 이하` : ''
       }${
         merged.maxMinutes ? ` · ${merged.maxMinutes}분 이내` : ''
       } 조건을 모두 만족하는 메뉴를 찾지 못했어요. 조건을 조금 넓혀서 다시 찾아드릴까요?`;
-      spokenText =
-        '조건에 모두 맞는 메뉴를 못 찾았어요. 예산이나 시간을 조금 넓혀서 다시 찾아드릴까요?';
+      spokenText = `${activeLocation?.areaName ?? '내 주변'}에서 조건에 딱 맞는 메뉴를 못 찾았어요. 예산이나 시간을 조금 넓혀볼까요? 원하시는 다른 음식을 말씀하셔도 돼요.`;
     } else if (aiConversationalReply) {
       botText = aiConversationalReply;
       const top = topMatches[0];
@@ -1619,7 +1947,7 @@ export function AiChatOrderView({
     } else {
       const tagPart =
         merged.tags.length > 0 ? ` (${merged.tags.slice(0, 3).join('·')})` : '';
-      botText = `${tagPart ? `${tagPart.trim()} ` : ''}조건에 딱 맞는 내 주변 추천 메뉴 ${topMatches.length}곳을 찾았어요. 1순위 메뉴는 아래에서 바로 담거나 결제하실 수 있어요.`;
+      botText = `${tagPart ? `${tagPart.trim()} ` : ''}조건에 맞는 ${activeLocation?.areaName ?? '내 주변'} 배달 가능 추천 메뉴 ${topMatches.length}곳을 찾았어요. 1순위 메뉴는 아래에서 바로 담거나 결제하실 수 있어요.`;
       const top = topMatches[0];
       spokenText = `${top.store.name}의 ${top.menu.name} 외 ${Math.max(0, topMatches.length - 1)}곳을 찾았어요. 1순위는 배달비 포함 ${formatWon(top.estimatedTotal)}, 약 ${top.effectiveMinutes}분 도착입니다. 이 메뉴로 주문할까요, 다른 메뉴도 들어보실래요?`;
     }
@@ -1776,15 +2104,20 @@ export function AiChatOrderView({
       // ignore storage errors
     }
     if (!next) {
+      shouldContinueListeningRef.current = false;
       clearAutoListenTimer();
+      clearRestartListenTimer();
       stopVoiceRef.current?.();
       stopSpeaking();
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
       setIsListening(false);
       isListeningRef.current = false;
       setInterimTranscript('');
       setVoiceAutoplayBlocked(false);
     } else {
+      voiceDeniedRef.current = false;
+      shouldContinueListeningRef.current = true;
       const lastBot = [...messages].reverse().find((m) => m.sender === 'bot');
       if (lastBot) {
         lastSpokenMsgIdRef.current = lastBot.id;
@@ -1794,12 +2127,16 @@ export function AiChatOrderView({
             : lastBot.spokenText ?? lastBot.text,
           true
         );
+      } else {
+        startListening();
       }
     }
   };
 
   const handleUnlockVoiceGreeting = () => {
     setVoiceAutoplayBlocked(false);
+    voiceDeniedRef.current = false;
+    shouldContinueListeningRef.current = true;
     setVoiceReplyEnabled(true);
     voiceReplyEnabledRef.current = true;
     try {
@@ -1818,9 +2155,22 @@ export function AiChatOrderView({
     speakBotReply(textToSpeak, true);
   };
 
+  const handleInterruptToListen = () => {
+    voiceDeniedRef.current = false;
+    shouldContinueListeningRef.current = true;
+    clearAutoListenTimer();
+    clearRestartListenTimer();
+    stopSpeaking();
+    setIsSpeaking(false);
+    isSpeakingRef.current = false;
+    startListening();
+  };
+
   const handleMicToggle = () => {
     if (isListening) {
+      shouldContinueListeningRef.current = false;
       clearAutoListenTimer();
+      clearRestartListenTimer();
       stopVoiceRef.current?.();
       setIsListening(false);
       isListeningRef.current = false;
@@ -1828,6 +2178,13 @@ export function AiChatOrderView({
       return;
     }
 
+    voiceDeniedRef.current = false;
+    shouldContinueListeningRef.current = true;
+    if (isSpeakingRef.current) {
+      stopSpeaking();
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+    }
     startListening();
   };
 
@@ -1960,7 +2317,7 @@ export function AiChatOrderView({
           </div>
 
           <div className="text-xs font-semibold text-[#687064]">
-            검색 결과 {directSearchResults.length}건 ({activeLocation?.areaName ?? '전국'} 우선 정렬)
+            검색 결과 {directSearchResults.length}건 ({activeLocation?.areaName ?? '전국'} 배달 가능 매장만 표시)
           </div>
 
           {directSearchResults.length === 0 ? (
@@ -2650,11 +3007,11 @@ export function AiChatOrderView({
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
             <span className="inline-flex items-center gap-2">
               <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>alle가 말씀드리고 있어요...</span>
+              <span>alle가 말씀드리고 있어요 · 지금 바로 말씀하셔도 듣고 있어요</span>
             </span>
             <button
               type="button"
-              onClick={startListening}
+              onClick={handleInterruptToListen}
               className="px-2.5 py-1 rounded-lg bg-white border border-[#D4E1C5] text-[#1A1D1A] text-[11px] font-bold hover:bg-[#F7F8F5] cursor-pointer shrink-0"
             >
               말 끊고 내가 말하기
@@ -2667,7 +3024,7 @@ export function AiChatOrderView({
             <div className="max-w-[85%] px-4 py-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-bold rounded-2xl space-y-1">
               <div className="flex items-center gap-2">
                 <Mic className="w-4 h-4 animate-pulse shrink-0" />
-                <span>듣고 있어요... 말씀해 주세요</span>
+                <span>상시 듣기 ON · 말씀해 주세요</span>
               </div>
               {interimTranscript && (
                 <p className="text-[11px] font-medium text-red-900">

@@ -43,6 +43,7 @@ import {
   evaluateRecommendations,
   formatWon,
   getEffectiveMenuPrice,
+  isStoreDeliverableToLocation,
 } from '../utils/parser';
 import { estimateCompetitorSavings } from '../utils/pricing';
 import { startKoreanVoiceInput } from '../utils/voice';
@@ -211,8 +212,13 @@ export function ConditionHome({
 }: ConditionHomeProps) {
   const [activeCategoryChip, setActiveCategoryChip] =
     useState<QuickCategoryId>('all');
+  const [visibleCount, setVisibleCount] = useState<number>(12);
   const [detailMenuId, setDetailMenuId] = useState<string | null>(null);
   const [showAdvancedInput, setShowAdvancedInput] = useState(false);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [activeCategoryChip, activeLocation?.id]);
   const [editingPrefs, setEditingPrefs] = useState(false);
   const [draftPrefs, setDraftPrefs] = useState<UserPreferences>(preferences);
   const [prefsSavedNotice, setPrefsSavedNotice] = useState(false);
@@ -266,9 +272,29 @@ export function ConditionHome({
     [stores, menus, activeLocation]
   );
 
-  const displayedRecommendations: RecommendationMatch[] = useMemo(() => {
+  const hasDeliverableInArea = useMemo(
+    () =>
+      Boolean(
+        activeLocation &&
+          stores.some((s) => isStoreDeliverableToLocation(s, activeLocation))
+      ),
+    [stores, activeLocation]
+  );
+
+  const deliverableOpenStoreCount = useMemo(
+    () =>
+      stores.filter(
+        (s) =>
+          s.isOpen &&
+          (!hasDeliverableInArea ||
+            isStoreDeliverableToLocation(s, activeLocation))
+      ).length,
+    [stores, hasDeliverableInArea, activeLocation]
+  );
+
+  const filteredRecommendations: RecommendationMatch[] = useMemo(() => {
     if (activeCategoryChip === 'all') {
-      return autoRecommendations.matches.slice(0, 6);
+      return autoRecommendations.matches;
     }
     const wideList = evaluateRecommendations(
       {
@@ -288,7 +314,7 @@ export function ConditionHome({
       }),
       activeLocation
     );
-    return wideList.matches.slice(0, 6);
+    return wideList.matches;
   }, [
     activeCategoryChip,
     autoRecommendations.matches,
@@ -298,11 +324,23 @@ export function ConditionHome({
     activeLocation,
   ]);
 
+  const displayedRecommendations: RecommendationMatch[] = useMemo(
+    () => filteredRecommendations.slice(0, visibleCount),
+    [filteredRecommendations, visibleCount]
+  );
+
   const quickReorderCandidate = useMemo(() => {
     for (const ord of orders) {
       const m = menus.find((item) => item.id === ord.menuId);
       const st = m ? storeMap.get(m.storeId) : undefined;
-      if (m && st && st.isOpen && !m.isSoldOut && m.stock >= 1) {
+      if (
+        m &&
+        st &&
+        st.isOpen &&
+        !m.isSoldOut &&
+        m.stock >= 1 &&
+        (!hasDeliverableInArea || isStoreDeliverableToLocation(st, activeLocation))
+      ) {
         return {
           menu: m,
           store: st,
@@ -316,7 +354,12 @@ export function ConditionHome({
     }
     const fallbackMenu = menus.find((m) => {
       const st = storeMap.get(m.storeId);
-      return st?.isOpen && !m.isSoldOut && m.stock >= 1;
+      return Boolean(
+        st?.isOpen &&
+          !m.isSoldOut &&
+          m.stock >= 1 &&
+          (!hasDeliverableInArea || isStoreDeliverableToLocation(st, activeLocation))
+      );
     });
     if (!fallbackMenu) return null;
     const fallbackStore = storeMap.get(fallbackMenu.storeId);
@@ -330,7 +373,14 @@ export function ConditionHome({
       paymentMethod: undefined,
       customerNote: preferences.memoNote,
     };
-  }, [orders, menus, storeMap, preferences.memoNote]);
+  }, [
+    orders,
+    menus,
+    storeMap,
+    preferences.memoNote,
+    hasDeliverableInArea,
+    activeLocation,
+  ]);
 
   const triggerQuickPay = (payload: {
     menuId: string;
@@ -440,7 +490,9 @@ export function ConditionHome({
           Boolean(st?.isOpen) &&
           !m.isSoldOut &&
           m.stock > 0 &&
-          (m.closingDiscountPercent ?? 0) > 0
+          (m.closingDiscountPercent ?? 0) > 0 &&
+          (!hasDeliverableInArea ||
+            (st ? isStoreDeliverableToLocation(st, activeLocation) : false))
         );
       })
       .slice(0, 4)
@@ -449,7 +501,7 @@ export function ConditionHome({
         store: storeMap.get(m.storeId)!,
         discountedPrice: getEffectiveMenuPrice(m),
       }));
-  }, [menus, storeMap]);
+  }, [menus, storeMap, hasDeliverableInArea, activeLocation]);
 
   const quickServices = [
     {
@@ -859,7 +911,10 @@ export function ConditionHome({
           </button>
           <span aria-hidden="true">·</span>
           <span className="tabular-nums">
-            전국 매장 {stores.filter((s) => s.isOpen).length}곳 영업 중 · 스탬프 {stampCount}개
+            {hasDeliverableInArea && activeLocation
+              ? `${activeLocation.areaName} 배달 가능 매장 ${deliverableOpenStoreCount}곳`
+              : `영업 중 매장 ${deliverableOpenStoreCount}곳`}{' '}
+            · 스탬프 {stampCount}개
           </span>
         </div>
 
@@ -1169,7 +1224,7 @@ export function ConditionHome({
               const storeReviewCount = (
                 item.store.reviewCount ?? 1200
               ).toLocaleString('ko-KR');
-              const menuReviews = INITIAL_REVIEWS.filter(
+              const menuReviews = reviews.filter(
                 (r) => r.menuId === item.menu.id
               );
               const topReview = menuReviews[0];
@@ -1326,6 +1381,22 @@ export function ConditionHome({
                 </article>
               );
             })}
+          </div>
+        )}
+
+        {filteredRecommendations.length > visibleCount && (
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={() => setVisibleCount((prev) => prev + 12)}
+              className="min-h-[44px] px-6 py-2.5 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs sm:text-sm font-bold rounded-2xl shadow-2xs inline-flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <span>
+                메뉴 더 보기 (+
+                {filteredRecommendations.length - visibleCount}개)
+              </span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
           </div>
         )}
       </section>

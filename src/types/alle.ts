@@ -168,6 +168,27 @@ export interface OrderLineItem {
   lineSubtotal: number;
 }
 
+export type DeliveryProgressStage =
+  | 'PREPARING'
+  | 'ASSIGNED'
+  | 'DEPARTED'
+  | 'FIVE_MIN_LEFT'
+  | 'ARRIVED';
+
+export interface DeliveryNotification {
+  id: string;
+  orderId: string;
+  orderCode: string;
+  storeName: string;
+  stage: DeliveryProgressStage;
+  title: string;
+  body: string;
+  riderLabel: string;
+  dispatchMode: DispatchMode;
+  createdAt: string;
+  read: boolean;
+}
+
 export interface Order {
   id: string;
   orderCode: string;
@@ -195,6 +216,9 @@ export interface Order {
   estimatedSavings?: number;
   status: OrderStatus;
   dispatchMode?: DispatchMode;
+  deliveryStage?: DeliveryProgressStage;
+  riderName?: string;
+  remainingMinutes?: number;
   createdAt: string;
   updatedAt: string;
   stockDeducted: boolean;
