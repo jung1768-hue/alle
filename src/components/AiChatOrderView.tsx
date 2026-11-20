@@ -1618,35 +1618,178 @@ export function AiChatOrderView({
       }
     }
 
-    // 2. Ask about other recommended choices in the current list
+    // 2. Ask about other recommended choices or reject current choice
     if (
-      latestMatchedIds.length > 1 &&
-      /(다른\s*메뉴|나머지|2번\s*뭐|두\s*번째\s*뭐|3번\s*뭐|세\s*번째\s*뭐|다른\s*건\s*뭐)/.test(
+      !hasDishCategory &&
+      /(이거\s*말고|그거\s*말고|다른\s*거|딴\s*거|다른\s*음식|다른\s*메뉴|별로|싫어|나머지|2번\s*뭐|두\s*번째\s*뭐|3번\s*뭐|세\s*번째\s*뭐|다른\s*건\s*뭐)/.test(
         trimmed
       )
     ) {
-      const descriptions = latestMatchedIds
-        .map((id, idx) => {
-          const m = menuMap.get(id);
-          const s = m ? storeMap.get(m.storeId) : undefined;
-          if (!m || !s) return null;
-          return `${idx + 1}번째 ${s.name}의 ${m.name} ${formatWon(getEffectiveMenuPrice(m))}`;
-        })
-        .filter((x): x is string => Boolean(x));
+      if (latestMatchedIds.length > 1) {
+        const currentFocusId = recommendedSpotlight
+          ? recommendedSpotlight.menuIds[recommendedSpotlight.activeIndex]
+          : activeMenu?.id;
+        const curIdx = currentFocusId
+          ? latestMatchedIds.indexOf(currentFocusId)
+          : 0;
+        const nextIdx =
+          /(세\s*번째|3번)/.test(trimmed) && latestMatchedIds.length > 2
+            ? 2
+            : (Math.max(0, curIdx) + 1) % latestMatchedIds.length;
+        const nextMenu = menuMap.get(latestMatchedIds[nextIdx]);
+        const nextStore = nextMenu ? storeMap.get(nextMenu.storeId) : undefined;
 
-      const replyText = `현재 추천 목록은 ${descriptions.join(', ')}입니다. 몇 번째 메뉴로 선택할까요?`;
-      setMessages((prev) => [
-        ...prev,
+        if (nextMenu && nextStore) {
+          const servings =
+            recommendedSpotlight?.servings ??
+            Math.max(1, activeCondition.servings || 1);
+          const total =
+            getEffectiveMenuPrice(nextMenu) * servings + nextStore.deliveryFee;
+          const eta = nextMenu.estimatedMinutes + (nextStore.extraPrepMinutes ?? 0);
+          const reasonPart = nextMenu.aiReason ? `${nextMenu.aiReason} ` : '';
+          const replyText = `${nextIdx + 1}순위 추천 ${nextStore.name}의 ${nextMenu.name}은 어떠세요? ${reasonPart}배달비 포함 ${formatWon(total)}, 약 ${eta}분 도착입니다. 이 메뉴로 주문할까요?`;
+
+          setStagedServings((prev) => ({
+            ...prev,
+            [nextMenu.id]: Math.min(servings, Math.max(1, nextMenu.stock)),
+          }));
+          setRecommendedSpotlight({
+            msgId: `b-next-${Date.now() + 1}`,
+            menuIds: latestMatchedIds,
+            activeIndex: nextIdx,
+            explanation: replyText,
+            servings,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-next-${Date.now() + 1}`,
+              sender: 'bot',
+              text: replyText,
+              spokenText: replyText,
+              matchedMenuIds: latestMatchedIds,
+              stagedMenuId: nextMenu.id,
+              servings,
+              aiSource: 'rule',
+            },
+          ]);
+          return;
+        }
+      }
+
+      // Fallback: find brand-new deliverable alternatives excluding current activeMenu
+      const freshEval = evaluateRecommendations(
         {
-          id: `b-list-${Date.now() + 1}`,
-          sender: 'bot',
-          text: replyText,
-          spokenText: replyText,
-          matchedMenuIds: latestMatchedIds,
-          aiSource: 'rule',
+          rawInput: '',
+          servings: Math.max(1, activeCondition.servings || 1),
+          tags: [],
+          excludeTags: activeCondition.excludeTags ?? [],
+          maxBudget: activeCondition.maxBudget,
+          maxMinutes: activeCondition.maxMinutes,
+          unknownTokens: [],
+          needsConfirmation: false,
         },
-      ]);
-      return;
+        stores,
+        menus,
+        activeLocation
+      );
+      const freshPicks = freshEval.matches
+        .filter((m) => m.menu.id !== activeMenu?.id)
+        .slice(0, 3);
+      if (freshPicks.length > 0) {
+        const pick = freshPicks[0];
+        const freshIds = freshPicks.map((p) => p.menu.id);
+        const replyText = `그럼 다른 메뉴로 ${pick.store.name}의 ${pick.menu.name} 추천드릴게요. 배달비 포함 ${formatWon(pick.estimatedTotal)}, 약 ${pick.effectiveMinutes}분 도착입니다. 이건 어떠세요?`;
+        setStagedServings((prev) => ({
+          ...prev,
+          [pick.menu.id]: Math.min(
+            Math.max(1, activeCondition.servings || 1),
+            Math.max(1, pick.menu.stock)
+          ),
+        }));
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-alt-${Date.now() + 1}`,
+            sender: 'bot',
+            text: replyText,
+            spokenText: replyText,
+            matchedMenuIds: freshIds,
+            stagedMenuId: pick.menu.id,
+            servings: Math.max(1, activeCondition.servings || 1),
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
+    }
+
+    // 2-1. Direct Q&A about the currently focused/staged menu (ETA / price / reviews)
+    if (activeMenu && activeStore && !hasDishCategory) {
+      const qty =
+        stagedServings[activeMenu.id] ??
+        Math.max(1, activeCondition.servings || 1);
+      const effectivePrice = getEffectiveMenuPrice(activeMenu);
+      const total = effectivePrice * qty + activeStore.deliveryFee;
+      const eta =
+        activeMenu.estimatedMinutes + (activeStore.extraPrepMinutes ?? 0);
+
+      if (/(몇\s*분|언제\s*와|오래\s*걸려|도착\s*시간|배달\s*시간)/.test(trimmed)) {
+        const etaReply = `${activeStore.name} ${activeMenu.name}은 지금 주문하시면 약 ${eta}분 안에 도착 예정입니다. 바로 주문할까요?`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-eta-${Date.now() + 1}`,
+            sender: 'bot',
+            text: etaReply,
+            spokenText: etaReply,
+            stagedMenuId: activeMenu.id,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
+
+      if (/(배달비\s*얼마|배달팁\s*얼마|얼마야|가격이?\s*어떻)/.test(trimmed)) {
+        const feeText =
+          activeStore.deliveryFee === 0
+            ? '무료'
+            : formatWon(activeStore.deliveryFee);
+        const priceReply = `${activeMenu.name}은 1인분 ${formatWon(effectivePrice)}이고 배달비는 ${feeText}예요. ${qty}인분 합계 ${formatWon(total)}입니다. 주문 진행할까요?`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-price-${Date.now() + 1}`,
+            sender: 'bot',
+            text: priceReply,
+            spokenText: priceReply,
+            stagedMenuId: activeMenu.id,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
+
+      if (/(리뷰\s*어때|후기\s*어때|평점\s*몇|맛있어|괜찮아)/.test(trimmed)) {
+        const menuReviews = reviews.filter((r) => r.menuId === activeMenu.id);
+        const topRev = menuReviews[0];
+        const revSnippet = topRev
+          ? ` 최근 후기에는 "${topRev.content.slice(0, 42)}"라고 적혀 있어요.`
+          : '';
+        const revReply = `${activeStore.name} 평점은 ${(activeStore.rating ?? 4.9).toFixed(1)}점이고 리뷰는 ${menuReviews.length}건입니다.${revSnippet} 이 메뉴로 주문할까요?`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-rev-${Date.now() + 1}`,
+            sender: 'bot',
+            text: revReply,
+            spokenText: revReply,
+            stagedMenuId: activeMenu.id,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
     }
 
     // 3. Pick by ordinal (1st / 2nd / 3rd) or menu/store name match
@@ -2337,12 +2480,18 @@ export function AiChatOrderView({
   const handleInterruptToListen = () => {
     voiceDeniedRef.current = false;
     shouldContinueListeningRef.current = true;
+    isNearSpeechEndRef.current = false;
+    pendingVoiceQueryRef.current = null;
+    lastBotSpeechEndedAtRef.current = Date.now();
     clearAutoListenTimer();
     clearRestartListenTimer();
     stopSpeaking();
     setIsSpeaking(false);
     isSpeakingRef.current = false;
-    startListening();
+    // Brief 180ms decay prevents residual speaker audio from leaking into mic
+    autoListenTimerRef.current = window.setTimeout(() => {
+      startListeningRef.current();
+    }, 180);
   };
 
   const handleMicToggle = () => {
@@ -2395,55 +2544,11 @@ export function AiChatOrderView({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {viewMode === 'chat' && getSpeechRecognitionConstructor() && (
-              <button
-                type="button"
-                onClick={handleMicToggle}
-                aria-pressed={isListening}
-                className={`min-h-[36px] px-2.5 py-1 text-xs font-bold rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
-                  isListening
-                    ? 'bg-red-50 border-red-300 text-red-700'
-                    : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
-                }`}
-              >
-                {isListening ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                    <Mic className="w-3.5 h-3.5 shrink-0" />
-                    <span>마이크 ON</span>
-                  </>
-                ) : (
-                  <>
-                    <MicOff className="w-3.5 h-3.5 shrink-0" />
-                    <span>마이크 OFF</span>
-                  </>
-                )}
-              </button>
-            )}
             {aiReady && (
               <span className="hidden lg:inline-flex min-h-[36px] px-2.5 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>alle 분석</span>
               </span>
-            )}
-            {viewMode === 'chat' && isSpeechSynthesisSupported() && (
-              <button
-                type="button"
-                onClick={handleToggleVoiceReply}
-                aria-pressed={voiceReplyEnabled}
-                className={`min-h-[36px] px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
-                  voiceReplyEnabled
-                    ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                    : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
-                }`}
-              >
-                {voiceReplyEnabled ? (
-                  <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                ) : (
-                  <VolumeX className="w-3.5 h-3.5 shrink-0" />
-                )}
-                <span>{voiceReplyEnabled ? '음성 대화 ON' : '음성 꺼짐'}</span>
-              </button>
             )}
             {viewMode === 'chat' && (
               <button
@@ -2453,7 +2558,7 @@ export function AiChatOrderView({
                 className="min-h-[36px] px-2.5 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl inline-flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">새 대화</span>
+                <span>새 대화</span>
               </button>
             )}
           </div>
@@ -2485,6 +2590,56 @@ export function AiChatOrderView({
             <span>가게·메뉴 직접 검색</span>
           </button>
         </div>
+
+        {viewMode === 'chat' &&
+          (getSpeechRecognitionConstructor() || isSpeechSynthesisSupported()) && (
+            <div className="grid grid-cols-2 gap-2">
+              {getSpeechRecognitionConstructor() && (
+                <button
+                  type="button"
+                  onClick={handleMicToggle}
+                  aria-pressed={isListening}
+                  className={`min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
+                    isListening
+                      ? 'bg-red-50 border-red-300 text-red-700'
+                      : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
+                  }`}
+                >
+                  {isListening ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                      <Mic className="w-3.5 h-3.5 shrink-0" />
+                      <span>마이크 ON</span>
+                    </>
+                  ) : (
+                    <>
+                      <MicOff className="w-3.5 h-3.5 shrink-0" />
+                      <span>마이크 OFF</span>
+                    </>
+                  )}
+                </button>
+              )}
+              {isSpeechSynthesisSupported() && (
+                <button
+                  type="button"
+                  onClick={handleToggleVoiceReply}
+                  aria-pressed={voiceReplyEnabled}
+                  className={`min-h-[36px] px-3 py-1.5 text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
+                    voiceReplyEnabled
+                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                      : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
+                  }`}
+                >
+                  {voiceReplyEnabled ? (
+                    <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <VolumeX className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>{voiceReplyEnabled ? '음성 대화 ON' : '음성 꺼짐'}</span>
+                </button>
+              )}
+            </div>
+          )}
       </div>
 
       {viewMode === 'search' ? (

@@ -2128,10 +2128,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Clean Header: Brand Logo + Current Location + Notification Bell */}
+      {/* Clean Single-Row Header: Brand Logo + Current Location + Easy Mode + Notification Bell */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-[#E8ECE4]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
             <button
               type="button"
               onClick={() => {
@@ -2146,36 +2146,41 @@ export default function App() {
 
             <span
               aria-hidden="true"
-              className="hidden sm:inline-block h-4 w-px bg-[#E8ECE4] shrink-0"
+              className="h-4 w-px bg-[#E8ECE4] shrink-0"
             />
 
             <button
               type="button"
               onClick={() => setShowLocationPicker(true)}
               aria-label="등록된 위치 변경하기"
-              className="hidden sm:inline-flex min-h-[36px] max-w-[260px] px-2.5 py-1 rounded-xl hover:bg-[#EAF1E2]/70 text-sm font-semibold text-[#1A1D1A] items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="inline-flex min-w-0 min-h-[34px] max-w-full sm:max-w-[260px] px-1.5 sm:px-2.5 py-1 rounded-xl hover:bg-[#EAF1E2]/70 text-xs sm:text-sm font-semibold text-[#1A1D1A] items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer"
             >
-              <MapPin className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4E6E2A] shrink-0" />
               <span className="truncate">{activeLocation.areaName}</span>
               <ChevronDown className="w-3.5 h-3.5 text-[#687064] shrink-0" />
             </button>
           </div>
 
           {/* Right Easy Mode Toggle + Presenter Demo Switcher + Notification Bell */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleToggleEasyMode}
               aria-pressed={appState.easyMode}
               aria-label="큰 글씨 쉬운 모드 전환"
-              className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 transition-all cursor-pointer ${
+              className={`min-h-[34px] px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
                 appState.easyMode
                   ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
                   : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
               }`}
             >
-              <Eye className="w-3.5 h-3.5 text-[#4E6E2A]" />
-              <span>{appState.easyMode ? '쉬운 모드 ON' : '가+ 쉬운 모드'}</span>
+              <Eye className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+              <span className="hidden sm:inline">
+                {appState.easyMode ? '쉬운 모드 ON' : '가+ 쉬운 모드'}
+              </span>
+              <span className="sm:hidden">
+                {appState.easyMode ? '쉬운 ON' : '쉬운모드'}
+              </span>
             </button>
 
             {showPresenterMode && (
@@ -2475,20 +2480,6 @@ export default function App() {
             )}
             </div>
           </div>
-        </div>
-
-        {/* Mobile Compact Location Row right under Logo */}
-        <div className="sm:hidden px-4 pb-2.5 pt-0.5 flex items-center">
-          <button
-            type="button"
-            onClick={() => setShowLocationPicker(true)}
-            aria-label="등록된 위치 변경하기"
-            className="min-h-[32px] max-w-full px-1 py-0.5 rounded-lg text-[13px] font-semibold text-[#1A1D1A] inline-flex items-center gap-1 cursor-pointer"
-          >
-            <MapPin className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
-            <span className="truncate">{activeLocation.areaName}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#687064] shrink-0" />
-          </button>
         </div>
       </header>
 
