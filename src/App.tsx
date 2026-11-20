@@ -2221,6 +2221,8 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             orders={appState.orders}
+            reviews={INITIAL_REVIEWS}
+            reviewReplies={appState.reviewReplies}
             stampCount={appState.stampCount}
             wishlistIds={appState.wishlistIds}
             easyMode={appState.easyMode}
@@ -2253,6 +2255,9 @@ export default function App() {
             wishlistIds={appState.wishlistIds}
             activeLocation={activeLocation}
             initialPrompt={aiChatInitialPrompt}
+            walletBalance={appState.walletBalance}
+            stampCount={appState.stampCount}
+            defaultNote={appState.preferences.memoNote}
             onToggleWishlist={handleToggleWishlist}
             onBackToHome={() => {
               setAiChatInitialPrompt(undefined);
@@ -2266,6 +2271,7 @@ export default function App() {
             onAddToCart={handleAddToCart}
             onOpenRecommendationWithCondition={handleOpenRecommendationWithCondition}
             onProceedToConfirm={handleProceedToConfirm}
+            onCompleteVoiceOrder={handleConfirmOrder}
           />
         ) : step === ConsumerStep.RECOMMEND ? (
           <RecommendationView

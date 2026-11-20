@@ -3,6 +3,8 @@ import {
   AlertCircle,
   ArrowLeft,
   AudioLines,
+  CheckCircle2,
+  CreditCard,
   Heart,
   Mic,
   MicOff,
@@ -12,15 +14,18 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
+  Ticket,
   Volume2,
   VolumeX,
   Zap,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
+import { MOCK_COUPONS, VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
 import {
   MenuItem,
+  OrderLineItem,
   ParsedCondition,
+  PaymentMethod,
   SavedLocation,
   Store,
   SuperAppTab,
@@ -37,6 +42,11 @@ import {
   getEffectiveMenuPrice,
   parseConditionInput,
 } from '../utils/parser';
+import {
+  estimateCompetitorSavings,
+  getBestCoupon,
+  getLocalCurrencyLabel,
+} from '../utils/pricing';
 import {
   getSpeechRecognitionConstructor,
   isSpeechSynthesisSupported,
@@ -127,15 +137,25 @@ function buildIntentChips(
   return chips;
 }
 
+interface VoiceCheckoutDraft {
+  menuId: string;
+  servings: number;
+  selectedOptionIds: string[];
+  paymentMethod: PaymentMethod;
+  customerNote: string;
+}
+
 interface ChatMessage {
   id: string;
   sender: 'bot' | 'user';
   text: string;
+  spokenText?: string;
   parsed?: ParsedCondition;
   matchedMenuIds?: string[];
   servings?: number;
   isEmptyRelaxPrompt?: boolean;
   stagedMenuId?: string;
+  checkoutDraftSnapshot?: VoiceCheckoutDraft;
   aiSource?: 'gemini' | 'rule';
   actionLink?: {
     label: string;
@@ -150,6 +170,9 @@ interface AiChatOrderViewProps {
   wishlistIds: string[];
   activeLocation?: SavedLocation;
   initialPrompt?: string;
+  walletBalance?: number;
+  stampCount?: number;
+  defaultNote?: string;
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
   onOpenAiSettings?: () => void;
@@ -170,6 +193,92 @@ interface AiChatOrderViewProps {
     selectedOptionIds: string[];
     couponCode: string;
   }) => void;
+  onCompleteVoiceOrder?: (payload: {
+    menuId: string;
+    servings: number;
+    selectedOptionIds: string[];
+    items: OrderLineItem[];
+    couponCode: string;
+    couponDiscount: number;
+    sharedDeliveryApplied: boolean;
+    reservationSlot: string | null;
+    customerAlias: string;
+    addressAlias: string;
+    customerNote: string;
+    paymentMethod: PaymentMethod;
+    paymentMethodLabel: string;
+    estimatedSavings: number;
+  }) => { ok: boolean; error?: string };
+}
+
+function detectPaymentMethodFromSpeech(rawText: string): PaymentMethod | null {
+  const t = rawText.toLowerCase().trim();
+  if (/카카오/.test(t)) return 'kakaopay';
+  if (/토스/.test(t)) return 'tosspay';
+  if (/네이버/.test(t)) return 'naverpay';
+  if (/(alle\s*페이|알레\s*페이|올레\s*페이|페이\s*잔액|지갑\s*잔액|예치금)/.test(t)) {
+    return 'alle_pay';
+  }
+  if (/(지역\s*화폐|사랑\s*상품권|동백전|대구로페이|이음|상생카드)/.test(t)) {
+    return 'local_currency';
+  }
+  if (/(기업\s*식대|복지\s*식대|식대\s*포인트|식대|법인)/.test(t)) {
+    return 'b2b_meal_point';
+  }
+  if (/(등록\s*카드|원클릭\s*카드|신용카드|카드)/.test(t)) {
+    return 'card_oneclick';
+  }
+  return null;
+}
+
+function extractExplicitQuantity(rawText: string): number | null {
+  const trimmed = rawText.trim();
+  const numeric = trimmed.match(/(\d+)\s*(?:인분|개|명|잔|그릇|마리)/);
+  if (numeric) {
+    const n = parseInt(numeric[1], 10);
+    if (n >= 1 && n <= 20) return n;
+  }
+  if (/(?:^|\s)(?:한\s*(?:개|인분|명|잔|그릇|마리)|하나(?:만)?)(?:\s|$|[,.!?])/.test(trimmed)) {
+    return 1;
+  }
+  if (/(?:^|\s)(?:두\s*(?:개|인분|명|잔|그릇|마리)|둘)(?:\s|$|[,.!?])/.test(trimmed)) {
+    return 2;
+  }
+  if (/(?:^|\s)(?:세\s*(?:개|인분|명|잔|그릇|마리)|셋)(?:\s|$|[,.!?])/.test(trimmed)) {
+    return 3;
+  }
+  if (/(?:^|\s)(?:네\s*(?:개|인분|명|잔|그릇|마리)|넷)(?:\s|$|[,.!?])/.test(trimmed)) {
+    return 4;
+  }
+  return null;
+}
+
+function getVoicePaymentOptions(
+  areaName: string,
+  walletBalance: number
+): Array<{ id: PaymentMethod; shortLabel: string; label: string }> {
+  const localCur = getLocalCurrencyLabel(areaName);
+  return [
+    { id: 'kakaopay', shortLabel: '카카오페이', label: '카카오페이' },
+    { id: 'tosspay', shortLabel: '토스페이', label: '토스페이' },
+    { id: 'naverpay', shortLabel: '네이버페이', label: '네이버페이' },
+    { id: 'card_oneclick', shortLabel: '등록카드', label: '등록카드 1초결제' },
+    {
+      id: 'alle_pay',
+      shortLabel: `alle페이 (${formatWon(walletBalance)})`,
+      label: 'alle페이 잔액',
+    },
+    {
+      id: 'local_currency',
+      shortLabel: localCur.shortLabel,
+      label: localCur.fullLabel,
+    },
+    {
+      id: 'b2b_meal_point',
+      shortLabel: '기업 식대',
+      label: '기업 식대 포인트',
+    },
+  ];
 }
 
 const COUNSELOR_QUICK_STARTERS = [
@@ -295,6 +404,9 @@ export function AiChatOrderView({
   wishlistIds,
   activeLocation,
   initialPrompt,
+  walletBalance = 0,
+  stampCount = 0,
+  defaultNote = '',
   onToggleWishlist,
   onBackToHome,
   onOpenAiSettings: _onOpenAiSettings,
@@ -303,6 +415,7 @@ export function AiChatOrderView({
   onAddToCart,
   onOpenRecommendationWithCondition,
   onProceedToConfirm,
+  onCompleteVoiceOrder,
 }: AiChatOrderViewProps) {
   const [viewMode, setViewMode] = useState<'chat' | 'search'>('chat');
   const [directSearchText, setDirectSearchText] = useState('');
@@ -311,13 +424,20 @@ export function AiChatOrderView({
   const [input, setInput] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [voiceAutoplayBlocked, setVoiceAutoplayBlocked] = useState(false);
+  const [voiceCheckoutDraft, setVoiceCheckoutDraft] =
+    useState<VoiceCheckoutDraft | null>(null);
+  const [voiceCheckoutCompleted, setVoiceCheckoutCompleted] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReady, setAiReady] = useState(() => hasGeminiApiKey());
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem('alle_voice_reply_enabled') === 'true';
+      const saved = window.localStorage.getItem('alle_voice_reply_enabled');
+      return saved === null ? true : saved === 'true';
     } catch {
-      return false;
+      return true;
     }
   });
   const [showVoiceTips, setShowVoiceTips] = useState(false);
@@ -327,12 +447,26 @@ export function AiChatOrderView({
       if (ok || hasGeminiApiKey()) setAiReady(true);
     });
   }, []);
+
   const [stagedServings, setStagedServings] = useState<Record<string, number>>({});
   const [stagedOptions, setStagedOptions] = useState<Record<string, string[]>>({});
   const stopVoiceRef = useRef<(() => void) | null>(null);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastSpokenMsgIdRef = useRef<string | null>(null);
+  const didInitialGreetRef = useRef(false);
+  const keepSpeechOnUnmountRef = useRef(false);
+  const autoListenTimerRef = useRef<number | null>(null);
+  const voiceReplyEnabledRef = useRef(voiceReplyEnabled);
+  const viewModeRef = useRef(viewMode);
+  const isListeningRef = useRef(isListening);
+  const voiceCheckoutCompletedRef = useRef(voiceCheckoutCompleted);
+  const startListeningRef = useRef<() => void>(() => {});
   const runChatQueryRef = useRef<(rawText: string) => void>(() => {});
+
+  voiceReplyEnabledRef.current = voiceReplyEnabled;
+  viewModeRef.current = viewMode;
+  isListeningRef.current = isListening;
+  voiceCheckoutCompletedRef.current = voiceCheckoutCompleted;
 
   const [activeCondition, setActiveCondition] = useState<ParsedCondition>(() =>
     parseConditionInput(
@@ -348,15 +482,19 @@ export function AiChatOrderView({
       const evaluated = evaluateRecommendations(parsed, stores, menus, activeLocation);
       const topMatches = evaluated.matches.slice(0, 3);
       let reply = '';
+      let spokenText: string | undefined;
       if (parsed.needsConfirmation && parsed.unknownTokens.length > 0) {
         reply = `말씀하신 ‘${parsed.unknownTokens.join(
           ', '
         )}’ 느낌을 가장 잘 맞추기 위해 아래에서 원하시는 맛을 한 번만 골라주세요.`;
+        spokenText = `말씀하신 ${parsed.unknownTokens.join(', ')} 느낌에 가장 가까운 맛을 화면에서 골라주세요.`;
       } else if (topMatches.length === 0) {
         reply =
           '말씀해 주신 조건에 모두 맞는 메뉴가 지금 바로 보이지 않아요. 예산이나 시간을 조금 넓혀서 다시 찾아볼까요?';
       } else {
+        const best = topMatches[0];
         reply = `추천 메뉴 ${topMatches.length}곳을 찾았어요.`;
+        spokenText = `${best.store.name}의 ${best.menu.name} 외 ${Math.max(0, topMatches.length - 1)}곳을 찾았어요. 1순위는 배달비 포함 ${formatWon(best.estimatedTotal)}, 약 ${best.effectiveMinutes}분 도착입니다. 이 메뉴로 주문할까요, 다른 메뉴도 들어보실래요?`;
       }
       return [
         {
@@ -368,6 +506,7 @@ export function AiChatOrderView({
           id: 'init-bot',
           sender: 'bot',
           text: reply,
+          spokenText,
           parsed,
           matchedMenuIds: topMatches.map((m) => m.menu.id),
           servings: parsed.servings,
@@ -390,6 +529,7 @@ export function AiChatOrderView({
         id: 'welcome',
         sender: 'bot',
         text: '어떤 음식을 찾아드릴까요? 아래 빠른 버튼을 누르거나 직접 말씀해 보세요.',
+        spokenText: '어떤 음식을 찾아드릴까요?',
         parsed: defaultParsed,
         matchedMenuIds: defaultEval.matches.slice(0, 3).map((m) => m.menu.id),
         servings: defaultParsed.servings,
@@ -399,6 +539,38 @@ export function AiChatOrderView({
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+
+  const paymentOptions = useMemo(
+    () => getVoicePaymentOptions(activeLocation?.areaName ?? '', walletBalance),
+    [activeLocation?.areaName, walletBalance]
+  );
+
+  const latestMatchedIds = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const ids = messages[i].matchedMenuIds;
+      if (ids && ids.length > 0 && messages[i].id !== 'welcome') {
+        return ids;
+      }
+    }
+    return [];
+  }, [messages]);
+
+  const latestStagedMenuId = useMemo(() => {
+    if (voiceCheckoutDraft?.menuId) return voiceCheckoutDraft.menuId;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].stagedMenuId) {
+        return messages[i].stagedMenuId;
+      }
+    }
+    return latestMatchedIds[0];
+  }, [voiceCheckoutDraft?.menuId, messages, latestMatchedIds]);
+
+  const latestCheckoutMsgId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].checkoutDraftSnapshot) return messages[i].id;
+    }
+    return null;
+  }, [messages]);
 
   const directSearchResults = useMemo(() => {
     const q = directSearchText.trim().toLowerCase();
@@ -453,12 +625,118 @@ export function AiChatOrderView({
     [liveIntentCondition, wishlistIds.length]
   );
 
-  useEffect(() => {
-    bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  const clearAutoListenTimer = () => {
+    if (autoListenTimerRef.current !== null) {
+      window.clearTimeout(autoListenTimerRef.current);
+      autoListenTimerRef.current = null;
+    }
+  };
+
+  const startListening = () => {
+    clearAutoListenTimer();
+    if (viewModeRef.current !== 'chat' || voiceCheckoutCompletedRef.current) {
+      return;
+    }
+    if (!getSpeechRecognitionConstructor()) {
+      setShowVoiceTips(true);
+      return;
+    }
+    if (isListeningRef.current) {
+      return;
+    }
+
+    stopSpeaking();
+    setIsSpeaking(false);
+    setVoiceAutoplayBlocked(false);
+    setShowVoiceTips(false);
+    setInterimTranscript('');
+    setIsListening(true);
+    isListeningRef.current = true;
+
+    let lastErrCode = '';
+    stopVoiceRef.current = startKoreanVoiceInput({
+      onInterim: (text) => {
+        setInterimTranscript(text);
+      },
+      onTranscript: (text) => {
+        setInterimTranscript('');
+        setIsListening(false);
+        isListeningRef.current = false;
+        void runChatQueryRef.current(text);
+      },
+      onErrorCode: (err) => {
+        lastErrCode = err;
+      },
+      onUnavailableOrError: () => {
+        setInterimTranscript('');
+        setIsListening(false);
+        isListeningRef.current = false;
+        if (
+          lastErrCode === 'not-allowed' ||
+          lastErrCode === 'service-not-allowed' ||
+          lastErrCode === 'not-supported'
+        ) {
+          setShowVoiceTips(true);
+        }
+      },
+      onEnd: () => {
+        setInterimTranscript('');
+        setIsListening(false);
+        isListeningRef.current = false;
+      },
+    });
+  };
+  startListeningRef.current = startListening;
+
+  const speakBotReply = (spokenMessage: string, allowAutoListen: boolean) => {
+    clearAutoListenTimer();
+    if (!voiceReplyEnabledRef.current || viewModeRef.current !== 'chat') return;
+    speakKoreanText(spokenMessage, {
+      onStart: () => {
+        setIsSpeaking(true);
+        setVoiceAutoplayBlocked(false);
+      },
+      onEnd: () => {
+        setIsSpeaking(false);
+        if (
+          allowAutoListen &&
+          voiceReplyEnabledRef.current &&
+          viewModeRef.current === 'chat' &&
+          !voiceCheckoutCompletedRef.current &&
+          getSpeechRecognitionConstructor()
+        ) {
+          autoListenTimerRef.current = window.setTimeout(() => {
+            startListeningRef.current();
+          }, 250);
+        }
+      },
+      onError: () => {
+        setIsSpeaking(false);
+        setVoiceAutoplayBlocked(true);
+      },
+    });
+  };
 
   useEffect(() => {
-    if (!voiceReplyEnabled || messages.length === 0) return;
+    bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isListening, isSpeaking]);
+
+  useEffect(() => {
+    if (viewMode === 'search') {
+      clearAutoListenTimer();
+      stopVoiceRef.current?.();
+      stopSpeaking();
+      setIsSpeaking(false);
+      setIsListening(false);
+      isListeningRef.current = false;
+      setInterimTranscript('');
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (!voiceReplyEnabled || viewMode !== 'chat' || messages.length === 0) {
+      return;
+    }
     const last = messages[messages.length - 1];
     if (
       last.sender === 'bot' &&
@@ -466,34 +744,242 @@ export function AiChatOrderView({
       last.id !== lastSpokenMsgIdRef.current
     ) {
       lastSpokenMsgIdRef.current = last.id;
-      speakKoreanText(last.text);
+      speakBotReply(
+        last.spokenText ?? last.text,
+        !voiceCheckoutCompletedRef.current
+      );
     }
-  }, [messages, voiceReplyEnabled]);
+  }, [messages, voiceReplyEnabled, viewMode]);
 
   useEffect(() => {
-    if (voiceReplyEnabled && getSpeechRecognitionConstructor()) {
-      stopSpeaking();
-      setIsListening(true);
-      stopVoiceRef.current = startKoreanVoiceInput({
-        onTranscript: (text) => {
-          setIsListening(false);
-          void runChatQueryRef.current(text);
-        },
-        onUnavailableOrError: () => {
-          setIsListening(false);
-        },
-        onEnd: () => {
-          setIsListening(false);
-        },
-      });
+    if (
+      !didInitialGreetRef.current &&
+      voiceReplyEnabledRef.current &&
+      viewModeRef.current === 'chat'
+    ) {
+      didInitialGreetRef.current = true;
+      const last = messages[messages.length - 1];
+      if (last && last.sender === 'bot') {
+        lastSpokenMsgIdRef.current = last.id;
+        const textToSpeak =
+          last.id === 'welcome'
+            ? '어떤 음식을 찾아드릴까요?'
+            : last.spokenText ?? last.text;
+        speakBotReply(textToSpeak, true);
+      }
     }
 
     return () => {
+      clearAutoListenTimer();
       stopVoiceRef.current?.();
-      stopSpeaking();
+      if (!keepSpeechOnUnmountRef.current) {
+        stopSpeaking();
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const buildVoiceCheckoutSummary = (draft: VoiceCheckoutDraft) => {
+    const menu = menuMap.get(draft.menuId);
+    const store = menu ? storeMap.get(menu.storeId) : undefined;
+    if (!menu || !store) return null;
+
+    const qty = Math.min(Math.max(1, draft.servings), Math.max(1, menu.stock));
+    const unitPrice = getEffectiveMenuPrice(menu);
+    const selectedOpts = menu.options.filter((o) =>
+      draft.selectedOptionIds.includes(o.id)
+    );
+    const optionsSubtotal =
+      selectedOpts.reduce((sum, o) => sum + o.priceDelta, 0) * qty;
+    const menuSubtotal = unitPrice * qty;
+    const originalMenuSubtotal = menu.pricePerPerson * qty;
+    const deliveryFee = store.deliveryFee;
+    const preCouponTotal = menuSubtotal + optionsSubtotal + deliveryFee;
+    const bestCoupon = getBestCoupon(MOCK_COUPONS, {
+      menuSubtotal,
+      stampCount,
+      paymentMethod: draft.paymentMethod,
+    });
+    const couponDiscount =
+      bestCoupon.code !== 'NONE'
+        ? Math.min(bestCoupon.discountAmount, preCouponTotal)
+        : 0;
+    const finalTotal = Math.max(0, preCouponTotal - couponDiscount);
+    const savings = estimateCompetitorSavings({
+      menuSubtotal,
+      originalMenuSubtotal,
+      deliveryFee,
+      originalDeliveryFee: deliveryFee,
+      couponDiscount,
+      isSameStorePrice: menu.storePrice === menu.pricePerPerson,
+    });
+    const effectiveMinutes =
+      menu.estimatedMinutes + (store.extraPrepMinutes ?? 0);
+    const paymentOption =
+      paymentOptions.find((p) => p.id === draft.paymentMethod) ??
+      paymentOptions[0];
+
+    return {
+      menu,
+      store,
+      qty,
+      selectedOpts,
+      unitPrice,
+      menuSubtotal,
+      optionsSubtotal,
+      deliveryFee,
+      preCouponTotal,
+      bestCoupon,
+      couponDiscount,
+      finalTotal,
+      savings,
+      effectiveMinutes,
+      paymentOption,
+    };
+  };
+
+  const openCheckoutDraftMessage = (
+    draft: VoiceCheckoutDraft,
+    leadPrefix?: string
+  ) => {
+    const summary = buildVoiceCheckoutSummary(draft);
+    if (!summary) return;
+    setVoiceCheckoutDraft(draft);
+    const couponPart =
+      summary.couponDiscount > 0 && summary.bestCoupon
+        ? `${summary.bestCoupon.label} 쿠폰까지 자동 적용해 `
+        : '';
+    const notePart = draft.customerNote.trim()
+      ? ` · 요청 "${draft.customerNote.trim()}"`
+      : '';
+    const spoken = `${leadPrefix ? `${leadPrefix} ` : ''}${summary.store.name} ${summary.menu.name} ${summary.qty}인분, ${couponPart}최종 결제 금액은 ${formatWon(summary.finalTotal)}입니다. ${summary.paymentOption.label}로 바로 결제할까요? 결제해줘 또는 취소라고 말씀해 주세요.`;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `b-checkout-${Date.now() + 1}`,
+        sender: 'bot',
+        text: `${summary.store.name} · ${summary.menu.name} ${summary.qty}인분 최종 결제 금액 ${formatWon(summary.finalTotal)}${notePart}. 아래 카드에서 결제 수단을 확인하시거나 말씀으로 '결제해줘'라고 해주세요.`,
+        spokenText: spoken,
+        stagedMenuId: draft.menuId,
+        checkoutDraftSnapshot: draft,
+        aiSource: 'rule',
+      },
+    ]);
+  };
+
+  const executeVoiceOrder = (draft: VoiceCheckoutDraft) => {
+    const summary = buildVoiceCheckoutSummary(draft);
+    if (!summary) return;
+
+    if (
+      !summary.store.isOpen ||
+      summary.menu.isSoldOut ||
+      summary.menu.stock < summary.qty
+    ) {
+      const msgText =
+        '죄송하지만 선택한 메뉴가 방금 품절되었거나 영업이 중단되었어요. 다른 메뉴를 찾아드릴까요?';
+      setVoiceCheckoutDraft(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-soldout-${Date.now() + 1}`,
+          sender: 'bot',
+          text: msgText,
+          spokenText: msgText,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (draft.paymentMethod === 'alle_pay' && walletBalance < summary.finalTotal) {
+      const shortText = `alle페이 잔액(${formatWon(walletBalance)})이 결제 금액(${formatWon(summary.finalTotal)})보다 부족합니다. 카카오페이나 토스페이 등 다른 결제 수단을 말씀하거나 눌러 주세요.`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-payerr-${Date.now() + 1}`,
+          sender: 'bot',
+          text: shortText,
+          spokenText: shortText,
+          checkoutDraftSnapshot: draft,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    if (!onCompleteVoiceOrder) {
+      onProceedToConfirm({
+        menuId: summary.menu.id,
+        servings: summary.qty,
+        selectedOptionIds: summary.selectedOpts.map((o) => o.id),
+        couponCode: summary.bestCoupon?.code ?? 'NONE',
+      });
+      return;
+    }
+
+    const orderLine: OrderLineItem = {
+      menuId: summary.menu.id,
+      menuName: summary.menu.name,
+      unitPrice: summary.unitPrice,
+      originalUnitPrice: summary.menu.pricePerPerson,
+      quantity: summary.qty,
+      selectedOptionIds: summary.selectedOpts.map((o) => o.id),
+      selectedOptionNames: summary.selectedOpts.map((o) => o.name),
+      optionsSubtotal: summary.optionsSubtotal,
+      lineSubtotal: summary.menuSubtotal,
+    };
+
+    keepSpeechOnUnmountRef.current = true;
+    clearAutoListenTimer();
+    stopVoiceRef.current?.();
+    setIsListening(false);
+    isListeningRef.current = false;
+
+    const result = onCompleteVoiceOrder({
+      menuId: summary.menu.id,
+      servings: summary.qty,
+      selectedOptionIds: summary.selectedOpts.map((o) => o.id),
+      items: [orderLine],
+      couponCode: summary.bestCoupon?.code ?? 'NONE',
+      couponDiscount: summary.couponDiscount,
+      sharedDeliveryApplied: false,
+      reservationSlot: null,
+      customerAlias: '음성 주문 고객',
+      addressAlias: activeLocation?.detailAddress ?? '문 앞 배달',
+      customerNote: draft.customerNote || defaultNote || '',
+      paymentMethod: draft.paymentMethod,
+      paymentMethodLabel: summary.paymentOption.label,
+      estimatedSavings: summary.savings.totalSaved,
+    });
+
+    if (result.ok) {
+      setVoiceCheckoutCompleted(true);
+      voiceCheckoutCompletedRef.current = true;
+      setVoiceCheckoutDraft(null);
+      if (voiceReplyEnabledRef.current) {
+        speakKoreanText(
+          `주문이 완료되었습니다! ${summary.store.name}에서 조리를 시작하면 약 ${summary.effectiveMinutes}분 뒤에 도착할 예정이에요.`
+        );
+      }
+      return;
+    }
+
+    keepSpeechOnUnmountRef.current = false;
+    const errText = result.error ?? '주문을 처리하지 못했어요. 다시 시도해 주세요.';
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `b-orderr-${Date.now() + 1}`,
+        sender: 'bot',
+        text: errText,
+        spokenText: errText,
+        checkoutDraftSnapshot: draft,
+        aiSource: 'rule',
+      },
+    ]);
+  };
 
   const runChatQuery = async (rawText: string) => {
     const trimmed = rawText.trim();
@@ -504,6 +990,388 @@ export function AiChatOrderView({
       sender: 'user',
       text: trimmed,
     };
+
+    if (/^(초기화|처음부터|새로\s*시작|새\s*대화)/.test(trimmed)) {
+      const defaultParsed = parseConditionInput(
+        '성인 2명, 얼큰한 국물, 총액 25,000원 이하, 30분 이내'
+      );
+      const defaultEval = evaluateRecommendations(
+        defaultParsed,
+        stores,
+        menus,
+        activeLocation
+      );
+      setVoiceCheckoutDraft(null);
+      setVoiceCheckoutCompleted(false);
+      voiceCheckoutCompletedRef.current = false;
+      setActiveCondition(defaultParsed);
+      setInput('');
+      setMessages([
+        {
+          id: `welcome-${Date.now()}`,
+          sender: 'bot',
+          text: '어떤 음식을 찾아드릴까요? 아래 빠른 버튼을 누르거나 직접 말씀해 보세요.',
+          spokenText: '새 대화를 시작할게요. 어떤 음식을 찾아드릴까요?',
+          parsed: defaultParsed,
+          matchedMenuIds: defaultEval.matches.slice(0, 3).map((m) => m.menu.id),
+          servings: defaultParsed.servings,
+        },
+      ]);
+      return;
+    }
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
+
+    const parsedInline = parseConditionInput(trimmed);
+    const activeMenu = latestStagedMenuId
+      ? menuMap.get(latestStagedMenuId)
+      : undefined;
+    const activeStore = activeMenu
+      ? storeMap.get(activeMenu.storeId)
+      : undefined;
+    const hasDishCategory = parsedInline.tags.some((t) =>
+      DISH_CATEGORY_TAGS.has(t)
+    );
+    const matchesCurrentStagedDish =
+      Boolean(activeMenu) &&
+      parsedInline.tags.some(
+        (t) =>
+          DISH_CATEGORY_TAGS.has(t) &&
+          (activeMenu!.tags.includes(t) ||
+            activeMenu!.name.includes(t) ||
+            (activeStore?.category ?? '').includes(t))
+      );
+
+    // 1. Active checkout voice confirmation loop
+    if (voiceCheckoutDraft) {
+      const currentSummary = buildVoiceCheckoutSummary(voiceCheckoutDraft);
+      const isCancel =
+        /(결제\s*취소|주문\s*취소|취소|그만|잠깐|안\s*할|다른\s*거|아니)/.test(
+          trimmed
+        );
+      if (isCancel) {
+        setVoiceCheckoutDraft(null);
+        if (hasDishCategory && !matchesCurrentStagedDish) {
+          // fall through to search the new dish right below
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-cancel-${Date.now() + 1}`,
+              sender: 'bot',
+              text: '네, 결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
+              spokenText: '네, 결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
+              aiSource: 'rule',
+            },
+          ]);
+          return;
+        }
+      } else if (hasDishCategory && !matchesCurrentStagedDish) {
+        setVoiceCheckoutDraft(null);
+      } else {
+        const spokenPay = detectPaymentMethodFromSpeech(trimmed);
+        const spokenQty = extractExplicitQuantity(trimmed);
+        const isConfirm =
+          /^(네|예|응|어|좋아|오케이|ok|확인|진행|결제|결재|주문)/.test(
+            trimmed.toLowerCase()
+          ) ||
+          /(결제\s*해|결재\s*해|주문\s*해|진행\s*해|바로\s*결제|그렇게\s*해|해\s*줘|할게)/.test(
+            trimmed
+          );
+        const isNoteEdit = /(문\s*앞|벨|노크|조심히|전화|요청|적어)/.test(
+          trimmed
+        );
+
+        let updatedDraft: VoiceCheckoutDraft = { ...voiceCheckoutDraft };
+        if (spokenPay) {
+          updatedDraft = { ...updatedDraft, paymentMethod: spokenPay };
+        }
+        if (spokenQty && currentSummary) {
+          updatedDraft = {
+            ...updatedDraft,
+            servings: Math.min(spokenQty, Math.max(1, currentSummary.menu.stock)),
+          };
+        }
+        if (isNoteEdit) {
+          updatedDraft = { ...updatedDraft, customerNote: trimmed };
+        }
+
+        if (isConfirm && !spokenQty && !isNoteEdit) {
+          executeVoiceOrder(updatedDraft);
+          return;
+        }
+
+        if (spokenPay || spokenQty || isNoteEdit) {
+          openCheckoutDraftMessage(
+            updatedDraft,
+            spokenPay ? '결제 수단을 반영했어요.' : '주문 내용을 수정했어요.'
+          );
+          return;
+        }
+
+        if (currentSummary) {
+          const rePrompt = `${currentSummary.paymentOption.label}로 최종 ${formatWon(currentSummary.finalTotal)} 결제할까요? '결제해줘' 또는 '취소'라고 말씀해 주세요.`;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-reask-${Date.now() + 1}`,
+              sender: 'bot',
+              text: rePrompt,
+              spokenText: rePrompt,
+              checkoutDraftSnapshot: voiceCheckoutDraft,
+              aiSource: 'rule',
+            },
+          ]);
+          return;
+        }
+      }
+    }
+
+    // 2. Ask about other recommended choices in the current list
+    if (
+      latestMatchedIds.length > 1 &&
+      /(다른\s*메뉴|나머지|2번\s*뭐|두\s*번째\s*뭐|3번\s*뭐|세\s*번째\s*뭐|다른\s*건\s*뭐)/.test(
+        trimmed
+      )
+    ) {
+      const descriptions = latestMatchedIds
+        .map((id, idx) => {
+          const m = menuMap.get(id);
+          const s = m ? storeMap.get(m.storeId) : undefined;
+          if (!m || !s) return null;
+          return `${idx + 1}번째 ${s.name}의 ${m.name} ${formatWon(getEffectiveMenuPrice(m))}`;
+        })
+        .filter((x): x is string => Boolean(x));
+
+      const replyText = `현재 추천 목록은 ${descriptions.join(', ')}입니다. 몇 번째 메뉴로 선택할까요?`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-list-${Date.now() + 1}`,
+          sender: 'bot',
+          text: replyText,
+          spokenText: replyText,
+          matchedMenuIds: latestMatchedIds,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    // 3. Pick by ordinal (1st / 2nd / 3rd) or menu/store name match
+    let pickedMenu: MenuItem | undefined;
+    if (latestMatchedIds.length > 0 && /(첫\s*번째|1번|1순위|맨\s*앞)/.test(trimmed)) {
+      pickedMenu = menuMap.get(latestMatchedIds[0]);
+    } else if (
+      latestMatchedIds.length > 1 &&
+      /(두\s*번째|2번|2순위)/.test(trimmed)
+    ) {
+      pickedMenu = menuMap.get(latestMatchedIds[1]);
+    } else if (
+      latestMatchedIds.length > 2 &&
+      /(세\s*번째|3번|3순위)/.test(trimmed)
+    ) {
+      pickedMenu = menuMap.get(latestMatchedIds[2]);
+    } else if (latestMatchedIds.length > 0 && !hasDishCategory) {
+      const compactInput = trimmed.replace(/\s+/g, '').toLowerCase();
+      for (const id of latestMatchedIds) {
+        const candidate = menuMap.get(id);
+        const st = candidate ? storeMap.get(candidate.storeId) : undefined;
+        if (!candidate || !st) continue;
+        const mKey = candidate.name.replace(/\s+/g, '').toLowerCase();
+        const sKey = st.name.replace(/\s+/g, '').toLowerCase();
+        if (
+          (mKey.length >= 2 && compactInput.includes(mKey)) ||
+          (sKey.length >= 2 && compactInput.includes(sKey))
+        ) {
+          pickedMenu = candidate;
+          break;
+        }
+      }
+    }
+
+    if (pickedMenu) {
+      const pickedStore = storeMap.get(pickedMenu.storeId);
+      const qty = Math.min(
+        Math.max(1, stagedServings[pickedMenu.id] ?? activeCondition.servings ?? 1),
+        Math.max(1, pickedMenu.stock)
+      );
+      setStagedServings((prev) => ({ ...prev, [pickedMenu!.id]: qty }));
+      const totalEst =
+        getEffectiveMenuPrice(pickedMenu) * qty +
+        (pickedStore?.deliveryFee ?? 0);
+      const msg = `${pickedStore?.name ?? ''} ${pickedMenu.name} ${qty}인분, 배달비 포함 ${formatWon(totalEst)}으로 골랐어요. 수량이나 옵션을 바꿀까요, 바로 결제할까요?`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-choose-${Date.now() + 1}`,
+          sender: 'bot',
+          text: msg,
+          spokenText: msg,
+          stagedMenuId: pickedMenu!.id,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    // 4. Query or toggle options on the active staged menu
+    if (activeMenu && activeStore && (!hasDishCategory || matchesCurrentStagedDish)) {
+      if (/(옵션\s*뭐|추가\s*뭐|토핑\s*뭐)/.test(trimmed)) {
+        const optReply =
+          activeMenu.options.length > 0
+            ? `${activeMenu.name} 선택 가능 옵션은 ${activeMenu.options
+                .map((o) => `${o.name} ${formatWon(o.priceDelta)}`)
+                .join(', ')}입니다. 추가할 옵션을 말씀해 주세요.`
+            : `${activeMenu.name}에는 별도 추가 옵션이 없어요. 바로 결제할까요?`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-opts-${Date.now() + 1}`,
+            sender: 'bot',
+            text: optReply,
+            spokenText: optReply,
+            stagedMenuId: activeMenu.id,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
+
+      const compactInput = trimmed.replace(/\s+/g, '').toLowerCase();
+      const matchedOpt = activeMenu.options.find((opt) => {
+        const optKey = opt.name.replace(/\s+/g, '').toLowerCase();
+        return optKey.length >= 2 && compactInput.includes(optKey);
+      });
+      if (matchedOpt) {
+        const curOpts = stagedOptions[activeMenu.id] ?? [];
+        const isRemoving = /(빼|제외|취소)/.test(trimmed);
+        const nextOpts = isRemoving
+          ? curOpts.filter((id) => id !== matchedOpt.id)
+          : curOpts.includes(matchedOpt.id)
+            ? curOpts
+            : [...curOpts, matchedOpt.id];
+        setStagedOptions((prev) => ({ ...prev, [activeMenu.id]: nextOpts }));
+        const qty = stagedServings[activeMenu.id] ?? 1;
+        const optSum =
+          activeMenu.options
+            .filter((o) => nextOpts.includes(o.id))
+            .reduce((s, o) => s + o.priceDelta, 0) * qty;
+        const est =
+          getEffectiveMenuPrice(activeMenu) * qty +
+          optSum +
+          activeStore.deliveryFee;
+        const optText = isRemoving
+          ? `${matchedOpt.name} 옵션을 뺐어요. 예상 금액은 ${formatWon(est)}입니다. 바로 결제할까요?`
+          : `${matchedOpt.name} 옵션을 추가했어요. 배달비 포함 ${formatWon(est)}입니다. 바로 결제할까요?`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-optset-${Date.now() + 1}`,
+            sender: 'bot',
+            text: optText,
+            spokenText: optText,
+            stagedMenuId: activeMenu.id,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
+    }
+
+    // 5. Modify quantity on active staged menu without switching dish
+    const spokenQtyOnly = extractExplicitQuantity(trimmed);
+    const wantsCheckoutNow =
+      /(결제|결재|주문\s*해|시켜\s*줘|바로\s*주문|이걸로\s*할|그걸로\s*할|그거로\s*할|할게)/.test(
+        trimmed
+      ) || Boolean(detectPaymentMethodFromSpeech(trimmed));
+
+    if (
+      spokenQtyOnly &&
+      !hasDishCategory &&
+      !wantsCheckoutNow &&
+      activeMenu &&
+      activeStore
+    ) {
+      const nextQty = Math.min(spokenQtyOnly, Math.max(1, activeMenu.stock));
+      setStagedServings((prev) => ({ ...prev, [activeMenu.id]: nextQty }));
+      const curOpts = stagedOptions[activeMenu.id] ?? [];
+      const optSum =
+        activeMenu.options
+          .filter((o) => curOpts.includes(o.id))
+          .reduce((s, o) => s + o.priceDelta, 0) * nextQty;
+      const newEst =
+        getEffectiveMenuPrice(activeMenu) * nextQty +
+        optSum +
+        activeStore.deliveryFee;
+      const qtyReply = `${activeMenu.name} ${nextQty}인분으로 변경했어요. 배달비 포함 ${formatWon(newEst)}입니다. 바로 결제할까요?`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-qty-${Date.now() + 1}`,
+          sender: 'bot',
+          text: qtyReply,
+          spokenText: qtyReply,
+          stagedMenuId: activeMenu.id,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    // 6. Add to cart by voice
+    if (/(장바구니|담아\s*줘|담아\s*둘)/.test(trimmed) && activeMenu && activeStore) {
+      const qty = stagedServings[activeMenu.id] ?? 1;
+      const opts = stagedOptions[activeMenu.id] ?? [];
+      onAddToCart?.(activeMenu.id, qty, opts);
+      const cartMsg = `${activeMenu.name} ${qty}인분을 장바구니에 담았어요! 다른 메뉴를 더 보실까요, 바로 결제할까요?`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-cart-${Date.now() + 1}`,
+          sender: 'bot',
+          text: cartMsg,
+          spokenText: cartMsg,
+          stagedMenuId: activeMenu.id,
+          aiSource: 'rule',
+        },
+      ]);
+      return;
+    }
+
+    // 7. Proceed to in-chat checkout confirmation for staged menu
+    const lastBot = [...messages].reverse().find((m) => m.sender === 'bot');
+    const canAffirmFromLastBot =
+      Boolean(lastBot) &&
+      lastBot!.id !== 'welcome' &&
+      !lastBot!.id.startsWith('welcome-') &&
+      !lastBot!.parsed?.needsConfirmation &&
+      !lastBot!.isEmptyRelaxPrompt;
+
+    const isProceedToCheckoutIntent =
+      (!hasDishCategory || matchesCurrentStagedDish) &&
+      Boolean(activeMenu && activeStore) &&
+      (wantsCheckoutNow ||
+        (canAffirmFromLastBot &&
+          /^(네|예|응|어|좋아|오케이|ok)$/.test(trimmed.toLowerCase())));
+
+    if (isProceedToCheckoutIntent && activeMenu && activeStore) {
+      const baseQty =
+        spokenQtyOnly ??
+        stagedServings[activeMenu.id] ??
+        Math.min(activeCondition.servings || 1, Math.max(1, activeMenu.stock));
+      const qty = Math.min(Math.max(1, baseQty), Math.max(1, activeMenu.stock));
+      const paymentMethod = detectPaymentMethodFromSpeech(trimmed) ?? 'kakaopay';
+      openCheckoutDraftMessage({
+        menuId: activeMenu.id,
+        servings: qty,
+        selectedOptionIds: stagedOptions[activeMenu.id] ?? [],
+        paymentMethod,
+        customerNote: defaultNote ?? '',
+      });
+      return;
+    }
 
     // Greeting / open-ended handling
     if (
@@ -527,25 +1395,24 @@ export function AiChatOrderView({
           [topOpen[0].menu.id]: Math.min(openParsed.servings, Math.max(1, topOpen[0].menu.stock)),
         }));
       }
+      const spokenOpen = topOpen[0]
+        ? `반갑습니다! 지금 가장 빠른 추천 메뉴는 ${topOpen[0].store.name}의 ${topOpen[0].menu.name}, ${formatWon(topOpen[0].estimatedTotal)}입니다. 이 메뉴로 주문할까요, 다른 음식을 말씀해 주실래요?`
+        : '반갑습니다! 어떤 음식을 드시고 싶으신가요?';
       setMessages((prev) => [
         ...prev,
-        userMsg,
         {
           id: `b-${Date.now() + 1}`,
           sender: 'bot',
           text: '반갑습니다! 지금 바로 주문할 수 있는 내 주변 인기 메뉴 3곳을 먼저 보여드릴게요. 치킨·마라탕·카페·야식처럼 원하시는 메뉴를 말씀해 주셔도 좋아요.',
+          spokenText: spokenOpen,
           parsed: openParsed,
           matchedMenuIds: topOpen.map((m) => m.menu.id),
           servings: openParsed.servings,
           stagedMenuId: topOpen[0]?.menu.id,
         },
       ]);
-      setInput('');
       return;
     }
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
 
     // Special local-commerce intent routing (마감특가 / 시장묶음 / 공동구매 / B2B / 릴레이쿠폰)
     if (/(마감|타임세일|떨이|잔여\s*특가)/.test(trimmed)) {
@@ -561,6 +1428,15 @@ export function AiChatOrderView({
         })
         .slice(0, 3);
 
+      const firstClosing = closingMenus[0];
+      const firstClosingStore = firstClosing
+        ? storeMap.get(firstClosing.storeId)
+        : undefined;
+      const closingSpoken =
+        firstClosing && firstClosingStore
+          ? `동네 마감 특가 ${closingMenus.length}곳을 찾았어요. 1순위는 ${firstClosingStore.name} ${firstClosing.name} ${formatWon(getEffectiveMenuPrice(firstClosing))}입니다. 바로 결제할까요?`
+          : '현재 마감 특가가 잠시 소진되었어요. 다른 메뉴를 찾아드릴까요?';
+
       setMessages((prev) => [
         ...prev,
         {
@@ -570,6 +1446,7 @@ export function AiChatOrderView({
             closingMenus.length > 0
               ? `지금 바로 주문 가능한 동네 마감 특가(최대 30% 할인) 메뉴 ${closingMenus.length}곳을 찾았어요! 매장 동일가 기준에서 추가 할인되어 바로 결제하실 수 있어요.`
               : '현재 진행 중인 마감 특가 메뉴가 잠시 소진되었습니다. 대신 일반 매장 동일가 인기 메뉴를 찾아드릴까요?',
+          spokenText: closingSpoken,
           matchedMenuIds: closingMenus.map((m) => m.id),
           servings: 1,
           stagedMenuId: closingMenus[0]?.id,
@@ -580,12 +1457,15 @@ export function AiChatOrderView({
     }
 
     if (/(시장|한\s*바구니|여러\s*가게|합배송|골목\s*묶음)/.test(trimmed)) {
+      const marketText =
+        '전통시장과 골목 가게 여러 곳의 메뉴를 최소주문금액 없이 한 바구니에 담고, 이웃 도보 통합 배달비 1회(1,500원)로 한 번에 받아보실 수 있어요.';
       setMessages((prev) => [
         ...prev,
         {
           id: `b-market-${Date.now() + 1}`,
           sender: 'bot',
-          text: '전통시장과 골목 가게 여러 곳의 메뉴를 최소주문금액 없이 한 바구니에 담고, 이웃 도보 통합 배달비 1회(1,500원)로 한 번에 받아보실 수 있어요.',
+          text: marketText,
+          spokenText: marketText,
           actionLink: onOpenSuperApp
             ? {
                 label: '전통시장·골목 한 바구니 담으러 가기 →',
@@ -599,12 +1479,15 @@ export function AiChatOrderView({
     }
 
     if (/(공동구매|배달비\s*아끼|배달비\s*절약|배달비\s*반값|1\/n)/.test(trimmed)) {
+      const groupText =
+        '반경 300m 이웃과 주문을 묶으면 배달비가 절반으로 줄어들어요! 지금 참여 가능한 동네 공동구매 목록을 바로 열어드릴까요?';
       setMessages((prev) => [
         ...prev,
         {
           id: `b-group-${Date.now() + 1}`,
           sender: 'bot',
-          text: '반경 300m 이웃과 주문을 묶으면 배달비가 절반으로 줄어들어요! 지금 참여 가능한 동네 공동구매 목록을 바로 열어드릴까요?',
+          text: groupText,
+          spokenText: groupText,
           actionLink: onOpenSuperApp
             ? {
                 label: '이웃 공동구매 참여하기 →',
@@ -618,12 +1501,15 @@ export function AiChatOrderView({
     }
 
     if (/(단체|회의|오피스|법인|야근\s*식사)/.test(trimmed)) {
+      const b2bText =
+        '오피스·회의 단체 주문은 오프피크 15분 정밀 예약으로 딱 맞춰 받아보실 수 있어요. B2B 예약 화면으로 바로 연결해 드릴게요.';
       setMessages((prev) => [
         ...prev,
         {
           id: `b-b2b-${Date.now() + 1}`,
           sender: 'bot',
-          text: '오피스·회의 단체 주문은 오프피크 15분 정밀 예약으로 딱 맞춰 받아보실 수 있어요. B2B 예약 화면으로 바로 연결해 드릴게요.',
+          text: b2bText,
+          spokenText: b2bText,
           actionLink: onOpenSuperApp
             ? {
                 label: '오피스 B2B 15분 예약 열기 →',
@@ -651,17 +1537,21 @@ export function AiChatOrderView({
         ? storeMap.get(relayCandidate.storeId)
         : undefined;
 
+      const relayText =
+        relayCandidate && relayStore
+          ? `반경 200m 동네 이웃 매장 '${relayStore.name}'에서 옆집 릴레이 1,000원 할인 쿠폰을 바로 쓰실 수 있어요!`
+          : '인근 골목상권 릴레이 쿠폰 적용 가능한 매장을 확인해 보세요.';
+
       setMessages((prev) => [
         ...prev,
         {
           id: `b-relay-${Date.now() + 1}`,
           sender: 'bot',
-          text:
-            relayCandidate && relayStore
-              ? `반경 200m 동네 이웃 매장 '${relayStore.name}'에서 옆집 릴레이 1,000원 할인 쿠폰을 바로 쓰실 수 있어요!`
-              : '인근 골목상권 릴레이 쿠폰 적용 가능한 매장을 확인해 보세요.',
+          text: relayText,
+          spokenText: relayText,
           matchedMenuIds: relayCandidate ? [relayCandidate.id] : [],
           servings: 1,
+          stagedMenuId: relayCandidate?.id,
           actionLink:
             relayCandidate && onUseRelayCoupon
               ? {
@@ -705,12 +1595,14 @@ export function AiChatOrderView({
     const topMatches = evaluated.matches.slice(0, 3);
 
     let botText = '';
+    let spokenText: string | undefined;
     let isEmptyRelaxPrompt = false;
 
     if (merged.needsConfirmation && merged.unknownTokens.length > 0) {
       botText = `말씀하신 ‘${merged.unknownTokens.join(
         ', '
       )}’에 어울리는 맛을 아래에서 선택해 주시면 바로 정확한 메뉴를 찾아드릴게요.`;
+      spokenText = `말씀하신 ${merged.unknownTokens.join(', ')}에 어울리는 맛을 화면에서 골라주세요.`;
     } else if (topMatches.length === 0) {
       isEmptyRelaxPrompt = true;
       botText = `${merged.servings}인${
@@ -718,12 +1610,18 @@ export function AiChatOrderView({
       }${
         merged.maxMinutes ? ` · ${merged.maxMinutes}분 이내` : ''
       } 조건을 모두 만족하는 메뉴를 찾지 못했어요. 조건을 조금 넓혀서 다시 찾아드릴까요?`;
+      spokenText =
+        '조건에 모두 맞는 메뉴를 못 찾았어요. 예산이나 시간을 조금 넓혀서 다시 찾아드릴까요?';
     } else if (aiConversationalReply) {
       botText = aiConversationalReply;
+      const top = topMatches[0];
+      spokenText = `${aiConversationalReply} ${top.store.name} ${top.menu.name}, 배달비 포함 ${formatWon(top.estimatedTotal)}입니다. 이 메뉴로 주문할까요?`;
     } else {
       const tagPart =
         merged.tags.length > 0 ? ` (${merged.tags.slice(0, 3).join('·')})` : '';
       botText = `${tagPart ? `${tagPart.trim()} ` : ''}조건에 딱 맞는 내 주변 추천 메뉴 ${topMatches.length}곳을 찾았어요. 1순위 메뉴는 아래에서 바로 담거나 결제하실 수 있어요.`;
+      const top = topMatches[0];
+      spokenText = `${top.store.name}의 ${top.menu.name} 외 ${Math.max(0, topMatches.length - 1)}곳을 찾았어요. 1순위는 배달비 포함 ${formatWon(top.estimatedTotal)}, 약 ${top.effectiveMinutes}분 도착입니다. 이 메뉴로 주문할까요, 다른 메뉴도 들어보실래요?`;
     }
 
     const autoStaged =
@@ -741,6 +1639,7 @@ export function AiChatOrderView({
       id: `b-${Date.now() + 1}`,
       sender: 'bot',
       text: botText,
+      spokenText,
       parsed: merged,
       matchedMenuIds: topMatches.map((m) => m.menu.id),
       servings: merged.servings,
@@ -861,6 +1760,7 @@ export function AiChatOrderView({
         id: `b-stage-${Date.now() + 1}`,
         sender: 'bot',
         text: `${item.name}, 정말 맛있죠! ${safeServings}인분으로 수량과 추가 옵션을 확인하신 뒤 바로 주문 확인으로 넘어가실 수 있어요.`,
+        spokenText: `${item.name} ${safeServings}인분으로 골랐어요. 수량이나 옵션을 바꾸거나 바로 결제할까요?`,
         stagedMenuId: item.id,
       },
     ]);
@@ -869,137 +1769,160 @@ export function AiChatOrderView({
   const handleToggleVoiceReply = () => {
     const next = !voiceReplyEnabled;
     setVoiceReplyEnabled(next);
+    voiceReplyEnabledRef.current = next;
     try {
       window.localStorage.setItem('alle_voice_reply_enabled', String(next));
     } catch {
       // ignore storage errors
     }
     if (!next) {
+      clearAutoListenTimer();
+      stopVoiceRef.current?.();
       stopSpeaking();
+      setIsSpeaking(false);
+      setIsListening(false);
+      isListeningRef.current = false;
+      setInterimTranscript('');
+      setVoiceAutoplayBlocked(false);
     } else {
       const lastBot = [...messages].reverse().find((m) => m.sender === 'bot');
       if (lastBot) {
         lastSpokenMsgIdRef.current = lastBot.id;
-        speakKoreanText(lastBot.text);
+        speakBotReply(
+          lastBot.id === 'welcome'
+            ? '어떤 음식을 찾아드릴까요?'
+            : lastBot.spokenText ?? lastBot.text,
+          true
+        );
       }
     }
   };
 
+  const handleUnlockVoiceGreeting = () => {
+    setVoiceAutoplayBlocked(false);
+    setVoiceReplyEnabled(true);
+    voiceReplyEnabledRef.current = true;
+    try {
+      window.localStorage.setItem('alle_voice_reply_enabled', 'true');
+    } catch {
+      // ignore storage errors
+    }
+    const lastBot = [...messages].reverse().find((m) => m.sender === 'bot');
+    const textToSpeak =
+      lastBot && lastBot.id !== 'welcome'
+        ? lastBot.spokenText ?? lastBot.text
+        : '어떤 음식을 찾아드릴까요?';
+    if (lastBot) {
+      lastSpokenMsgIdRef.current = lastBot.id;
+    }
+    speakBotReply(textToSpeak, true);
+  };
+
   const handleMicToggle = () => {
     if (isListening) {
+      clearAutoListenTimer();
       stopVoiceRef.current?.();
       setIsListening(false);
+      isListeningRef.current = false;
+      setInterimTranscript('');
       return;
     }
 
-    stopSpeaking();
-    setShowVoiceTips(false);
-    setIsListening(true);
-    stopVoiceRef.current = startKoreanVoiceInput({
-      onTranscript: (text) => {
-        setIsListening(false);
-        runChatQuery(text);
-      },
-      onUnavailableOrError: () => {
-        setIsListening(false);
-        setShowVoiceTips(true);
-      },
-      onEnd: () => {
-        setIsListening(false);
-      },
-    });
+    startListening();
   };
 
-  const isAiActive = isListening || isInputFocused || input.trim().length > 0;
+  const isAiActive =
+    isListening || isSpeaking || isInputFocused || input.trim().length > 0;
 
   return (
     <div className="max-w-3xl mx-auto os-card rounded-[32px] overflow-hidden flex flex-col min-h-[76vh]">
-      {/* Calm AI Studio Header */}
-      <div className="px-4 sm:px-7 py-3.5 bg-white border-b border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onBackToHome}
-            className="min-w-[38px] min-h-[38px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center text-[#1A1D1A] cursor-pointer transition-colors shrink-0"
-            aria-label="홈으로 돌아가기"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight truncate">
-              AI 주문 · 통합 검색
-            </h1>
-            <p className="text-xs text-[#687064] truncate">
-              {activeLocation?.areaName ?? '전국'} 기준 · 대화로 추천받거나 가게명을 직접 검색하세요
-            </p>
+      {/* Calm AI Studio Header (2-row layout prevents mobile truncation) */}
+      <div className="px-4 sm:px-6 py-3 bg-white border-b border-[#E8ECE4] space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={onBackToHome}
+              className="min-w-[38px] min-h-[38px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center text-[#1A1D1A] cursor-pointer transition-colors shrink-0"
+              aria-label="홈으로 돌아가기"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight whitespace-nowrap">
+                AI 주문
+              </h1>
+              <p className="text-xs text-[#687064] truncate">
+                {activeLocation?.areaName ?? '전국'} 기준 · 대화부터 결제까지
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {aiReady && (
+              <span className="hidden lg:inline-flex min-h-[36px] px-2.5 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>alle 분석</span>
+              </span>
+            )}
+            {viewMode === 'chat' && isSpeechSynthesisSupported() && (
+              <button
+                type="button"
+                onClick={handleToggleVoiceReply}
+                aria-pressed={voiceReplyEnabled}
+                className={`min-h-[36px] px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
+                  voiceReplyEnabled
+                    ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                    : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
+                }`}
+              >
+                {voiceReplyEnabled ? (
+                  <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <VolumeX className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{voiceReplyEnabled ? '음성 대화 ON' : '음성 꺼짐'}</span>
+              </button>
+            )}
+            {viewMode === 'chat' && (
+              <button
+                type="button"
+                onClick={() => runChatQuery('초기화')}
+                aria-label="새 대화 시작"
+                className="min-h-[36px] px-2.5 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl inline-flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">새 대화</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="inline-flex p-0.5 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
-            <button
-              type="button"
-              onClick={() => setViewMode('chat')}
-              className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
-                viewMode === 'chat'
-                  ? 'bg-[#4E6E2A] text-white'
-                  : 'text-[#555E52] hover:text-[#1A1D1A]'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>AI 대화</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('search')}
-              className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
-                viewMode === 'search'
-                  ? 'bg-[#4E6E2A] text-white'
-                  : 'text-[#555E52] hover:text-[#1A1D1A]'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>직접 검색</span>
-            </button>
-          </div>
-
-          {viewMode === 'chat' && isSpeechSynthesisSupported() && (
-            <button
-              type="button"
-              onClick={handleToggleVoiceReply}
-              aria-pressed={voiceReplyEnabled}
-              className={`min-h-[36px] px-3 py-1 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 cursor-pointer transition-colors border ${
-                voiceReplyEnabled
-                  ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                  : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
-              }`}
-            >
-              {voiceReplyEnabled ? (
-                <Volume2 className="w-3.5 h-3.5" />
-              ) : (
-                <VolumeX className="w-3.5 h-3.5" />
-              )}
-              <span className="hidden sm:inline">
-                {voiceReplyEnabled ? '음성 안내 ON' : '음성 안내'}
-              </span>
-            </button>
-          )}
-          {aiReady && (
-            <span className="hidden md:inline-flex min-h-[36px] px-3 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>alle 분석</span>
-            </span>
-          )}
-          {viewMode === 'chat' && (
-            <button
-              type="button"
-              onClick={() => runChatQuery('초기화')}
-              className="min-h-[36px] px-3 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">새 대화</span>
-            </button>
-          )}
+        <div className="grid grid-cols-2 p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
+          <button
+            type="button"
+            onClick={() => setViewMode('chat')}
+            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+              viewMode === 'chat'
+                ? 'bg-[#4E6E2A] text-white shadow-2xs'
+                : 'text-[#555E52] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI 대화 주문</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('search')}
+            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+              viewMode === 'search'
+                ? 'bg-[#4E6E2A] text-white shadow-2xs'
+                : 'text-[#555E52] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>가게·메뉴 직접 검색</span>
+          </button>
         </div>
       </div>
 
@@ -1544,15 +2467,213 @@ export function AiChatOrderView({
                   </div>
                 </div>
               )}
+
+              {/* Conversational Voice Checkout Confirmation Card */}
+              {msg.checkoutDraftSnapshot && (() => {
+                const isLiveCard =
+                  Boolean(voiceCheckoutDraft) && msg.id === latestCheckoutMsgId;
+                const activeDraft =
+                  isLiveCard && voiceCheckoutDraft
+                    ? voiceCheckoutDraft
+                    : msg.checkoutDraftSnapshot;
+                const summary = buildVoiceCheckoutSummary(activeDraft);
+                if (!summary) return null;
+
+                return (
+                  <div className="pl-1 sm:pl-12">
+                    {isLiveCard ? (
+                      <div className="max-w-md bg-white border-2 border-[#4E6E2A] rounded-2xl p-4 space-y-3 shadow-md">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span>음성·대화 간편 결제 확인</span>
+                          </span>
+                          <span className="text-[11px] font-semibold text-[#687064] truncate">
+                            {summary.store.name}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1 text-xs">
+                          <div className="flex items-center justify-between gap-2 font-bold text-[#1A1D1A]">
+                            <span className="truncate">
+                              {summary.menu.name} · {summary.qty}인분
+                            </span>
+                            <span className="font-mono tabular-nums shrink-0">
+                              {formatWon(
+                                summary.menuSubtotal + summary.optionsSubtotal
+                              )}
+                            </span>
+                          </div>
+                          {summary.selectedOpts.length > 0 && (
+                            <p className="text-[11px] text-[#687064]">
+                              옵션:{' '}
+                              {summary.selectedOpts.map((o) => o.name).join(', ')}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-[#687064] truncate">
+                            배달: {activeLocation?.areaName ?? ''}{' '}
+                            {activeLocation?.detailAddress ?? '문 앞 배달'} · 약{' '}
+                            {summary.effectiveMinutes}분
+                          </p>
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          <div className="flex items-center justify-between text-[#687064]">
+                            <span>배달비</span>
+                            <span className="font-mono tabular-nums">
+                              +{formatWon(summary.deliveryFee)}
+                            </span>
+                          </div>
+                          {summary.bestCoupon && summary.couponDiscount > 0 && (
+                            <div className="flex items-center justify-between text-[#4E6E2A] font-semibold">
+                              <span className="inline-flex items-center gap-1">
+                                <Ticket className="w-3.5 h-3.5" />
+                                <span>{summary.bestCoupon.label} (자동 적용)</span>
+                              </span>
+                              <span className="font-mono tabular-nums">
+                                -{formatWon(summary.couponDiscount)}
+                              </span>
+                            </div>
+                          )}
+                          {summary.savings.totalSaved > 0 && (
+                            <div className="text-[11px] font-semibold text-[#3D5720] bg-[#EAF1E2]/70 rounded-lg px-2.5 py-1">
+                              타 배달앱 대비 약{' '}
+                              {formatWon(summary.savings.totalSaved)} 절약
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5 pt-2 border-t border-[#E8ECE4]">
+                          <div className="text-[11px] font-bold text-[#687064]">
+                            결제 수단 (말씀하시거나 눌러서 변경)
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {paymentOptions.map((opt) => {
+                              const active =
+                                activeDraft.paymentMethod === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setVoiceCheckoutDraft((prev) =>
+                                      prev
+                                        ? { ...prev, paymentMethod: opt.id }
+                                        : prev
+                                    )
+                                  }
+                                  className={`min-h-[30px] px-2.5 py-1 rounded-lg border text-[11px] font-bold cursor-pointer transition-colors ${
+                                    active
+                                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                                      : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
+                                  }`}
+                                >
+                                  {opt.shortLabel}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {activeDraft.customerNote && (
+                          <p className="text-[11px] text-[#687064]">
+                            요청사항: {activeDraft.customerNote}
+                          </p>
+                        )}
+
+                        <div className="pt-2 border-t border-[#E8ECE4] flex items-baseline justify-between">
+                          <span className="text-xs font-bold text-[#1A1D1A]">
+                            최종 결제 금액
+                          </span>
+                          <span className="text-lg font-extrabold font-mono tabular-nums text-[#4E6E2A]">
+                            {formatWon(summary.finalTotal)}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVoiceCheckoutDraft(null);
+                              setMessages((prev) => [
+                                ...prev,
+                                {
+                                  id: `b-cancelbtn-${Date.now()}`,
+                                  sender: 'bot',
+                                  text: '결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
+                                  spokenText:
+                                    '결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
+                                  aiSource: 'rule',
+                                },
+                              ]);
+                            }}
+                            className="min-h-[42px] px-3 py-2 bg-[#F7F8F5] hover:bg-[#E8ECE4] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => executeVoiceOrder(activeDraft)}
+                            className="col-span-2 min-h-[42px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>지금 바로 결제 완료</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="max-w-md px-3.5 py-2.5 rounded-xl bg-white border border-[#E8ECE4] text-xs text-[#687064]">
+                        {summary.store.name} · {summary.menu.name} 결제 안내 (종료됨)
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
 
+        {voiceAutoplayBlocked && voiceReplyEnabled && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleUnlockVoiceGreeting}
+              className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md inline-flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Volume2 className="w-4 h-4 shrink-0" />
+              <span>터치해서 AI 음성 주문 시작하기 (&quot;어떤 음식을 찾아드릴까요?&quot;)</span>
+            </button>
+          </div>
+        )}
+
+        {isSpeaking && (
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
+            <span className="inline-flex items-center gap-2">
+              <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
+              <span>alle가 말씀드리고 있어요...</span>
+            </span>
+            <button
+              type="button"
+              onClick={startListening}
+              className="px-2.5 py-1 rounded-lg bg-white border border-[#D4E1C5] text-[#1A1D1A] text-[11px] font-bold hover:bg-[#F7F8F5] cursor-pointer shrink-0"
+            >
+              말 끊고 내가 말하기
+            </button>
+          </div>
+        )}
+
         {isListening && (
           <div className="flex justify-end">
-            <div className="px-4 py-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-bold rounded-2xl flex items-center gap-2">
-              <Mic className="w-4 h-4" />
-              <span>듣고 있어요... 말씀해 주세요</span>
+            <div className="max-w-[85%] px-4 py-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-bold rounded-2xl space-y-1">
+              <div className="flex items-center gap-2">
+                <Mic className="w-4 h-4 animate-pulse shrink-0" />
+                <span>듣고 있어요... 말씀해 주세요</span>
+              </div>
+              {interimTranscript && (
+                <p className="text-[11px] font-medium text-red-900">
+                  “{interimTranscript}”
+                </p>
+              )}
             </div>
           </div>
         )}

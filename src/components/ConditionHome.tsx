@@ -32,6 +32,8 @@ import {
   ParsedCondition,
   PaymentMethod,
   RecommendationMatch,
+  Review,
+  ReviewReply,
   SavedLocation,
   Store,
   SuperAppTab,
@@ -46,6 +48,7 @@ import { estimateCompetitorSavings } from '../utils/pricing';
 import { startKoreanVoiceInput } from '../utils/voice';
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
+import { MenuDetailReviewModal } from './MenuDetailReviewModal';
 
 interface ConditionHomeProps {
   rawInput: string;
@@ -54,6 +57,8 @@ interface ConditionHomeProps {
   stores: Store[];
   menus: MenuItem[];
   orders: Order[];
+  reviews?: Review[];
+  reviewReplies?: Record<string, ReviewReply>;
   stampCount: number;
   wishlistIds: string[];
   easyMode?: boolean;
@@ -184,6 +189,8 @@ export function ConditionHome({
   stores,
   menus,
   orders,
+  reviews = INITIAL_REVIEWS,
+  reviewReplies = {},
   stampCount,
   wishlistIds,
   easyMode = false,
@@ -204,6 +211,7 @@ export function ConditionHome({
 }: ConditionHomeProps) {
   const [activeCategoryChip, setActiveCategoryChip] =
     useState<QuickCategoryId>('all');
+  const [detailMenuId, setDetailMenuId] = useState<string | null>(null);
   const [showAdvancedInput, setShowAdvancedInput] = useState(false);
   const [editingPrefs, setEditingPrefs] = useState(false);
   const [draftPrefs, setDraftPrefs] = useState<UserPreferences>(preferences);
@@ -470,6 +478,27 @@ export function ConditionHome({
     },
   ];
 
+  const detailMenu = useMemo(
+    () =>
+      detailMenuId ? menus.find((m) => m.id === detailMenuId) ?? null : null,
+    [detailMenuId, menus]
+  );
+  const detailStore = useMemo(
+    () => (detailMenu ? storeMap.get(detailMenu.storeId) ?? null : null),
+    [detailMenu, storeMap]
+  );
+
+  const detailModal = (
+    <MenuDetailReviewModal
+      menu={detailMenu}
+      store={detailStore}
+      reviews={reviews}
+      reviewReplies={reviewReplies}
+      onClose={() => setDetailMenuId(null)}
+      onQuickOrder={(id, servings) => onQuickReorderToConfirm(id, servings)}
+    />
+  );
+
   // ============================================================================
   // EASY MODE HOME (Large Text, Voice-First, Max 2~3 Clear Choices)
   // ============================================================================
@@ -660,22 +689,33 @@ export function ConditionHome({
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    triggerQuickPay({
-                      menuId: item.menu.id,
-                      servings: item.servings,
-                    })
-                  }
-                  className="w-full min-h-[56px] bg-[#EAF1E2] hover:bg-[#DCE7CF] border-2 border-[#4E6E2A] text-[#3D5720] text-lg font-extrabold rounded-2xl cursor-pointer"
-                >
-                  바로 시키기
-                </button>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setDetailMenuId(item.menu.id)}
+                    className="min-h-[56px] bg-white hover:bg-[#F7F8F5] border-2 border-[#E8ECE4] text-[#1A1D1A] text-base font-extrabold rounded-2xl cursor-pointer"
+                  >
+                    상세 · 리뷰
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      triggerQuickPay({
+                        menuId: item.menu.id,
+                        servings: item.servings,
+                      })
+                    }
+                    className="min-h-[56px] bg-[#EAF1E2] hover:bg-[#DCE7CF] border-2 border-[#4E6E2A] text-[#3D5720] text-base font-extrabold rounded-2xl cursor-pointer"
+                  >
+                    바로 시키기
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         </section>
+
+        {detailModal}
       </div>
     );
   }
@@ -1240,7 +1280,7 @@ export function ConditionHome({
                       {topReview && (
                         <button
                           type="button"
-                          onClick={() => onQuickSelectMenu(item.menu.id)}
+                          onClick={() => setDetailMenuId(item.menu.id)}
                           className="w-full text-left px-2.5 py-2 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2]/60 border border-[#E8ECE4] text-[11px] text-[#434B40] line-clamp-2 leading-snug cursor-pointer transition-colors"
                         >
                           💬 “{topReview.content}”
@@ -1249,7 +1289,14 @@ export function ConditionHome({
                     </div>
                   </div>
 
-                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 gap-2">
+                  <div className="px-4 pb-4 pt-1 grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setDetailMenuId(item.menu.id)}
+                      className="min-h-[38px] px-1.5 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-[11.5px] font-bold rounded-xl whitespace-nowrap cursor-pointer transition-colors"
+                    >
+                      상세 · 리뷰
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
@@ -1257,9 +1304,9 @@ export function ConditionHome({
                           ? onAddToCart(item.menu.id, item.servings, [])
                           : onQuickSelectMenu(item.menu.id)
                       }
-                      className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      className="min-h-[38px] px-1.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11.5px] font-bold rounded-xl inline-flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer transition-colors"
                     >
-                      <ShoppingBag className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                      <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                       <span>담기</span>
                     </button>
                     <button
@@ -1270,9 +1317,9 @@ export function ConditionHome({
                           servings: item.servings,
                         })
                       }
-                      className="min-h-[38px] px-2.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      className="min-h-[38px] px-1.5 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[11.5px] font-bold rounded-xl inline-flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer transition-colors"
                     >
-                      <Zap className="w-3.5 h-3.5" />
+                      <Zap className="w-3.5 h-3.5 shrink-0" />
                       <span>1초 주문</span>
                     </button>
                   </div>
@@ -1517,6 +1564,8 @@ export function ConditionHome({
           </div>
         )}
       </section>
+
+      {detailModal}
     </div>
   );
 }
