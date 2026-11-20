@@ -255,7 +255,7 @@ export function SuperAppHubView({
           이웃 공동구매 · 오피스 B2B · 생활 심부름
         </h1>
         <p className="text-xs sm:text-sm text-[#555D51] leading-relaxed">
-          배달비를 나누는 반경 300m 공동구매부터 오프피크 단체 예약, 에스크로 기반 동네 심부름까지 한 번에 이용할 수 있습니다.
+          “같은 건물에서 주문을 기다리고 있어요” — 같은 건물·같은 매장·비슷한 수령시간을 묶어 배달 동선을 줄이고, 오프피크 B2B·생활 심부름까지 연결합니다.
         </p>
       </section>
 

@@ -33,6 +33,7 @@ import {
   MenuItem,
   Order,
   OrderStatus,
+  PartnerPlanTier,
   PriceReport,
   Review,
   ReviewReply,
@@ -79,8 +80,8 @@ interface OwnerDashboardViewProps {
   onSaveReviewReply: (reviewId: string, replyText: string) => void;
   onToggleReviewFlag: (reviewId: string, reason: string) => void;
   onAttachOwnerPhotos?: (orderId: string, photos: EvidencePhoto[]) => void;
-  ownerSaasSubscribed?: boolean;
-  onToggleOwnerSaas?: () => void;
+  ownerSaasPlan?: PartnerPlanTier;
+  onSelectOwnerSaasPlan?: (plan: PartnerPlanTier) => void;
   onSwitchToConsumer: () => void;
   onOpenAiSettings?: () => void;
 }
@@ -115,8 +116,8 @@ export function OwnerDashboardView({
   onSaveReviewReply,
   onToggleReviewFlag,
   onAttachOwnerPhotos,
-  ownerSaasSubscribed = false,
-  onToggleOwnerSaas,
+  ownerSaasPlan = 'trial',
+  onSelectOwnerSaasPlan,
   onSwitchToConsumer,
   onOpenAiSettings,
 }: OwnerDashboardViewProps) {
@@ -155,6 +156,55 @@ export function OwnerDashboardView({
 
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [savedReplyId, setSavedReplyId] = useState<string | null>(null);
+  const [campaignNotice, setCampaignNotice] = useState<string | null>(null);
+  const [aiMarketingNotice, setAiMarketingNotice] = useState<string | null>(
+    null
+  );
+
+  const PLAN_RANK: Record<PartnerPlanTier, number> = {
+    trial: 0,
+    basic: 1,
+    pro: 2,
+    premium: 3,
+  };
+  const PLAN_LABEL: Record<PartnerPlanTier, string> = {
+    trial: '체험형 (2개월 무료)',
+    basic: '베이직 (월 2.9만 원)',
+    pro: '프로 (월 5.9만 원)',
+    premium: '프리미엄 (월 9.9만 원)',
+  };
+  const hasPlan = (minPlan: PartnerPlanTier) =>
+    PLAN_RANK[ownerSaasPlan] >= PLAN_RANK[minPlan];
+
+  const renderPlanLock = (
+    minPlan: PartnerPlanTier,
+    featureTitle: string,
+    summary: string
+  ) => (
+    <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-dashed border-[#CBD4C4] space-y-2 flex flex-col justify-between">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-bold text-[#687064] flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5 text-[#8A9485] shrink-0" />
+            <span>{featureTitle}</span>
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-[#E8ECE4] text-[#555E52] text-[10px] font-bold shrink-0">
+            {PLAN_LABEL[minPlan]} 이상
+          </span>
+        </div>
+        <p className="text-[11px] text-[#687064] leading-snug">{summary}</p>
+      </div>
+      {onSelectOwnerSaasPlan && (
+        <button
+          type="button"
+          onClick={() => onSelectOwnerSaasPlan(minPlan)}
+          className="self-start px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11px] font-bold transition-colors cursor-pointer"
+        >
+          {PLAN_LABEL[minPlan]}으로 전환해 보기 →
+        </button>
+      )}
+    </div>
+  );
 
   useEffect(() => {
     return () => {
@@ -1374,78 +1424,238 @@ export function OwnerDashboardView({
             </div>
           </section>
 
-          {/* alle Partners SaaS Membership (19,000 KRW/mo) + Tax Book + Voicebot Log */}
+          {/* alle Partners Subscription Model (PPT Slides 10, 11, 13, 18) */}
           <section className="os-card rounded-3xl p-6 space-y-4 border border-[#DCE7CF]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A]">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>중개수수료 0% 자생 수익 모델 · 점주 구독형 운영 툴</span>
+                  <span>플랫폼 중개수수료 0% · 카드·PG 수수료 및 배달 수행비 별도</span>
                 </div>
                 <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A] mt-0.5">
-                  alle 파트너스 매장관리 SaaS (월 19,000원 · 첫 3개월 무료)
+                  파트너 구독요금제 (검증용 가설 · 광고비보다 관리 가능한 월 구독)
                 </h2>
               </div>
-              {onToggleOwnerSaas && (
-                <button
-                  type="button"
-                  onClick={onToggleOwnerSaas}
-                  aria-pressed={ownerSaasSubscribed}
-                  className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                    ownerSaasSubscribed
-                      ? 'bg-[#3D5720] text-white'
-                      : 'bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] border border-[#82B440]/50'
-                  }`}
-                >
-                  {ownerSaasSubscribed
-                    ? '✓ SaaS 멤버십 이용 중 (해지)'
-                    : 'SaaS 멤버십 시작 (첫 3개월 0원)'}
-                </button>
-              )}
+              <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
+                현재 선택:{' '}
+                {ownerSaasPlan === 'trial'
+                  ? '체험형 (2개월 무료)'
+                  : ownerSaasPlan === 'basic'
+                    ? '베이직 (월 2.9만원)'
+                    : ownerSaasPlan === 'pro'
+                      ? '프로 (월 5.9만원)'
+                      : '프리미엄 (월 9.9만원)'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+              {(
+                [
+                  {
+                    id: 'trial',
+                    name: '체험형',
+                    price: '2개월 무료',
+                    desc: '매장 등록 · 주문 접수',
+                  },
+                  {
+                    id: 'basic',
+                    name: '베이직',
+                    price: '월 2.9만 원',
+                    desc: '주문·단골 관리 · 기본 추천 노출',
+                  },
+                  {
+                    id: 'pro',
+                    name: '프로 (기준)',
+                    price: '월 5.9만 원',
+                    desc: '재방문 캠페인 · 매출 분석',
+                  },
+                  {
+                    id: 'premium',
+                    name: '프리미엄',
+                    price: '월 9.9만 원',
+                    desc: 'AI 마케팅 · 고급 고객 분석',
+                  },
+                ] as const
+              ).map((tier) => {
+                const active = ownerSaasPlan === tier.id;
+                return (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => onSelectOwnerSaasPlan?.(tier.id)}
+                    aria-pressed={active}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer space-y-1 ${
+                      active
+                        ? 'bg-[#EAF1E2] border-[#4E6E2A] ring-1 ring-[#4E6E2A]/30'
+                        : 'bg-[#F7F8F5] border-[#E8ECE4] hover:border-[#82B440]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-[#1A1D1A]">{tier.name}</span>
+                      {active && (
+                        <span className="text-[10px] font-extrabold text-[#3D5720]">
+                          ✓ 선택됨
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm font-extrabold text-[#3D5720]">
+                      {tier.price}
+                    </div>
+                    <p className="text-[11px] text-[#555E52] leading-snug">
+                      {tier.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              {(
+                [
+                  { min: 'trial' as PartnerPlanTier, label: '매장 등록 · 주문 접수' },
+                  { min: 'basic' as PartnerPlanTier, label: '단골 관리 · 세무 자동 정리' },
+                  { min: 'pro' as PartnerPlanTier, label: '재방문 캠페인 · 매출 분석' },
+                  { min: 'premium' as PartnerPlanTier, label: 'AI 마케팅 · 고급 고객 분석' },
+                ] as const
+              ).map((cap) => {
+                const enabled = hasPlan(cap.min);
+                return (
+                  <span
+                    key={cap.label}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border font-medium ${
+                      enabled
+                        ? 'bg-[#EAF1E2] border-[#CFE0BC] text-[#3D5720]'
+                        : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#8A9485]'
+                    }`}
+                  >
+                    {enabled ? (
+                      <CheckCircle2 className="w-3 h-3 shrink-0" />
+                    ) : (
+                      <Lock className="w-3 h-3 shrink-0" />
+                    )}
+                    <span>{cap.label}</span>
+                  </span>
+                );
+              })}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-              <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5">
-                <div className="font-bold text-[#1A1D1A]">
-                  📊 세무 · 부가세 장부 자동 정리
+              {hasPlan('basic') ? (
+                <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-[#1A1D1A]">
+                      📊 세무 · 부가세 장부 자동 정리
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
+                      베이직+
+                    </span>
+                  </div>
+                  <div className="text-[#687064] tabular-nums">
+                    과세표준(공급가액):{' '}
+                    <strong className="text-[#1A1D1A]">
+                      {formatWon(Math.round(analytics.totalRevenue / 1.1))}
+                    </strong>
+                  </div>
+                  <div className="text-[#687064] tabular-nums">
+                    예상 부가세(10%):{' '}
+                    <strong className="text-[#4E6E2A]">
+                      {formatWon(
+                        analytics.totalRevenue -
+                          Math.round(analytics.totalRevenue / 1.1)
+                      )}
+                    </strong>
+                  </div>
                 </div>
-                <div className="text-[#687064] tabular-nums">
-                  과세표준(공급가액):{' '}
-                  <strong className="text-[#1A1D1A]">
-                    {formatWon(Math.round(analytics.totalRevenue / 1.1))}
-                  </strong>
-                </div>
-                <div className="text-[#687064] tabular-nums">
-                  예상 부가세(10%):{' '}
-                  <strong className="text-[#4E6E2A]">
-                    {formatWon(
-                      analytics.totalRevenue -
-                        Math.round(analytics.totalRevenue / 1.1)
+              ) : (
+                renderPlanLock(
+                  'basic',
+                  '📊 세무 · 부가세 장부 자동 정리',
+                  '주문별 과세표준·예상 부가세(10%) 자동 집계를 제공합니다.'
+                )
+              )}
+
+              {hasPlan('pro') ? (
+                <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-[#1A1D1A]">
+                      📈 재방문 캠페인 & 매출 KPI
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
+                      프로+
+                    </span>
+                  </div>
+                  <p className="text-[#555E52] leading-snug">
+                    • 프로(5.9만 원) 기준 100개 점포 월 590만 · 추적 KPI: 30일 재주문율 · 공동배달 성사율
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCampaignNotice(
+                          `단골 ${Math.max(3, stampCount + 2)}명에게 1초 재주문 리마인드 캠페인을 발송했습니다.`
+                        )
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-[#4E6E2A] hover:bg-[#3D5720] text-white text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      단골 재방문 캠페인 발송
+                    </button>
+                    {campaignNotice && (
+                      <span className="text-[11px] text-[#3D5720] font-medium">
+                        ✓ {campaignNotice}
+                      </span>
                     )}
-                  </strong>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                renderPlanLock(
+                  'pro',
+                  '📈 재방문 캠페인 & 매출 KPI',
+                  '단골 재방문 푸시 캠페인 발송과 30일 재주문율·수익 시뮬레이션을 제공합니다.'
+                )
+              )}
 
-              <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5">
-                <div className="font-bold text-[#1A1D1A]">
-                  📞 부재중 AI 보이스봇 전화 응대
+              {hasPlan('premium') ? (
+                <div className="p-3.5 rounded-2xl bg-[#EAF1E2]/70 border border-[#DCE7CF] space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-[#3D5720]">
+                      📞 AI 마케팅 · 보이스봇 & 고객 분석
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#4E6E2A] text-white text-[10px] font-bold">
+                      프리미엄
+                    </span>
+                  </div>
+                  <p className="text-[#434B40] leading-snug">
+                    • 11:42 “단체 12인분 가능?” → 오프피크 11:30 예약 링크 자동 전송
+                  </p>
+                  <p className="text-[#434B40] leading-snug">
+                    • 세그먼트: 단골 재주문(42%) · 오프피크 직장인(35%) · 이웃 묶음(23%)
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAiMarketingNotice(
+                          '오프피크(11:30~12:00) 직장인 세그먼트에 AI 맞춤 메뉴 제안을 자동 발송했습니다.'
+                        )
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-[#3D5720] hover:bg-[#2F4418] text-white text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      AI 세그먼트 마케팅 실행
+                    </button>
+                    {aiMarketingNotice && (
+                      <span className="text-[11px] text-[#3D5720] font-medium">
+                        ✓ {aiMarketingNotice}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[#555E52] leading-snug">
-                  • 11:42 “단체 12인분 가능?” → 오프피크 11:30 예약 링크 전송
-                </p>
-                <p className="text-[#555E52] leading-snug">
-                  • 13:05 “주차 되나요?” → 매장 앞 2대 무료 주차 자동 안내
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#EAF1E2]/70 border border-[#DCE7CF] space-y-1.5">
-                <div className="font-bold text-[#3D5720]">
-                  💡 플랫폼 자생 수익 구조 (중개 0% · PG 실비만 점주 부담)
-                </div>
-                <p className="text-[#434B40] leading-snug">
-                  이웃·심부름 매칭비(건당 350원) · B2B 단체정산(3.5%) · 점주 SaaS(월 19,000원) · 오픈뱅킹(0.5%↓)으로 시 보조금 없이 흑자 운영
-                </p>
-              </div>
+              ) : (
+                renderPlanLock(
+                  'premium',
+                  '📞 AI 마케팅 · 보이스봇 & 고객 분석',
+                  '부재중 AI 보이스봇 자동 응대, 고객 세그먼트 분석 및 AI 자동 마케팅을 제공합니다.'
+                )
+              )}
             </div>
           </section>
 
@@ -1492,15 +1702,27 @@ export function OwnerDashboardView({
                         <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-[#687064] tabular-nums">
                           <span>
                             30일 수수료 절감{' '}
-                            <strong className="font-mono text-[#4E6E2A]">
-                              +{formatWon(storeProfit.savedCommissionAndAdFee)}
-                            </strong>
+                            {hasPlan('pro') ? (
+                              <strong className="font-mono text-[#4E6E2A]">
+                                +{formatWon(storeProfit.savedCommissionAndAdFee)}
+                              </strong>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[#8A9485]">
+                                <Lock className="w-3 h-3" /> 프로+
+                              </span>
+                            )}
                           </span>
                           <span>
                             단골 매칭 순증{' '}
-                            <strong className="font-mono text-[#1A1D1A]">
-                              +{formatWon(storeProfit.aiRegularIncrementalSales)}
-                            </strong>
+                            {hasPlan('basic') ? (
+                              <strong className="font-mono text-[#1A1D1A]">
+                                +{formatWon(storeProfit.aiRegularIncrementalSales)}
+                              </strong>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[#8A9485]">
+                                <Lock className="w-3 h-3" /> 베이직+
+                              </span>
+                            )}
                           </span>
                         </div>
                       )}
@@ -1533,10 +1755,23 @@ export function OwnerDashboardView({
               </div>
 
               <div className="pt-5 border-t border-[#E8ECE4] space-y-3">
-                <h3 className="text-sm font-bold text-[#1A1D1A]">
-                  인기 취향 수요
-                </h3>
-                {analytics.tagDemand.length === 0 ? (
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-[#1A1D1A]">
+                    인기 취향 수요 (기본 추천 노출)
+                  </h3>
+                  {!hasPlan('basic') && (
+                    <span className="text-[10px] font-bold text-[#687064] inline-flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> 베이직+
+                    </span>
+                  )}
+                </div>
+                {!hasPlan('basic') ? (
+                  renderPlanLock(
+                    'basic',
+                    '인기 취향 수요 · 추천 노출 분석',
+                    '고객이 많이 찾는 취향 태그와 기본 추천 노출 비중을 확인할 수 있습니다.'
+                  )
+                ) : analytics.tagDemand.length === 0 ? (
                   <p className="text-xs text-[#687064]">주문 데이터가 없습니다.</p>
                 ) : (
                   <div className="space-y-2.5">
@@ -1569,28 +1804,68 @@ export function OwnerDashboardView({
           <section className="os-card rounded-3xl overflow-hidden">
             <button
               type="button"
-              onClick={() => setShowMenuTable((prev) => !prev)}
-              aria-expanded={showMenuTable}
-              className="w-full min-h-[58px] px-6 py-4 flex items-center justify-between gap-3 text-left hover:bg-[#F7F8F5] transition-colors cursor-pointer"
+              onClick={() => {
+                if (hasPlan('pro')) {
+                  setShowMenuTable((prev) => !prev);
+                }
+              }}
+              aria-expanded={hasPlan('pro') ? showMenuTable : false}
+              className={`w-full min-h-[58px] px-6 py-4 flex items-center justify-between gap-3 text-left transition-colors ${
+                hasPlan('pro')
+                  ? 'hover:bg-[#F7F8F5] cursor-pointer'
+                  : 'bg-[#F7F8F5]/60 cursor-default'
+              }`}
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
-                  <PackageCheck className="w-4 h-4 text-[#4E6E2A]" />
+                  {hasPlan('pro') ? (
+                    <PackageCheck className="w-4 h-4 text-[#4E6E2A]" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-[#8A9485]" />
+                  )}
                   <span>메뉴별 판매 · 재고 상세표</span>
+                  {!hasPlan('pro') && (
+                    <span className="px-2 py-0.5 rounded-full bg-[#E8ECE4] text-[#555E52] text-[10px] font-bold">
+                      프로 (월 5.9만 원) 이상
+                    </span>
+                  )}
                 </span>
                 <span className="text-xs text-[#687064] tabular-nums">
                   스탬프 {stampCount}회 · 가격 제보 {priceReports.length}건 · 취소
                   요청 {analytics.cancelRequestCount}건
                 </span>
               </div>
-              {showMenuTable ? (
-                <ChevronUp className="w-4 h-4 text-[#687064] shrink-0" />
+              {hasPlan('pro') ? (
+                showMenuTable ? (
+                  <ChevronUp className="w-4 h-4 text-[#687064] shrink-0" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#687064] shrink-0" />
+                )
               ) : (
-                <ChevronDown className="w-4 h-4 text-[#687064] shrink-0" />
+                onSelectOwnerSaasPlan && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectOwnerSaasPlan('pro');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelectOwnerSaasPlan('pro');
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11px] font-bold shrink-0 cursor-pointer"
+                  >
+                    프로로 전환해 보기 →
+                  </span>
+                )
               )}
             </button>
 
-            {showMenuTable && (
+            {hasPlan('pro') && showMenuTable && (
               <div className="px-6 pb-6 pt-2 border-t border-[#E8ECE4] overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs sm:text-sm">
                   <thead>

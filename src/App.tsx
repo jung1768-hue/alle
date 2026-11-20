@@ -54,6 +54,7 @@ import {
   OrderLineItem,
   OrderStatus,
   ParsedCondition,
+  PartnerPlanTier,
   PaymentMethod,
   PriceReport,
   SavedLocation,
@@ -1919,17 +1920,19 @@ export default function App() {
     );
   };
 
-  const handleToggleOwnerSaas = () => {
-    const nextVal = !appState.ownerSaasSubscribed;
+  const handleSelectOwnerSaasPlan = (plan: PartnerPlanTier) => {
+    const planLabelMap: Record<PartnerPlanTier, string> = {
+      trial: '체험형 (2개월 무료)',
+      basic: '베이직 (월 2.9만 원)',
+      pro: '프로 (월 5.9만 원)',
+      premium: '프리미엄 (월 9.9만 원)',
+    };
     setAppState((prev) => ({
       ...prev,
-      ownerSaasSubscribed: nextVal,
+      ownerSaasSubscribed: plan !== 'trial',
+      ownerSaasPlan: plan,
     }));
-    showToast(
-      nextVal
-        ? 'alle 파트너스 매장관리 SaaS (월 19,000원 · 첫 3개월 무료)가 활성화되었습니다.'
-        : 'alle 파트너스 매장관리 SaaS 구독이 해지되었습니다.'
-    );
+    showToast(`파트너 구독 요금제가 ‘${planLabelMap[plan]}’으로 변경되었습니다.`);
   };
 
   const handleSaveReviewReply = (reviewId: string, replyText: string) => {
@@ -2597,8 +2600,11 @@ export default function App() {
             onAttachOwnerPhotos={(orderId, photos) =>
               handleAttachOrderPhotos(orderId, 'owner', photos)
             }
-            ownerSaasSubscribed={Boolean(appState.ownerSaasSubscribed)}
-            onToggleOwnerSaas={handleToggleOwnerSaas}
+            ownerSaasPlan={
+              appState.ownerSaasPlan ??
+              (appState.ownerSaasSubscribed ? 'pro' : 'trial')
+            }
+            onSelectOwnerSaasPlan={handleSelectOwnerSaasPlan}
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
             onOpenAiSettings={() => setShowGeminiModal(true)}
           />
@@ -2812,7 +2818,7 @@ export default function App() {
 
       <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span>alle · 차세대 하이퍼로컬 생활 OS</span>
+          <span>alle · 일상을 알아서, 우리 동네와 함께</span>
           <div className="flex items-center gap-5">
             <button
               type="button"

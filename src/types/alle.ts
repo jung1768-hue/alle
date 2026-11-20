@@ -351,6 +351,8 @@ export interface SavedLocation {
   tag: 'home' | 'work' | 'etc';
 }
 
+export type PartnerPlanTier = 'trial' | 'basic' | 'pro' | 'premium';
+
 export interface AllePersistedState {
   stores: Store[];
   menus: MenuItem[];
@@ -361,6 +363,7 @@ export interface AllePersistedState {
   wishlistIds: string[];
   preferences: UserPreferences;
   ownerSaasSubscribed?: boolean;
+  ownerSaasPlan?: PartnerPlanTier;
   lastConditionInput: string;
   reviewReplies: Record<string, ReviewReply>;
   priceReports: PriceReport[];

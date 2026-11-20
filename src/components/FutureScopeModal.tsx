@@ -19,10 +19,10 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 id="future-scope-title" className="text-lg font-bold text-[#1A1D1A]">
-              alle 서비스 안내 및 상생 원칙
+              alle · 일상을 알아서, 우리 동네와 함께
             </h2>
             <p className="text-xs font-medium text-[#687064] mt-0.5">
-              매장 동일가격 · 중개수수료 0% · 개인정보 안심 보호
+              검색에서 제안으로, 일회성에서 반복으로 · 중개수수료 0% · 개인정보 안심 보호
             </p>
           </div>
           <button
