@@ -21,12 +21,14 @@ import {
 import {
   ErrandRequest,
   ErrandStatus,
+  EvidencePhoto,
   MenuItem,
   Order,
   SavedLocation,
   Store,
   SuperAppTab,
 } from '../types/alle';
+import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import { FoodImage } from './FoodImage';
 
@@ -60,7 +62,8 @@ interface SuperAppHubViewProps {
   onAdvanceErrand: (
     errandId: string,
     nextStatus: ErrandStatus,
-    actualReceiptCost?: number
+    actualReceiptCost?: number,
+    receiptPhoto?: EvidencePhoto
   ) => void;
 }
 
@@ -166,6 +169,7 @@ export function SuperAppHubView({
   const [errandFee, setErrandFee] = useState<number>(2000);
   const [errandError, setErrandError] = useState<string | null>(null);
   const [receiptInputs, setReceiptInputs] = useState<Record<string, number>>({});
+  const [receiptPhotos, setReceiptPhotos] = useState<Record<string, EvidencePhoto>>({});
   const [dualPhotoChecked, setDualPhotoChecked] = useState<Record<string, boolean>>({});
 
   const prohibitedMatches = useMemo(() => {
@@ -769,8 +773,14 @@ export function SuperAppHubView({
                     </dd>
                   </div>
                   <div className="flex justify-between text-[#4E6E2A]">
-                    <dt>중개수수료</dt>
+                    <dt>음식값 중개수수료</dt>
                     <dd className="font-mono tabular-nums font-semibold">0원</dd>
+                  </div>
+                  <div className="flex justify-between text-[#687064]">
+                    <dt>B2B 정산·관제 서비스 이용료 (3.5% · 기업 정산)</dt>
+                    <dd className="font-mono tabular-nums font-semibold text-[#1A1D1A]">
+                      {formatWon(Math.round(b2bSubtotal * 0.035))}
+                    </dd>
                   </div>
                   <div className="pt-3 border-t border-dashed border-[#D4DCD0] flex justify-between font-bold text-[#1A1D1A]">
                     <dt>최종 결제액</dt>
@@ -975,10 +985,44 @@ export function SuperAppHubView({
 
                     {err.status === ErrandStatus.MATCHED && (
                       <div className="pt-2.5 border-t border-[#E8ECE4] space-y-2 text-xs">
-                        <div className="flex items-center gap-1.5 font-semibold text-[#1A1D1A]">
-                          <Receipt className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                          <span>영수증 실비 정산</span>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 font-semibold text-[#1A1D1A]">
+                            <Receipt className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                            <span>영수증 사진 OCR · 실비 정산</span>
+                          </span>
+                          <label className="min-h-[30px] px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] font-bold inline-flex items-center gap-1 cursor-pointer">
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>
+                              {receiptPhotos[err.id] ? '영수증 재첨부' : '영수증 사진 첨부'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const loaded = await readCompressedEvidencePhotos(e, 0, 1);
+                                if (loaded[0]) {
+                                  setReceiptPhotos((prev) => ({
+                                    ...prev,
+                                    [err.id]: loaded[0],
+                                  }));
+                                }
+                              }}
+                              className="hidden"
+                            />
+                          </label>
                         </div>
+                        {receiptPhotos[err.id] && (
+                          <div className="flex items-center gap-2 p-2 rounded-xl bg-[#F7F8F5] border border-[#D4E1C5]">
+                            <img
+                              src={receiptPhotos[err.id].dataUrl}
+                              alt={receiptPhotos[err.id].name}
+                              className="w-12 h-12 rounded-lg object-cover border border-[#D4E1C5] shrink-0"
+                            />
+                            <div className="min-w-0 text-[11px] text-[#3D5720] font-semibold">
+                              ✓ 영수증 첨부 완료 · 실비 금액 확인 후 정산을 확정하세요.
+                            </div>
+                          </div>
+                        )}
                         <div className="flex gap-2">
                           <input
                             type="number"
@@ -1002,7 +1046,8 @@ export function SuperAppHubView({
                               onAdvanceErrand(
                                 err.id,
                                 ErrandStatus.RECEIPT_CHECKED,
-                                receiptVal
+                                receiptVal,
+                                receiptPhotos[err.id]
                               )
                             }
                             className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-semibold rounded-xl cursor-pointer"
@@ -1025,6 +1070,13 @@ export function SuperAppHubView({
                               : `추가 차액 ${formatWon(Math.abs(err.refundDifference ?? 0))}`}
                           </span>
                         </div>
+                        {err.receiptPhoto && (
+                          <img
+                            src={err.receiptPhoto.dataUrl}
+                            alt={err.receiptPhoto.name}
+                            className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5]"
+                          />
+                        )}
                         <label className="flex items-center gap-2 text-[#555E52] cursor-pointer">
                           <input
                             type="checkbox"

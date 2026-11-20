@@ -1280,10 +1280,16 @@ export function ConditionHome({
                             내 주변
                           </span>
                         )}
-                        {item.isSameStorePrice && (
-                          <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#3D5720] border border-[#D4E1C5] text-[10.5px] font-bold shadow-2xs">
-                            매장 동일가 ✓
+                        {item.store.singlePriceRevoked ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10.5px] font-bold shadow-2xs">
+                            가격 확인 중
                           </span>
+                        ) : (
+                          item.isSameStorePrice && (
+                            <span className="px-2 py-0.5 rounded-full bg-white/95 text-[#3D5720] border border-[#D4E1C5] text-[10.5px] font-bold shadow-2xs">
+                              매장 동일가 ✓
+                            </span>
+                          )
                         )}
                         {(item.menu.closingDiscountPercent ?? 0) > 0 && (
                           <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10.5px] font-bold shadow-2xs">

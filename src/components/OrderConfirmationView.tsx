@@ -200,6 +200,13 @@ export function OrderConfirmationView({
         benefitText: '등록된 카드로 비밀번호 입력 없이 1초 만에 바로 주문합니다.',
       },
       {
+        id: 'openbanking',
+        shortLabel: '오픈뱅킹 계좌이체',
+        label: '오픈뱅킹 1초 계좌이체',
+        subtitle: '수수료 0.5%↓ · 최저원가',
+        benefitText: '오픈뱅킹 계좌 직결제로 결제 수수료를 0.5% 이하로 낮춰 매장 상생에 기여합니다.',
+      },
+      {
         id: 'alle_pay',
         shortLabel: 'alle페이',
         label: 'alle페이 잔액',

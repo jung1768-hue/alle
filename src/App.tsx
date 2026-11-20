@@ -1389,7 +1389,8 @@ export default function App() {
   const handleAdvanceErrand = (
     errandId: string,
     nextStatus: ErrandStatus,
-    actualReceiptCost?: number
+    actualReceiptCost?: number,
+    receiptPhoto?: NonNullable<ErrandRequest['receiptPhoto']>
   ) => {
     setAppState((prev) => ({
       ...prev,
@@ -1404,11 +1405,13 @@ export default function App() {
             status: nextStatus,
             actualReceiptCost,
             refundDifference: err.estimatedItemCost - actualReceiptCost,
+            receiptPhoto: receiptPhoto ?? err.receiptPhoto,
           };
         }
         return {
           ...err,
           status: nextStatus,
+          receiptPhoto: receiptPhoto ?? err.receiptPhoto,
         };
       }),
     }));
@@ -1896,13 +1899,37 @@ export default function App() {
       appPrice: payload.appPrice,
       storePrice: payload.storePrice,
       reportedAt: formatNowTime(),
-      note: '매장가 대비 앱 가격 차이 제보',
+      note: '매장가 대비 앱 가격 차이 제보 (암행어사 5,000원 포상)',
     };
+    const isInflated = payload.appPrice > payload.storePrice;
     setAppState((prev) => ({
       ...prev,
+      walletBalance: isInflated ? prev.walletBalance + 5000 : prev.walletBalance,
+      stores: isInflated
+        ? prev.stores.map((s) =>
+            s.name === payload.storeName ? { ...s, singlePriceRevoked: true } : s
+          )
+        : prev.stores,
       priceReports: [report, ...prev.priceReports],
     }));
-    showToast('가격 차이 제보가 접수되었습니다.');
+    showToast(
+      isInflated
+        ? '이중가격 제보 확인! 암행어사 포상 5,000원 적립 및 단일가격 배지가 회수되었습니다.'
+        : '가격 차이 제보가 접수되었습니다.'
+    );
+  };
+
+  const handleToggleOwnerSaas = () => {
+    const nextVal = !appState.ownerSaasSubscribed;
+    setAppState((prev) => ({
+      ...prev,
+      ownerSaasSubscribed: nextVal,
+    }));
+    showToast(
+      nextVal
+        ? 'alle 파트너스 매장관리 SaaS (월 19,000원 · 첫 3개월 무료)가 활성화되었습니다.'
+        : 'alle 파트너스 매장관리 SaaS 구독이 해지되었습니다.'
+    );
   };
 
   const handleSaveReviewReply = (reviewId: string, replyText: string) => {
@@ -2570,6 +2597,8 @@ export default function App() {
             onAttachOwnerPhotos={(orderId, photos) =>
               handleAttachOrderPhotos(orderId, 'owner', photos)
             }
+            ownerSaasSubscribed={Boolean(appState.ownerSaasSubscribed)}
+            onToggleOwnerSaas={handleToggleOwnerSaas}
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
             onOpenAiSettings={() => setShowGeminiModal(true)}
           />

@@ -242,6 +242,9 @@ function detectPaymentMethodFromSpeech(rawText: string): PaymentMethod | null {
   if (/(기업\s*식대|복지\s*식대|식대\s*포인트|식대|법인)/.test(t)) {
     return 'b2b_meal_point';
   }
+  if (/(오픈\s*뱅킹|계좌\s*이체|계좌\s*결제|무통장)/.test(t)) {
+    return 'openbanking';
+  }
   if (/(등록\s*카드|원클릭\s*카드|신용카드|카드)/.test(t)) {
     return 'card_oneclick';
   }
@@ -280,6 +283,11 @@ function getVoicePaymentOptions(
     { id: 'tosspay', shortLabel: '토스페이', label: '토스페이' },
     { id: 'naverpay', shortLabel: '네이버페이', label: '네이버페이' },
     { id: 'card_oneclick', shortLabel: '등록카드', label: '등록카드 1초결제' },
+    {
+      id: 'openbanking',
+      shortLabel: '오픈뱅킹',
+      label: '오픈뱅킹 1초 계좌이체',
+    },
     {
       id: 'alle_pay',
       shortLabel: `alle페이 (${formatWon(walletBalance)})`,

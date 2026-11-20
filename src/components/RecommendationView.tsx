@@ -414,7 +414,11 @@ export function RecommendationView({
                           </span>
                           <span aria-hidden="true"> · </span>
                           <span>
-                            {item.isSameStorePrice ? '매장 동일가' : '배달 포함'}
+                            {item.store.singlePriceRevoked
+                              ? '가격 확인 중'
+                              : item.isSameStorePrice
+                                ? '매장 동일가'
+                                : '배달 포함'}
                           </span>
                         </p>
                       </div>

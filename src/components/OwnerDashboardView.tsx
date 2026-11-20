@@ -79,6 +79,8 @@ interface OwnerDashboardViewProps {
   onSaveReviewReply: (reviewId: string, replyText: string) => void;
   onToggleReviewFlag: (reviewId: string, reason: string) => void;
   onAttachOwnerPhotos?: (orderId: string, photos: EvidencePhoto[]) => void;
+  ownerSaasSubscribed?: boolean;
+  onToggleOwnerSaas?: () => void;
   onSwitchToConsumer: () => void;
   onOpenAiSettings?: () => void;
 }
@@ -113,6 +115,8 @@ export function OwnerDashboardView({
   onSaveReviewReply,
   onToggleReviewFlag,
   onAttachOwnerPhotos,
+  ownerSaasSubscribed = false,
+  onToggleOwnerSaas,
   onSwitchToConsumer,
   onOpenAiSettings,
 }: OwnerDashboardViewProps) {
@@ -1333,7 +1337,7 @@ export function OwnerDashboardView({
                 {formatWon(analytics.totalRevenue)}
               </div>
               <div className="text-xs text-[#4E6E2A] font-medium tabular-nums">
-                유효 {analytics.totalCount}건 · 수수료 0원
+                유효 {analytics.totalCount}건 · 중개 0% (PG 실비만 매장과 동일 부담)
               </div>
             </div>
 
@@ -1366,6 +1370,81 @@ export function OwnerDashboardView({
               <div className="text-xs text-[#687064] tabular-nums">
                 재고 주의 {analytics.lowOrOutMenus.length}건 · 평점{' '}
                 {analytics.avgRating}
+              </div>
+            </div>
+          </section>
+
+          {/* alle Partners SaaS Membership (19,000 KRW/mo) + Tax Book + Voicebot Log */}
+          <section className="os-card rounded-3xl p-6 space-y-4 border border-[#DCE7CF]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A]">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>중개수수료 0% 자생 수익 모델 · 점주 구독형 운영 툴</span>
+                </div>
+                <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A] mt-0.5">
+                  alle 파트너스 매장관리 SaaS (월 19,000원 · 첫 3개월 무료)
+                </h2>
+              </div>
+              {onToggleOwnerSaas && (
+                <button
+                  type="button"
+                  onClick={onToggleOwnerSaas}
+                  aria-pressed={ownerSaasSubscribed}
+                  className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    ownerSaasSubscribed
+                      ? 'bg-[#3D5720] text-white'
+                      : 'bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] border border-[#82B440]/50'
+                  }`}
+                >
+                  {ownerSaasSubscribed
+                    ? '✓ SaaS 멤버십 이용 중 (해지)'
+                    : 'SaaS 멤버십 시작 (첫 3개월 0원)'}
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5">
+                <div className="font-bold text-[#1A1D1A]">
+                  📊 세무 · 부가세 장부 자동 정리
+                </div>
+                <div className="text-[#687064] tabular-nums">
+                  과세표준(공급가액):{' '}
+                  <strong className="text-[#1A1D1A]">
+                    {formatWon(Math.round(analytics.totalRevenue / 1.1))}
+                  </strong>
+                </div>
+                <div className="text-[#687064] tabular-nums">
+                  예상 부가세(10%):{' '}
+                  <strong className="text-[#4E6E2A]">
+                    {formatWon(
+                      analytics.totalRevenue -
+                        Math.round(analytics.totalRevenue / 1.1)
+                    )}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5">
+                <div className="font-bold text-[#1A1D1A]">
+                  📞 부재중 AI 보이스봇 전화 응대
+                </div>
+                <p className="text-[#555E52] leading-snug">
+                  • 11:42 “단체 12인분 가능?” → 오프피크 11:30 예약 링크 전송
+                </p>
+                <p className="text-[#555E52] leading-snug">
+                  • 13:05 “주차 되나요?” → 매장 앞 2대 무료 주차 자동 안내
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#EAF1E2]/70 border border-[#DCE7CF] space-y-1.5">
+                <div className="font-bold text-[#3D5720]">
+                  💡 플랫폼 자생 수익 구조 (중개 0% · PG 실비만 점주 부담)
+                </div>
+                <p className="text-[#434B40] leading-snug">
+                  이웃·심부름 매칭비(건당 350원) · B2B 단체정산(3.5%) · 점주 SaaS(월 19,000원) · 오픈뱅킹(0.5%↓)으로 시 보조금 없이 흑자 운영
+                </p>
               </div>
             </div>
           </section>

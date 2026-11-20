@@ -225,6 +225,9 @@ export function PartnerDashboardView({
                     <div className="text-sm font-bold text-[#4E6E2A] font-mono tabular-nums">
                       배달비 2,000원
                     </div>
+                    <div className="text-[11px] text-[#687064] tabular-nums">
+                      매칭·보험비 350원 제외 실수령 1,650원
+                    </div>
                     <div className="text-xs text-[#687064] mt-0.5">
                       {isAcceptedOnly
                         ? '점주 조리 시작 대기'

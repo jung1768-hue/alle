@@ -58,6 +58,7 @@ export interface Store {
   extraPrepMinutes: number;
   areaLabel: string;
   image: string;
+  singlePriceRevoked?: boolean;
 }
 
 export interface MenuOption {
@@ -147,6 +148,7 @@ export type PaymentMethod =
   | 'tosspay'
   | 'naverpay'
   | 'card_oneclick'
+  | 'openbanking'
   | 'alle_pay'
   | 'local_currency'
   | 'b2b_meal_point';
@@ -250,6 +252,7 @@ export interface ErrandRequest {
   escrowTotal: number;
   actualReceiptCost: number | null;
   refundDifference: number | null;
+  receiptPhoto?: EvidencePhoto;
   status: ErrandStatus;
   createdAt: string;
 }
@@ -357,6 +360,7 @@ export interface AllePersistedState {
   walletBalance: number;
   wishlistIds: string[];
   preferences: UserPreferences;
+  ownerSaasSubscribed?: boolean;
   lastConditionInput: string;
   reviewReplies: Record<string, ReviewReply>;
   priceReports: PriceReport[];
