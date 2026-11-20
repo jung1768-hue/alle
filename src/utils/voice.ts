@@ -1,5 +1,6 @@
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
+  confidence?: number;
 }
 
 interface SpeechRecognitionResultLike {
@@ -81,12 +82,26 @@ export function startKoreanVoiceInput(callbacks: {
         let interimText = '';
         for (let i = startIdx; i < event.results.length; i += 1) {
           const res = event.results[i];
-          const part = res?.[0]?.transcript?.trim() ?? '';
+          const alt = res?.[0];
+          const part = alt?.transcript?.trim() ?? '';
           if (!part) continue;
           if (res.isFinal) {
             processedFinalCount = i + 1;
+            const confidence = alt?.confidence;
+            const isShortAffirm = /^(네|예|응|어)$/.test(part);
+            if (
+              typeof confidence === 'number' &&
+              confidence > 0 &&
+              confidence < 0.45 &&
+              !isShortAffirm
+            ) {
+              continue;
+            }
+            if (part.length < 2 && !isShortAffirm) {
+              continue;
+            }
             callbacks.onTranscript(part);
-          } else {
+          } else if (part.length >= 2) {
             interimText += `${part} `;
           }
         }

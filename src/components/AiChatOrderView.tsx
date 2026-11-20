@@ -298,6 +298,20 @@ function getVoicePaymentOptions(
   ];
 }
 
+function isLikelyAmbientNoise(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  const compact = trimmed.replace(/[^가-힣a-zA-Z0-9]/g, '');
+  if (!compact) return true;
+  if (compact.length === 1 && !/^(네|예|응|어)$/.test(compact)) {
+    return true;
+  }
+  if (/^(음+|어+|아+|그+|저+|에+|음\s*그|아\s*저|하+|휴+)$/.test(compact)) {
+    return true;
+  }
+  return false;
+}
+
 function isLikelyBotEcho(
   heardText: string,
   botSpeech: string,
@@ -727,7 +741,7 @@ export function AiChatOrderView({
       setShowVoiceTips(true);
       return;
     }
-    if (isListeningRef.current) {
+    if (isSpeakingRef.current || isListeningRef.current) {
       return;
     }
 
@@ -742,8 +756,9 @@ export function AiChatOrderView({
     stopVoiceRef.current = startKoreanVoiceInput({
       continuous: true,
       onInterim: (text) => {
+        if (isSpeakingRef.current) return;
         const cleaned = text.trim();
-        if (!cleaned) {
+        if (!cleaned || isLikelyAmbientNoise(cleaned)) {
           setInterimTranscript('');
           return;
         }
@@ -758,17 +773,12 @@ export function AiChatOrderView({
           return;
         }
         setInterimTranscript(cleaned);
-        // Immediate barge-in when user clearly speaks 4+ characters while AI is talking
-        if (isSpeakingRef.current && cleaned.length >= 4) {
-          stopSpeaking();
-          setIsSpeaking(false);
-          isSpeakingRef.current = false;
-        }
       },
       onTranscript: (text) => {
+        if (isSpeakingRef.current) return;
         const cleaned = text.trim();
         setInterimTranscript('');
-        if (!cleaned) return;
+        if (!cleaned || isLikelyAmbientNoise(cleaned)) return;
         if (
           isLikelyBotEcho(
             cleaned,
@@ -788,11 +798,6 @@ export function AiChatOrderView({
         }
         lastTranscriptRef.current = { text: cleaned, at: now };
 
-        if (isSpeakingRef.current) {
-          stopSpeaking();
-          setIsSpeaking(false);
-          isSpeakingRef.current = false;
-        }
         void runChatQueryRef.current(cleaned);
       },
       onErrorCode: (err) => {
@@ -841,34 +846,28 @@ export function AiChatOrderView({
 
   const speakBotReply = (spokenMessage: string, allowAutoListen: boolean) => {
     clearAutoListenTimer();
+    clearRestartListenTimer();
     if (!voiceReplyEnabledRef.current || viewModeRef.current !== 'chat') return;
     currentSpokenTextRef.current = spokenMessage;
-    shouldContinueListeningRef.current = allowAutoListen;
+
+    // Mute/pause mic while bot is speaking so it never hears its own speaker output
+    shouldContinueListeningRef.current = false;
+    stopVoiceRef.current?.();
+    setIsListening(false);
+    isListeningRef.current = false;
+    setInterimTranscript('');
 
     speakKoreanText(spokenMessage, {
       onStart: () => {
         setIsSpeaking(true);
         isSpeakingRef.current = true;
         setVoiceAutoplayBlocked(false);
-        // Keep continuous mic open even while AI speaks so user can interrupt naturally
-        if (
-          allowAutoListen &&
-          voiceReplyEnabledRef.current &&
-          viewModeRef.current === 'chat' &&
-          !voiceCheckoutCompletedRef.current &&
-          !voiceDeniedRef.current &&
-          !isListeningRef.current &&
-          getSpeechRecognitionConstructor()
-        ) {
-          autoListenTimerRef.current = window.setTimeout(() => {
-            startListeningRef.current();
-          }, 200);
-        }
       },
       onEnd: () => {
         setIsSpeaking(false);
         isSpeakingRef.current = false;
         lastBotSpeechEndedAtRef.current = Date.now();
+        shouldContinueListeningRef.current = allowAutoListen;
         if (
           allowAutoListen &&
           voiceReplyEnabledRef.current &&
@@ -880,7 +879,7 @@ export function AiChatOrderView({
         ) {
           autoListenTimerRef.current = window.setTimeout(() => {
             startListeningRef.current();
-          }, 250);
+          }, 420);
         }
       },
       onError: () => {
@@ -3133,7 +3132,7 @@ export function AiChatOrderView({
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
             <span className="inline-flex items-center gap-2">
               <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>alle가 말씀드리고 있어요 · 지금 바로 말씀하셔도 듣고 있어요</span>
+              <span>올이가 말씀드리고 있어요 · 말이 끝나면 자동으로 듣기가 켜져요</span>
             </span>
             <button
               type="button"
