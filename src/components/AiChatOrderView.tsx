@@ -41,6 +41,7 @@ import {
   checkServerGeminiAvailable,
   hasGeminiApiKey,
   parseConditionWithAI,
+  understandChatTurnWithAI,
 } from '../utils/gemini';
 import {
   DISH_CATEGORY_TAGS,
@@ -1459,6 +1460,382 @@ export function AiChatOrderView({
     const activeStore = activeMenu
       ? storeMap.get(activeMenu.storeId)
       : undefined;
+
+    // Gemini-first conversational intent understanding (understands context & replies naturally; falls back to local rules if unavailable)
+    if (
+      (aiReady || hasGeminiApiKey()) &&
+      trimmed.length >= 1 &&
+      !/초기화|처음부터|새로\s*시작/.test(trimmed)
+    ) {
+      const recMenuIds =
+        recommendedSpotlight?.menuIds ?? latestMatchedIds ?? [];
+      const recommendedList = recMenuIds
+        .slice(0, 3)
+        .map((id, idx) => {
+          const m = menuMap.get(id);
+          const st = m ? storeMap.get(m.storeId) : undefined;
+          if (!m || !st) return null;
+          const qty = stagedServings[m.id] ?? activeCondition.servings ?? 1;
+          return {
+            index: idx,
+            id: m.id,
+            name: m.name,
+            storeName: st.name,
+            totalEstimate: getEffectiveMenuPrice(m) * qty + st.deliveryFee,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => Boolean(x));
+
+      const focusedReviews = activeMenu
+        ? reviews.filter((r) => r.menuId === activeMenu.id)
+        : [];
+
+      setIsAnalyzing(true);
+      const aiTurn = await understandChatTurnWithAI({
+        userInput: trimmed,
+        recentMessages: messages.slice(-6).map((m) => ({
+          sender: m.sender,
+          text: m.text,
+        })),
+        activeAreaName: activeLocation?.areaName,
+        inCheckoutConfirm: Boolean(voiceCheckoutDraft),
+        activeCondition,
+        focusedMenu:
+          activeMenu && activeStore
+            ? {
+                id: activeMenu.id,
+                name: activeMenu.name,
+                storeName: activeStore.name,
+                pricePerPerson: getEffectiveMenuPrice(activeMenu),
+                deliveryFee: activeStore.deliveryFee,
+                estimatedMinutes:
+                  activeMenu.estimatedMinutes +
+                  (activeStore.extraPrepMinutes ?? 0),
+                servings:
+                  voiceCheckoutDraft?.servings ??
+                  stagedServings[activeMenu.id] ??
+                  activeCondition.servings ??
+                  1,
+                selectedOptionIds:
+                  voiceCheckoutDraft?.selectedOptionIds ??
+                  stagedOptions[activeMenu.id] ??
+                  [],
+                options: activeMenu.options,
+                rating: activeStore.rating ?? 4.9,
+                reviewSnippet: focusedReviews[0]?.content.slice(0, 50),
+              }
+            : undefined,
+        recommendedList,
+      });
+      setIsAnalyzing(false);
+
+      if (aiTurn) {
+        if (aiTurn.action === 'cancel_checkout') {
+          setVoiceCheckoutDraft(null);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-cancel-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: aiTurn.replyText,
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+
+        if (aiTurn.action === 'confirm_checkout') {
+          if (voiceCheckoutDraft) {
+            const updated: VoiceCheckoutDraft = {
+              ...voiceCheckoutDraft,
+              paymentMethod:
+                aiTurn.paymentMethod ?? voiceCheckoutDraft.paymentMethod,
+              servings:
+                aiTurn.servings && aiTurn.servings > 0
+                  ? aiTurn.servings
+                  : voiceCheckoutDraft.servings,
+              customerNote:
+                aiTurn.customerNote ?? voiceCheckoutDraft.customerNote,
+            };
+            executeVoiceOrder(updated);
+            return;
+          }
+          if (activeMenu && activeStore) {
+            const qty = Math.min(
+              Math.max(
+                1,
+                aiTurn.servings ??
+                  stagedServings[activeMenu.id] ??
+                  activeCondition.servings ??
+                  1
+              ),
+              Math.max(1, activeMenu.stock)
+            );
+            openCheckoutDraftMessage({
+              menuId: activeMenu.id,
+              servings: qty,
+              selectedOptionIds: stagedOptions[activeMenu.id] ?? [],
+              paymentMethod: aiTurn.paymentMethod ?? 'kakaopay',
+              customerNote: aiTurn.customerNote ?? defaultNote ?? '',
+            });
+            return;
+          }
+        }
+
+        if (aiTurn.action === 'order_current' && activeMenu && activeStore) {
+          const qty = Math.min(
+            Math.max(
+              1,
+              aiTurn.servings ??
+                stagedServings[activeMenu.id] ??
+                activeCondition.servings ??
+                1
+            ),
+            Math.max(1, activeMenu.stock)
+          );
+          openCheckoutDraftMessage({
+            menuId: activeMenu.id,
+            servings: qty,
+            selectedOptionIds: stagedOptions[activeMenu.id] ?? [],
+            paymentMethod: aiTurn.paymentMethod ?? 'kakaopay',
+            customerNote: aiTurn.customerNote ?? defaultNote ?? '',
+          });
+          return;
+        }
+
+        if (aiTurn.action === 'toggle_option' && activeMenu && activeStore) {
+          const validIds = new Set(activeMenu.options.map((o) => o.id));
+          const curOpts =
+            voiceCheckoutDraft?.selectedOptionIds ??
+            stagedOptions[activeMenu.id] ??
+            [];
+          const toAdd = (aiTurn.optionIdsToAdd ?? []).filter((id) =>
+            validIds.has(id)
+          );
+          const toRemove = new Set(aiTurn.optionIdsToRemove ?? []);
+          const nextOpts = Array.from(
+            new Set([...curOpts.filter((id) => !toRemove.has(id)), ...toAdd])
+          );
+          setStagedOptions((prev) => ({ ...prev, [activeMenu.id]: nextOpts }));
+          if (voiceCheckoutDraft) {
+            const updated: VoiceCheckoutDraft = {
+              ...voiceCheckoutDraft,
+              selectedOptionIds: nextOpts,
+            };
+            openCheckoutDraftMessage(updated, aiTurn.replyText);
+            return;
+          }
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-opt-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: aiTurn.replyText,
+              stagedMenuId: activeMenu.id,
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+
+        if (aiTurn.action === 'change_quantity' && activeMenu && activeStore) {
+          const nextQty = Math.min(
+            Math.max(1, aiTurn.servings ?? 1),
+            Math.max(1, activeMenu.stock)
+          );
+          setStagedServings((prev) => ({ ...prev, [activeMenu.id]: nextQty }));
+          if (voiceCheckoutDraft) {
+            openCheckoutDraftMessage(
+              { ...voiceCheckoutDraft, servings: nextQty },
+              aiTurn.replyText
+            );
+            return;
+          }
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-qty-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: aiTurn.replyText,
+              stagedMenuId: activeMenu.id,
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+
+        if (
+          aiTurn.action === 'pick_recommended' &&
+          recommendedList.length > 0
+        ) {
+          const idx = Math.min(
+            Math.max(0, aiTurn.pickedIndex ?? 0),
+            recommendedList.length - 1
+          );
+          const picked = menuMap.get(recommendedList[idx].id);
+          if (picked) {
+            const qty = Math.min(
+              Math.max(
+                1,
+                aiTurn.servings ??
+                  stagedServings[picked.id] ??
+                  activeCondition.servings ??
+                  1
+              ),
+              Math.max(1, picked.stock)
+            );
+            setStagedServings((prev) => ({ ...prev, [picked.id]: qty }));
+            openCheckoutDraftMessage({
+              menuId: picked.id,
+              servings: qty,
+              selectedOptionIds: stagedOptions[picked.id] ?? [],
+              paymentMethod: aiTurn.paymentMethod ?? 'kakaopay',
+              customerNote: aiTurn.customerNote ?? defaultNote ?? '',
+            });
+            return;
+          }
+        }
+
+        if (aiTurn.action === 'switch_next') {
+          if (recommendedSpotlight && recommendedSpotlight.menuIds.length > 1) {
+            switchSpotlightIndex(recommendedSpotlight.activeIndex + 1);
+            return;
+          }
+          const currentRecIdx = latestMatchedIds.findIndex(
+            (id) => id === activeMenu?.id
+          );
+          const nextId =
+            latestMatchedIds.length > 1
+              ? latestMatchedIds[
+                  (currentRecIdx + 1) % latestMatchedIds.length
+                ]
+              : undefined;
+          const nextMenu = nextId ? menuMap.get(nextId) : undefined;
+          if (nextMenu) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `b-ai-next-${Date.now() + 1}`,
+                sender: 'bot',
+                text: aiTurn.replyText,
+                spokenText: aiTurn.replyText,
+                stagedMenuId: nextMenu.id,
+                aiSource: 'gemini',
+              },
+            ]);
+            return;
+          }
+        }
+
+        if (aiTurn.action === 'add_to_cart' && activeMenu) {
+          const qty = stagedServings[activeMenu.id] ?? 1;
+          const opts = stagedOptions[activeMenu.id] ?? [];
+          onAddToCart?.(activeMenu.id, qty, opts);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-cart-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: aiTurn.replyText,
+              stagedMenuId: activeMenu.id,
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+
+        if (aiTurn.action === 'ask_menu_info' && activeMenu) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-info-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: aiTurn.replyText,
+              stagedMenuId: activeMenu.id,
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+
+        if (aiTurn.action === 'chitchat') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-chat-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: aiTurn.replyText,
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+
+        if (aiTurn.action === 'search_food' && aiTurn.searchCondition) {
+          setVoiceCheckoutDraft(null);
+          const nextCond: ParsedCondition = {
+            rawInput: trimmed,
+            servings: Math.max(
+              1,
+              aiTurn.searchCondition.servings ?? activeCondition.servings ?? 1
+            ),
+            tags: aiTurn.searchCondition.tags ?? [],
+            excludeTags: aiTurn.searchCondition.excludeTags ?? [],
+            maxBudget:
+              aiTurn.searchCondition.maxBudget !== undefined
+                ? aiTurn.searchCondition.maxBudget
+                : null,
+            maxMinutes:
+              aiTurn.searchCondition.maxMinutes !== undefined
+                ? aiTurn.searchCondition.maxMinutes
+                : null,
+            unknownTokens: [],
+            needsConfirmation: false,
+          };
+          setActiveCondition(nextCond);
+          const evaluated = evaluateRecommendations(
+            nextCond,
+            stores,
+            menus,
+            activeLocation
+          );
+          const topMatches = evaluated.matches.slice(0, 3);
+          const topIds = topMatches.map((m) => m.menu.id);
+          if (topMatches[0]) {
+            setStagedServings((prev) => ({
+              ...prev,
+              [topMatches[0].menu.id]: Math.min(
+                nextCond.servings,
+                Math.max(1, topMatches[0].menu.stock)
+              ),
+            }));
+          }
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `b-ai-search-${Date.now() + 1}`,
+              sender: 'bot',
+              text: aiTurn.replyText,
+              spokenText: topMatches[0]
+                ? `${aiTurn.replyText} ${topMatches[0].store.name} ${topMatches[0].menu.name}, 배달비 포함 ${formatWon(topMatches[0].estimatedTotal)}입니다. 이 메뉴로 주문할까요?`
+                : aiTurn.replyText,
+              parsed: nextCond,
+              matchedMenuIds: topIds,
+              servings: nextCond.servings,
+              stagedMenuId: topIds[0],
+              aiSource: 'gemini',
+            },
+          ]);
+          return;
+        }
+      }
+    }
     const hasDishCategory = parsedInline.tags.some((t) =>
       DISH_CATEGORY_TAGS.has(t)
     );

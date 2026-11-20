@@ -37,6 +37,11 @@ import {
   BEOMEO_REVIEWS,
   BEOMEO_STORES,
 } from './beomeoSeedData';
+import {
+  DAEGU_ALL_MENUS,
+  DAEGU_ALL_REVIEWS,
+  DAEGU_ALL_STORES,
+} from './daeguAllSeedData';
 
 const BUNDLED_IMAGE_ENTRIES: Array<[string, string]> = [
   ['korean_beef_haejangguk_1794615612924', IMG_HAEJANG],
@@ -903,6 +908,7 @@ export const INITIAL_STORES: Store[] = [
     image: IMG_CAFE,
   },
   ...BEOMEO_STORES,
+  ...DAEGU_ALL_STORES,
 ];
 
 export const INITIAL_MENUS: MenuItem[] = [
@@ -1816,6 +1822,7 @@ export const INITIAL_MENUS: MenuItem[] = [
     aiReason: '동네 로스터리 + 식후 옆집 릴레이 쿠폰 인기 매장',
   },
   ...BEOMEO_MENUS,
+  ...DAEGU_ALL_MENUS,
 ];
 
 export const INITIAL_OWNER_PROFIT_COMPARISON: OwnerProfitComparison = {
@@ -2019,6 +2026,7 @@ export const INITIAL_REVIEWS: Review[] = [
     content: '딸기 쇼트케이크가 흐트러짐 없이 예쁘게 왔고 아메리카노 산미 없이 깔끔해요.',
   },
   ...BEOMEO_REVIEWS,
+  ...DAEGU_ALL_REVIEWS,
 ];
 
 export const INITIAL_ORDERS: Order[] = [
@@ -2203,6 +2211,14 @@ export const QUICK_NATIONWIDE_AREAS: string[] = [
   '인천 연수구 송도동',
   '부산 해운대구 우동',
   '대구 수성구 범어동',
+  '대구 중구 동성로',
+  '대구 동구 동대구',
+  '대구 서구 평리동',
+  '대구 남구 대명동',
+  '대구 북구 산격동',
+  '대구 달서구 상인동',
+  '대구 달성군 유가읍',
+  '대구 군위군 군위읍',
   '대전 서구 둔산동',
   '광주 서구 치평동',
 ];

@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { AVAILABLE_TAGS } from '../data/seedData';
-import { ParsedCondition, Review } from '../types/alle';
+import { ParsedCondition, PaymentMethod, Review } from '../types/alle';
 import { parseConditionInput } from './parser';
 
 const GEMINI_KEY_STORAGE = 'alle_gemini_api_key';
@@ -445,6 +445,155 @@ export async function parseOwnerVoiceCommandWithAI(
     const text = await generateGeminiText({ prompt, temperature: 0.1 });
 
     return extractJsonObject<ParsedOwnerCommand>(text ?? undefined);
+  } catch {
+    return null;
+  }
+}
+
+export type ChatActionIntent =
+  | 'search_food'
+  | 'pick_recommended'
+  | 'order_current'
+  | 'toggle_option'
+  | 'change_quantity'
+  | 'add_to_cart'
+  | 'confirm_checkout'
+  | 'cancel_checkout'
+  | 'ask_menu_info'
+  | 'switch_next'
+  | 'chitchat';
+
+export interface ChatTurnUnderstanding {
+  action: ChatActionIntent;
+  pickedIndex?: number;
+  optionIdsToAdd?: string[];
+  optionIdsToRemove?: string[];
+  servings?: number | null;
+  paymentMethod?: PaymentMethod | null;
+  customerNote?: string | null;
+  searchCondition?: {
+    servings?: number;
+    tags?: string[];
+    excludeTags?: string[];
+    maxBudget?: number | null;
+    maxMinutes?: number | null;
+  };
+  replyText: string;
+}
+
+export interface ChatTurnContext {
+  userInput: string;
+  recentMessages: Array<{ sender: 'user' | 'bot'; text: string }>;
+  activeAreaName?: string;
+  inCheckoutConfirm: boolean;
+  activeCondition: ParsedCondition;
+  focusedMenu?: {
+    id: string;
+    name: string;
+    storeName: string;
+    pricePerPerson: number;
+    deliveryFee: number;
+    estimatedMinutes: number;
+    servings: number;
+    selectedOptionIds: string[];
+    options: Array<{ id: string; name: string; priceDelta: number }>;
+    rating: number;
+    reviewSnippet?: string;
+  };
+  recommendedList?: Array<{
+    index: number;
+    id: string;
+    name: string;
+    storeName: string;
+    totalEstimate: number;
+  }>;
+}
+
+export async function understandChatTurnWithAI(
+  ctx: ChatTurnContext
+): Promise<ChatTurnUnderstanding | null> {
+  if (!hasGeminiApiKey() && !(await checkServerGeminiAvailable())) {
+    return null;
+  }
+
+  try {
+    const historyText = ctx.recentMessages
+      .slice(-6)
+      .map((m) => `${m.sender === 'user' ? '사용자' : '올이'}: ${m.text}`)
+      .join('\n');
+
+    const prompt = `당신은 AI 생활주문 플랫폼 'alle(올이)'의 한국어 대화형 주문 어시스턴트입니다.
+사용자의 마지막 발화와 직전 대화 맥락, 현재 보고 있는 메뉴/결제 상태를 정확히 이해해 다음에 수행할 액션과 자연스러운 응답을 JSON으로만 반환하세요.
+
+[현재 상태]
+- 배달 지역: ${ctx.activeAreaName ?? '대구 수성구 범어동'}
+- 결제 확인창 열림 여부(inCheckoutConfirm): ${ctx.inCheckoutConfirm}
+- 현재 선택/포커스된 메뉴: ${ctx.focusedMenu ? JSON.stringify(ctx.focusedMenu) : '없음'}
+- 직전 추천 메뉴 목록: ${ctx.recommendedList && ctx.recommendedList.length > 0 ? JSON.stringify(ctx.recommendedList) : '없음'}
+- 현재 검색 조건: ${JSON.stringify({
+      servings: ctx.activeCondition.servings,
+      tags: ctx.activeCondition.tags,
+      excludeTags: ctx.activeCondition.excludeTags ?? [],
+      maxBudget: ctx.activeCondition.maxBudget,
+      maxMinutes: ctx.activeCondition.maxMinutes,
+    })}
+- 사용 가능한 표준 음식 태그: ${AVAILABLE_TAGS.join(', ')}
+
+[최근 대화 기록]
+${historyText || '없음'}
+
+[사용자 마지막 발화]
+"${ctx.userInput}"
+
+[분류 규칙]
+1. order_current: 현재 포커스/추천된 메뉴를 주문하려는 의도 ("이거 주문해줘", "이걸로 할게", "응 시켜줘").
+2. confirm_checkout: 결제 확인창(inCheckoutConfirm=true)에서 결제를 승인하거나 결제수단을 말할 때 ("네 결제해줘", "그대로 결제", "카카오페이로 해줘").
+3. cancel_checkout: 결제/주문을 취소하거나 보류할 때 ("취소해줘", "잠깐만 그만").
+4. toggle_option: 현재 메뉴의 추가 옵션을 넣거나 빼거나, 옵션이 뭐 있는지 물을 때. optionIdsToAdd / optionIdsToRemove에 focusedMenu.options의 정확한 id를 넣으세요.
+5. change_quantity: 현재 메뉴 수량(인분)을 바꿀 때 (예: "2인분으로 바꿔줘").
+6. pick_recommended: 추천 목록(recommendedList) 중 특정 번호(0부터 시작)나 매장/메뉴를 고를 때.
+7. switch_next: 현재 메뉴 말고 다른 추천/다음 메뉴를 보여달라고 할 때 ("다른 거", "이거 말고", "더 싼 거").
+8. ask_menu_info: 현재 메뉴의 배달시간, 가격, 배달비, 리뷰 등에 대해 질문할 때. replyText에 현재 상태 숫자로 정확히 답하세요.
+9. add_to_cart: 장바구니에 담아달라고 할 때.
+10. search_food: 새로운 음식/맛/상황/예산/시간 조건으로 메뉴를 찾을 때 ("매운 떡볶이 먹고 싶어", "만 원 이하 따뜻한 국물"). searchCondition.tags는 반드시 표준 태그 목록에서만 고르세요.
+11. chitchat: 인사, 감사, 음식 주문과 무관한 대화.
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{
+  "action": "search_food" | "pick_recommended" | "order_current" | "toggle_option" | "change_quantity" | "add_to_cart" | "confirm_checkout" | "cancel_checkout" | "ask_menu_info" | "switch_next" | "chitchat",
+  "pickedIndex": number | null,
+  "optionIdsToAdd": string[],
+  "optionIdsToRemove": string[],
+  "servings": number | null,
+  "paymentMethod": "kakaopay" | "tosspay" | "naverpay" | "card" | "alle_pay" | "daeguro_pay" | "openbanking" | "corporate_meal" | null,
+  "customerNote": string | null,
+  "searchCondition": {
+    "servings": number,
+    "tags": string[],
+    "excludeTags": string[],
+    "maxBudget": number | null,
+    "maxMinutes": number | null
+  },
+  "replyText": string (사용자의 말에 찰떡같이 공감하고 다음 행동을 자연스럽게 안내하는 1~2문장의 한국어 응답)
+}`;
+
+    const text = await generateGeminiText({ prompt, temperature: 0.2 });
+    const parsed = extractJsonObject<ChatTurnUnderstanding>(text ?? undefined);
+    if (!parsed || !parsed.action || !parsed.replyText) {
+      return null;
+    }
+    if (parsed.searchCondition?.tags) {
+      parsed.searchCondition.tags = parsed.searchCondition.tags.filter((t) =>
+        (AVAILABLE_TAGS as readonly string[]).includes(t)
+      );
+    }
+    if (parsed.searchCondition?.excludeTags) {
+      parsed.searchCondition.excludeTags =
+        parsed.searchCondition.excludeTags.filter((t) =>
+          (AVAILABLE_TAGS as readonly string[]).includes(t)
+        );
+    }
+    return parsed;
   } catch {
     return null;
   }
