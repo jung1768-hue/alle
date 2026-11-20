@@ -1963,7 +1963,7 @@ export default function App() {
       setAiChatInitialPrompt('어제 야근해서 얼큰한 국물 2인분 30분 이내로 추천해줘');
       setRole(DemoRole.CONSUMER);
       setStep(ConsumerStep.AI_CHAT);
-      showToast('① AI 10초 음성·채팅 주문 시연');
+      showToast('① 올이 10초 음성·채팅 주문 시연');
     } else if (scene === 'b2b_checkout') {
       const targetMenu =
         appState.menus.find((m) => {
@@ -1994,7 +1994,7 @@ export default function App() {
         });
         setRole(DemoRole.CONSUMER);
         setStep(ConsumerStep.CONFIRM);
-        showToast('② B2B 기업 식대 · AI 추천 근거 확인 결제');
+        showToast('② B2B 기업 식대 · 맞춤 추천 근거 확인 결제');
       }
     } else if (scene === 'owner_dashboard') {
       setRole(DemoRole.OWNER);
@@ -2219,7 +2219,7 @@ export default function App() {
                           className="flex-1 text-left cursor-pointer"
                         >
                           <p className="text-xs font-semibold text-white">
-                            ① [고객] 컨디션 홈 & AI 10초 주문
+                            ① [고객] 컨디션 홈 & 올이 10초 주문
                           </p>
                           <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
                             비가격 효용 지표 · 원탭 Zero-UI 진입
@@ -2230,7 +2230,7 @@ export default function App() {
                           onClick={() => handleJumpDemoScene('customer_chat')}
                           className="px-2.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[10.5px] font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
                         >
-                          AI 채팅 →
+                          올이 대화 →
                         </button>
                       </div>
                     </div>
@@ -2248,7 +2248,7 @@ export default function App() {
                         ② [결제] B2B 식대 & 추천 근거 확인 결제
                       </p>
                       <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                        Explainable AI 근거 · 자생형 법인 식대 결제
+                        맞춤 추천 근거 · 자생형 법인 식대 결제
                       </p>
                     </button>
 
@@ -2265,7 +2265,7 @@ export default function App() {
                         ③ [점주] 실시간 주문 접수 · 순수익 대시보드
                       </p>
                       <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                        입점 효과 요약 · 광고비 절감 & AI 단골 순증 매출
+                        입점 효과 요약 · 광고비 절감 & 단골 매칭 순증 매출
                       </p>
                     </button>
 
@@ -2365,7 +2365,7 @@ export default function App() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1A1D1A]">
-                    alle AI · 실시간 배달 알림
+                    올이 · 실시간 배달 알림
                   </span>
                   <button
                     type="button"
@@ -2432,7 +2432,7 @@ export default function App() {
                     className="w-full text-left p-2.5 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] transition-colors cursor-pointer"
                   >
                     <p className="font-semibold text-[#3D5720]">
-                      실시간 주문 · AI 최적 배차 안내
+                      실시간 주문 · 최적 배차 안내
                     </p>
                     <p className="text-[#687064] mt-0.5">
                       진행 중인 주문 {appState.orders.length}건의 도착 현황을 확인하세요.
@@ -2611,6 +2611,7 @@ export default function App() {
           <AiChatOrderView
             stores={appState.stores}
             menus={appState.menus}
+            reviews={INITIAL_REVIEWS}
             wishlistIds={appState.wishlistIds}
             activeLocation={activeLocation}
             initialPrompt={aiChatInitialPrompt}
@@ -2770,7 +2771,7 @@ export default function App() {
       <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span>
-            alle · 차세대 하이퍼로컬 AI 생활 OS{' '}
+            alle · 차세대 하이퍼로컬 생활 OS{' '}
             <span className="text-[#4E6E2A] font-semibold">
               (
               {firebaseSyncStatus === 'synced'
@@ -2915,7 +2916,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">AI 주문</span>
+            <span className="text-[11px] leading-none">올이 주문</span>
           </button>
 
           <button

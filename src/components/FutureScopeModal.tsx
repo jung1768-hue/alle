@@ -81,11 +81,11 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
           <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-1.5">
             <h3 className="font-bold text-[#1A1D1A] flex items-center gap-1.5">
               <Cpu className="w-4 h-4 text-[#4E6E2A]" />
-              <span>AI 음성 주문 & 하이퍼로컬 연결</span>
+              <span>올이 음성 주문 & 하이퍼로컬 연결</span>
             </h3>
             <ul className="list-disc pl-5 space-y-1 text-xs">
               <li>
-                음성과 자연어로 조건을 말하면 AI 주문 상담사가 인원·취향·예산·시간을 분석해 맞춤 메뉴를 추천합니다.
+                음성과 자연어로 조건을 말하면 올이 주문 도우미가 인원·취향·예산·시간을 분석해 맞춤 메뉴를 추천합니다.
               </li>
             </ul>
           </div>

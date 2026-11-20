@@ -1022,7 +1022,7 @@ export function OrderStatusView({
                     </p>
                     <p className="text-[#555E52]">
                       조리 시작 이후 요청은 기록만 남기며 재고·금액을 자동으로 바꾸지
-                      않습니다. (AI 과실 판정 없음)
+                      않습니다. (자동 과실 판정 없음)
                     </p>
                   </div>
                 )}
@@ -1034,7 +1034,7 @@ export function OrderStatusView({
                         <ClipboardCheck className="w-4 h-4" />
                         <span>
                           {order.evidenceRecord.aiVerdict
-                            ? `⚡ AI 10초 자동 중재 판정 완료 (${order.evidenceRecord.aiVerdict.processedSeconds}초 · 신뢰도 ${order.evidenceRecord.aiVerdict.confidencePercent}%)`
+                            ? `⚡ 10초 자동 중재 판정 완료 (${order.evidenceRecord.aiVerdict.processedSeconds}초 · 신뢰도 ${order.evidenceRecord.aiVerdict.confidencePercent}%)`
                             : '안심 거래 증적 기록'}
                         </span>
                       </span>
@@ -1107,7 +1107,7 @@ export function OrderStatusView({
                             }
                             className="min-h-[40px] px-3.5 py-1.5 border border-[#D4E1C5] bg-white hover:bg-[#F7F8F5] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
                           >
-                            AI 10초 중재 시연
+                            10초 자동 중재 시연
                           </button>
                         )}
                         <button
@@ -1132,7 +1132,7 @@ export function OrderStatusView({
                       !order.evidenceRecord && (
                         <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
                           <div className="font-bold text-[#1A1D1A]">
-                            4단계 디지털 증적 제출 · AI 10초 자동 중재
+                            4단계 디지털 증적 제출 · 10초 자동 중재
                           </div>
                           <div className="flex flex-wrap gap-1.5">
                             {(
@@ -1206,7 +1206,7 @@ export function OrderStatusView({
                               }}
                               className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
                             >
-                              AI 10초 자동 중재 실행
+                              10초 자동 중재 실행
                             </button>
                             <button
                               type="button"
@@ -1316,7 +1316,7 @@ export function OrderStatusView({
                         {evidenceOrderId === order.id && !order.evidenceRecord && (
                           <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
                             <div className="font-bold text-[#1A1D1A]">
-                              4단계 디지털 증적 제출 · AI 10초 자동 중재
+                              4단계 디지털 증적 제출 · 10초 자동 중재
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {(
@@ -1390,7 +1390,7 @@ export function OrderStatusView({
                                 }}
                                 className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
                               >
-                                AI 10초 자동 중재 실행
+                                10초 자동 중재 실행
                               </button>
                               <button
                                 type="button"

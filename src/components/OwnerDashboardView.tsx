@@ -597,7 +597,7 @@ export function OwnerDashboardView({
 
       if (!hasGeminiApiKey()) {
         setOcrError(
-          '실제 메뉴판 사진 인식은 alle 분석 연동 키가 필요합니다. AI 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
+          '실제 메뉴판 사진 인식은 alle 분석 연동 키가 필요합니다. 연동 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
         );
         return;
       }
@@ -680,7 +680,7 @@ export function OwnerDashboardView({
               <span>{analytics.profitComparison.periodLabel} · 전국 입점 매장 기준</span>
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-[#1A1D1A] tracking-tight text-balance">
-              광고비 부담은 없애고, AI 단골 매칭으로 순증 매출을 만들었습니다
+              광고비 부담은 없애고, 맞춤 단골 매칭으로 순증 매출을 만들었습니다
             </h2>
           </div>
 
@@ -718,7 +718,7 @@ export function OwnerDashboardView({
           <div className="bg-[#EAF1E2] border border-[#DCE7CF] rounded-2xl p-5 sm:p-6 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs sm:text-sm font-bold text-[#3D5720]">
-                AI 매칭 순증 매출
+                맞춤 매칭 순증 매출
               </p>
               <span className="w-2 h-2 rounded-full bg-[#82B440] shrink-0" aria-hidden="true" />
             </div>
@@ -726,7 +726,7 @@ export function OwnerDashboardView({
               +{formatWon(analytics.profitComparison.totalAiRegularIncrementalSales)}
             </div>
             <p className="text-xs text-[#4C6235] tabular-nums pt-1">
-              AI 단골 자동 매칭{' '}
+              단골 자동 매칭{' '}
               <strong className="text-[#1A1D1A]">
                 +{analytics.profitComparison.totalAiRegularMatchedOrders}건
               </strong>{' '}
@@ -755,7 +755,7 @@ export function OwnerDashboardView({
               <div className="font-mono tabular-nums text-base font-bold text-[#4E6E2A]">
                 {formatWon(analytics.profitComparison.totalAdExposureFeeSaved)}
               </div>
-              <p className="text-[#687064]">노출 입찰 없는 AI 컨디션 매칭</p>
+              <p className="text-[#687064]">노출 입찰 없는 컨디션 맞춤 매칭</p>
             </div>
             <div className="space-y-1">
               <span className="text-[#687064]">지자체 보조금 의존도</span>
@@ -1311,7 +1311,7 @@ export function OwnerDashboardView({
                             </strong>
                           </span>
                           <span>
-                            AI 단골 순증{' '}
+                            단골 매칭 순증{' '}
                             <strong className="font-mono text-[#1A1D1A]">
                               +{formatWon(storeProfit.aiRegularIncrementalSales)}
                             </strong>
@@ -1522,7 +1522,7 @@ export function OwnerDashboardView({
                     onClick={onOpenAiSettings}
                     className="min-h-[36px] px-3 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
                   >
-                    AI 키 설정
+                    연동 키 설정
                   </button>
                 )}
                 <input
@@ -1544,7 +1544,7 @@ export function OwnerDashboardView({
                     <Camera className="w-3.5 h-3.5" />
                   )}
                   <span>
-                    {isOcrScanning ? 'AI 메뉴판 인식 중...' : '종이 메뉴판 사진 인식'}
+                    {isOcrScanning ? '메뉴판 자동 인식 중...' : '종이 메뉴판 사진 인식'}
                   </span>
                 </button>
                 <button
@@ -1607,7 +1607,7 @@ export function OwnerDashboardView({
                         onClick={onOpenAiSettings}
                         className="px-3 py-1.5 bg-white border border-[#D4E1C5] hover:bg-[#EAF1E2] text-[#3D5720] font-bold rounded-lg cursor-pointer shrink-0"
                       >
-                        AI 키 설정 열기
+                        연동 키 설정 열기
                       </button>
                     )}
                   </div>

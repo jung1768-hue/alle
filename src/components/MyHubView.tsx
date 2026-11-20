@@ -514,7 +514,7 @@ export function MyHubView({
                   className="min-h-[42px] px-4 py-2 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] text-xs font-bold text-[#1A1D1A] flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <KeyRound className="w-4 h-4 text-[#4E6E2A]" />
-                  <span>AI 연동 설정 (Gemini Key)</span>
+                  <span>스마트 추천 연동 설정 (Gemini Key)</span>
                 </button>
               )}
             </div>

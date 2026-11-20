@@ -657,7 +657,7 @@ export function OrderConfirmationView({
             <Sparkles className="w-4 h-4 text-[#4E6E2A] shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed text-[#3D5720]">
               <strong className="font-semibold text-[#4E6E2A] mr-1.5">
-                AI 추천 근거
+                올이 추천 근거
               </strong>
               {leadMenu.aiReason}
             </p>
@@ -992,7 +992,7 @@ export function OrderConfirmationView({
               <p className="text-xs font-bold text-[#3D5720]">
                 {effectiveCouponDiscount > 0
                   ? `✨ 최대 할인 자동 적용: ${selectedCoupon.label} (-${formatWon(effectiveCouponDiscount)})`
-                  : 'AI 자동 옵션 적용 완료'}
+                  : '이전 옵션 자동 적용 완료'}
               </p>
               <p className="text-xs text-[#4C6235] leading-relaxed">
                 {autoAppliedSummary}

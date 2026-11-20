@@ -785,9 +785,9 @@ export function ConditionHome({
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      {/* 1. Soft Sage Green Hero Card: 'AI에게 주문해보세요' */}
+      {/* 1. Soft Sage Green Hero Card: '올이에게 주문해보세요' */}
       <section
-        aria-label="AI에게 주문해보세요"
+        aria-label="올이에게 주문해보세요"
         className="bg-[#EAF1E2] border border-[#DCE7CF] shadow-sm rounded-3xl p-5 sm:p-7 space-y-5"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -812,7 +812,7 @@ export function ConditionHome({
           </div>
           <div className="min-w-0 space-y-2">
             <h1 className="text-2xl sm:text-[30px] font-extrabold tracking-tight text-[#1A1D1A] leading-tight">
-              AI에게 주문해보세요
+              올이에게 주문해보세요
             </h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-[#687064]">
               <button
@@ -879,7 +879,7 @@ export function ConditionHome({
               className="flex-1 sm:flex-initial min-h-[48px] px-5 py-2.5 rounded-full bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold text-sm inline-flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap"
             >
               <Sparkles className="w-4 h-4 shrink-0" />
-              <span>AI 바로 찾기</span>
+              <span>올이 바로 찾기</span>
             </button>
             <button
               type="button"
@@ -907,7 +907,7 @@ export function ConditionHome({
             className="inline-flex items-center gap-1 font-semibold text-[#3D5720] hover:text-[#4E6E2A] cursor-pointer"
           >
             <VoiceWaveformIcon className="text-[#82B440] w-5 h-3.5" />
-            <span>대화형 AI 주문 열기</span>
+            <span>올이와 대화로 주문하기</span>
           </button>
           <span aria-hidden="true">·</span>
           <span className="tabular-nums">
@@ -937,7 +937,7 @@ export function ConditionHome({
           <div className="p-4 bg-white border border-[#E8ECE4] rounded-2xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#1A1D1A]">
-                예시 문장을 눌러 바로 AI 주문을 시작해 보세요
+                예시 문장을 눌러 바로 올이 주문을 시작해 보세요
               </span>
               <button
                 type="button"
@@ -1150,12 +1150,12 @@ export function ConditionHome({
         </section>
       )}
 
-      {/* 4. 'AI가 추천하는 내 주변 맛집' + Horizontal Category Chips */}
+      {/* 4. '올이가 추천하는 내 주변 맛집' + Horizontal Category Chips */}
       <section ref={recommendationSectionRef} className="space-y-4 scroll-mt-20">
         <div className="flex items-center justify-between gap-3 px-0.5">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-[#1A1D1A]">
-              AI가 추천하는 내 주변 맛집
+              올이가 추천하는 내 주변 맛집
             </h2>
             <p className="text-xs text-[#687064] mt-0.5">
               {activeLocation?.areaName ?? '선택 지역'} 기준 · 매장 동일가 검증 맛집
@@ -1201,7 +1201,7 @@ export function ConditionHome({
         {displayedRecommendations.length === 0 ? (
           <div className="os-card rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span className="text-sm text-[#687064]">
-              현재 조건에 맞는 메뉴가 없습니다. AI 상담으로 조건을 가볍게
+              현재 조건에 맞는 메뉴가 없습니다. 올이 상담으로 조건을 가볍게
               조정해 보세요.
             </span>
             <button
@@ -1209,7 +1209,7 @@ export function ConditionHome({
               onClick={() => onOpenAiChat(rawInput)}
               className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-semibold rounded-xl shrink-0 cursor-pointer"
             >
-              AI 상담 열기
+              올이에게 물어보기
             </button>
           </div>
         ) : (

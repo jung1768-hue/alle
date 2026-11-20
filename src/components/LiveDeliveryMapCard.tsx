@@ -113,7 +113,7 @@ export function LiveDeliveryMapCard({
           <span>
             {dispatchMode
               ? `${activeRiderLabel} 배정 완료`
-              : 'AI 라이더 최적 동선 매칭 완료'}
+              : '라이더 최적 동선 매칭 완료'}
           </span>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A] font-mono tabular-nums">
