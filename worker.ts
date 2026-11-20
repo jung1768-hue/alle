@@ -1,5 +1,6 @@
 interface WorkerEnv {
   GEMINI_API_KEY?: string;
+  GOOGLE_CLOUD_TTS_API_KEY?: string;
   ASSETS: {
     fetch: (request: Request) => Promise<Response>;
   };
@@ -8,8 +9,12 @@ interface WorkerEnv {
 const GEMINI_ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
-const GEMINI_TTS_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent';
+const GOOGLE_TTS_ENDPOINT =
+  'https://texttospeech.googleapis.com/v1/text:synthesize';
+
+const TTS_MAX_CHARS_PER_REQUEST = 300;
+const TTS_DAILY_SAFE_CAP = 40_000;
+const TTS_MONTHLY_SAFE_CAP = 800_000;
 
 async function handleGeminiApi(request: Request, env: WorkerEnv): Promise<Response> {
   if (request.method === 'GET') {
@@ -113,6 +118,47 @@ async function handleGeminiApi(request: Request, env: WorkerEnv): Promise<Respon
   });
 }
 
+async function getEdgeCounter(key: string): Promise<number> {
+  try {
+    const cache = (caches as unknown as { default?: Cache }).default;
+    if (!cache) return 0;
+    const res = await cache.match(`https://tts-quota.alle.internal/${key}`);
+    if (!res) return 0;
+    const n = Number(await res.text());
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function putEdgeCounter(
+  key: string,
+  value: number,
+  maxAgeSeconds: number
+): Promise<void> {
+  try {
+    const cache = (caches as unknown as { default?: Cache }).default;
+    if (!cache) return;
+    await cache.put(
+      `https://tts-quota.alle.internal/${key}`,
+      new Response(String(value), {
+        headers: { 'Cache-Control': `public, max-age=${maxAgeSeconds}` },
+      })
+    );
+  } catch {
+    // ignore cache write errors
+  }
+}
+
+async function hashText(text: string): Promise<string> {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 async function handleTtsApi(request: Request, env: WorkerEnv): Promise<Response> {
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -121,10 +167,13 @@ async function handleTtsApi(request: Request, env: WorkerEnv): Promise<Response>
     });
   }
 
-  const apiKey = env.GEMINI_API_KEY?.trim();
+  const apiKey =
+    env.GOOGLE_CLOUD_TTS_API_KEY?.trim() || env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: 'GEMINI_API_KEY is not configured on server.' }),
+      JSON.stringify({
+        error: 'GOOGLE_CLOUD_TTS_API_KEY (or GEMINI_API_KEY) is not configured on server.',
+      }),
       { status: 503, headers: { 'Content-Type': 'application/json' } }
     );
   }
@@ -147,36 +196,58 @@ async function handleTtsApi(request: Request, env: WorkerEnv): Promise<Response>
     });
   }
 
-  const boundedText = rawText.slice(0, 420);
+  const boundedText = rawText.slice(0, TTS_MAX_CHARS_PER_REQUEST);
   const voiceName =
-    typeof body.voiceName === 'string' && body.voiceName.trim()
+    typeof body.voiceName === 'string' && /^ko-KR-/i.test(body.voiceName.trim())
       ? body.voiceName.trim()
-      : 'Aoede';
+      : 'ko-KR-Neural2-A';
+
+  // 1. Serve from Cloudflare Edge Cache first (0 Google Cloud TTS quota used)
+  const cache = (caches as unknown as { default?: Cache }).default;
+  const cacheKeyUrl = `https://tts-cache.alle.internal/v1/${encodeURIComponent(voiceName)}/${await hashText(boundedText)}`;
+  if (cache) {
+    const cached = await cache.match(cacheKeyUrl);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  // 2. Enforce strict free-tier safety caps (800k/month, 40k/day < 1M Neural2 free tier)
+  const now = new Date();
+  const dayKey = `day-${now.toISOString().slice(0, 10)}`;
+  const monthKey = `month-${now.toISOString().slice(0, 7)}`;
+  const [dailyUsed, monthlyUsed] = await Promise.all([
+    getEdgeCounter(dayKey),
+    getEdgeCounter(monthKey),
+  ]);
+
+  if (
+    dailyUsed + boundedText.length > TTS_DAILY_SAFE_CAP ||
+    monthlyUsed + boundedText.length > TTS_MONTHLY_SAFE_CAP
+  ) {
+    return new Response(
+      JSON.stringify({
+        error: 'TTS free-tier safety cap reached. Falling back to device voice.',
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
   const upstream = await fetch(
-    `${GEMINI_TTS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
+    `${GOOGLE_TTS_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `따뜻하고 친근한 한국어 상담사처럼 자연스러운 억양과 호흡으로 말해주세요:\n${boundedText}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName,
-              },
-            },
-          },
+        input: { text: boundedText },
+        voice: {
+          languageCode: 'ko-KR',
+          name: voiceName,
+        },
+        audioConfig: {
+          audioEncoding: 'MP3',
+          speakingRate: 1.0,
+          pitch: 0.5,
         },
       }),
     }
@@ -186,7 +257,7 @@ async function handleTtsApi(request: Request, env: WorkerEnv): Promise<Response>
     const errText = await upstream.text().catch(() => '');
     return new Response(
       JSON.stringify({
-        error: `Gemini TTS error (${upstream.status})`,
+        error: `Google Cloud TTS error (${upstream.status})`,
         detail: errText.slice(0, 300),
       }),
       {
@@ -196,37 +267,41 @@ async function handleTtsApi(request: Request, env: WorkerEnv): Promise<Response>
     );
   }
 
-  const data = (await upstream.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{
-          inlineData?: { data?: string; mimeType?: string };
-        }>;
-      };
-    }>;
-  };
-
-  const inline = data.candidates?.[0]?.content?.parts?.find(
-    (p) => p.inlineData?.data
-  )?.inlineData;
-
-  if (!inline?.data) {
+  const data = (await upstream.json()) as { audioContent?: string };
+  if (!data.audioContent) {
     return new Response(JSON.stringify({ error: 'No audio generated.' }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  return new Response(
-    JSON.stringify({
-      audioBase64: inline.data,
-      mimeType: inline.mimeType ?? 'audio/L16;codec=pcm;rate=24000',
-    }),
-    {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }
-  );
+  await Promise.all([
+    putEdgeCounter(dayKey, dailyUsed + boundedText.length, 86_400),
+    putEdgeCounter(monthKey, monthlyUsed + boundedText.length, 2_764_800),
+  ]);
+
+  const jsonBody = JSON.stringify({
+    audioBase64: data.audioContent,
+    mimeType: 'audio/mpeg',
+  });
+
+  if (cache) {
+    await cache.put(
+      cacheKeyUrl,
+      new Response(jsonBody, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=604800',
+        },
+      })
+    );
+  }
+
+  return new Response(jsonBody, {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 export default {

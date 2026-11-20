@@ -73,7 +73,6 @@ import {
 import { checkServerGeminiAvailable } from './utils/gemini';
 import {
   extractSharedState,
-  FirebaseSyncStatus,
   pushSharedState,
   subscribeSharedState,
 } from './utils/firebase';
@@ -225,8 +224,6 @@ export default function App() {
     orderId: string;
     seq: number;
   } | null>(null);
-  const [firebaseSyncStatus, setFirebaseSyncStatus] =
-    useState<FirebaseSyncStatus>('connecting');
 
   const orderSubmitLockRef = useRef<boolean>(false);
   const deliveryTimersRef = useRef<Map<string, number[]>>(new Map());
@@ -337,9 +334,6 @@ export default function App() {
           reviewReplies: remote.reviewReplies,
           priceReports: remote.priceReports,
         }));
-      },
-      (status) => {
-        setFirebaseSyncStatus(status);
       }
     );
     return () => unsubscribe();
@@ -2770,18 +2764,7 @@ export default function App() {
 
       <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span>
-            alle · 차세대 하이퍼로컬 생활 OS{' '}
-            <span className="text-[#4E6E2A] font-semibold">
-              (
-              {firebaseSyncStatus === 'synced'
-                ? 'Firebase 실시간 동기화'
-                : firebaseSyncStatus === 'connecting'
-                  ? 'Firebase 연결 중...'
-                  : '로컬 저장소 모드'}
-              )
-            </span>
-          </span>
+          <span>alle · 차세대 하이퍼로컬 생활 OS</span>
           <div className="flex items-center gap-5">
             <button
               type="button"

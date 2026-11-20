@@ -179,6 +179,7 @@ export function isSpeechSynthesisSupported(): boolean {
 let speechGeneration = 0;
 let activeAudio: HTMLAudioElement | null = null;
 let activeFetchController: AbortController | null = null;
+let serverTtsDisabled = false;
 const ttsBlobUrlCache = new Map<string, string>();
 
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -504,7 +505,11 @@ export function speakKoreanText(
       if (ok || myGen !== speechGeneration) return;
     }
 
-    if (typeof fetch !== 'undefined' && typeof AbortController !== 'undefined') {
+    if (
+      !serverTtsDisabled &&
+      typeof fetch !== 'undefined' &&
+      typeof AbortController !== 'undefined'
+    ) {
       const controller = new AbortController();
       activeFetchController = controller;
       const timeoutId = window.setTimeout(() => controller.abort(), 3800);
@@ -513,7 +518,10 @@ export function speakKoreanText(
         const res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: cleaned, voiceName: 'Aoede' }),
+          body: JSON.stringify({
+            text: cleaned,
+            voiceName: 'ko-KR-Neural2-A',
+          }),
           signal: controller.signal,
         });
         window.clearTimeout(timeoutId);
@@ -530,14 +538,23 @@ export function speakKoreanText(
           if (payload.audioBase64 && myGen === speechGeneration) {
             const url = buildAudioObjectUrl(
               payload.audioBase64,
-              payload.mimeType ?? 'audio/L16;codec=pcm;rate=24000'
+              payload.mimeType ?? 'audio/mpeg'
             );
-            if (ttsBlobUrlCache.size < 24) {
+            if (ttsBlobUrlCache.size < 40) {
               ttsBlobUrlCache.set(cleaned, url);
             }
             const ok = await playAudioUrl(url);
             if (ok || myGen !== speechGeneration) return;
           }
+        } else if (
+          res.status === 400 ||
+          res.status === 403 ||
+          res.status === 404 ||
+          res.status === 429 ||
+          res.status === 503
+        ) {
+          // Disable server TTS for this session when key/quota/cap is reached
+          serverTtsDisabled = true;
         }
       } catch {
         window.clearTimeout(timeoutId);
