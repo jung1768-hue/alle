@@ -1289,8 +1289,10 @@ export function AiChatOrderView({
     const total =
       getEffectiveMenuPrice(menu) * target.servings + store.deliveryFee;
     const effectiveMin = menu.estimatedMinutes + (store.extraPrepMinutes ?? 0);
-    const reasonText = menu.aiReason ? `${menu.aiReason} ` : '';
-    const explanation = `${bounded + 1}순위 추천 ${store.name}의 ${menu.name}입니다. ${reasonText}배달비 포함 ${formatWon(total)}, 약 ${effectiveMin}분 안에 도착해요. 이 메뉴로 주문할까요?`;
+    const reasonText = menu.aiReason
+      ? `${menu.aiReason.replace(/추천/g, '인기')} `
+      : '';
+    const explanation = `${bounded + 1}순위 ${store.name}의 ${menu.name}입니다. ${reasonText}배달비 포함 ${formatWon(total)}, 약 ${effectiveMin}분 안에 도착해요. 이 메뉴로 주문할까요?`;
 
     setStagedServings((prev) => ({
       ...prev,
@@ -4113,6 +4115,63 @@ export function AiChatOrderView({
                   onClick={(e) => e.stopPropagation()}
                   className="w-full sm:max-w-lg max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#DCE7CF] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
                 >
+                  {/* Top Switcher Bar: Switch Between Top Recommendations */}
+                  {recommendedSpotlight.menuIds.length > 1 && (
+                    <div className="px-4 py-2.5 bg-[#FAFCF8] border-b border-[#E8ECE4] space-y-1.5 shrink-0">
+                      <div className="flex items-center justify-between text-xs font-bold text-[#687064]">
+                        <span>다른 추천 메뉴 바로 비교</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              switchSpotlightIndex(
+                                recommendedSpotlight.activeIndex - 1
+                              )
+                            }
+                            aria-label="이전 추천 메뉴"
+                            className="w-7 h-7 rounded-lg border border-[#E8ECE4] bg-white hover:bg-[#F7F8F5] flex items-center justify-center cursor-pointer"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              switchSpotlightIndex(
+                                recommendedSpotlight.activeIndex + 1
+                              )
+                            }
+                            aria-label="다음 추천 메뉴"
+                            className="w-7 h-7 rounded-lg border border-[#E8ECE4] bg-white hover:bg-[#F7F8F5] flex items-center justify-center cursor-pointer"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                        {recommendedSpotlight.menuIds.map((mId, idx) => {
+                          const m = menuMap.get(mId);
+                          if (!m) return null;
+                          const isActive =
+                            idx === recommendedSpotlight.activeIndex;
+                          return (
+                            <button
+                              key={mId}
+                              type="button"
+                              onClick={() => switchSpotlightIndex(idx)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer transition-colors ${
+                                isActive
+                                  ? 'bg-[#3D5720] text-white'
+                                  : 'bg-[#F0F3EC] text-[#4A5048] hover:bg-[#EAF1E2]'
+                              }`}
+                            >
+                              {idx + 1}순위 · {m.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Top Visual Image */}
                   <div className="relative h-44 sm:h-48 w-full shrink-0 overflow-hidden bg-[#F7F8F5]">
                     <FoodImage
@@ -4294,63 +4353,6 @@ export function AiChatOrderView({
                         </>
                       )}
                     </div>
-
-                    {/* Switch Between Top Recommendations */}
-                    {recommendedSpotlight.menuIds.length > 1 && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs font-bold text-[#687064]">
-                          <span>다른 추천 메뉴도 바로 비교해 보세요</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                switchSpotlightIndex(
-                                  recommendedSpotlight.activeIndex - 1
-                                )
-                              }
-                              aria-label="이전 추천 메뉴"
-                              className="w-7 h-7 rounded-lg border border-[#E8ECE4] bg-white hover:bg-[#F7F8F5] flex items-center justify-center cursor-pointer"
-                            >
-                              <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                switchSpotlightIndex(
-                                  recommendedSpotlight.activeIndex + 1
-                                )
-                              }
-                              aria-label="다음 추천 메뉴"
-                              className="w-7 h-7 rounded-lg border border-[#E8ECE4] bg-white hover:bg-[#F7F8F5] flex items-center justify-center cursor-pointer"
-                            >
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                          {recommendedSpotlight.menuIds.map((mId, idx) => {
-                            const m = menuMap.get(mId);
-                            if (!m) return null;
-                            const isActive =
-                              idx === recommendedSpotlight.activeIndex;
-                            return (
-                              <button
-                                key={mId}
-                                type="button"
-                                onClick={() => switchSpotlightIndex(idx)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer transition-colors ${
-                                  isActive
-                                    ? 'bg-[#3D5720] text-white'
-                                    : 'bg-[#F7F8F5] text-[#4A5048] hover:bg-[#EAF1E2]'
-                                }`}
-                              >
-                                {idx + 1}순위 · {m.name}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Sticky Bottom Actions + Always-Visible Mic Status */}

@@ -8,10 +8,13 @@ import {
   Footprints,
   MapPin,
   Receipt,
+  Search,
   ShieldCheck,
   ShoppingBasket,
   Sparkles,
+  Star,
   Users,
+  X,
 } from 'lucide-react';
 import {
   B2B_OFFPEAK_SLOTS,
@@ -24,19 +27,28 @@ import {
   EvidencePhoto,
   MenuItem,
   Order,
+  Review,
+  ReviewReply,
   SavedLocation,
   Store,
   SuperAppTab,
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
-import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
+import {
+  formatWon,
+  getEffectiveMenuPrice,
+  isStoreDeliverableToLocation,
+} from '../utils/parser';
 import { FoodImage } from './FoodImage';
+import { MenuDetailReviewModal } from './MenuDetailReviewModal';
 
 interface SuperAppHubViewProps {
   activeTab: SuperAppTab;
   onChangeTab: (tab: SuperAppTab) => void;
   stores: Store[];
   menus: MenuItem[];
+  reviews?: Review[];
+  reviewReplies?: Record<string, ReviewReply>;
   errands: ErrandRequest[];
   latestOrder?: Order;
   activeLocation?: SavedLocation;
@@ -72,6 +84,8 @@ export function SuperAppHubView({
   onChangeTab,
   stores,
   menus,
+  reviews = [],
+  reviewReplies = {},
   errands,
   activeLocation,
   onJoinGroupBuy,
@@ -95,12 +109,51 @@ export function SuperAppHubView({
     [menus, storeMap]
   );
 
+  const [b2bSearch, setB2bSearch] = useState<string>('');
+  const [b2bCategory, setB2bCategory] = useState<string>('전체');
+  const [b2bNearbyOnly, setB2bNearbyOnly] = useState<boolean>(true);
+  const [detailMenuId, setDetailMenuId] = useState<string | null>(null);
+
+  const b2bCategories = useMemo(
+    () => [
+      '전체',
+      '한식/국밥/찜',
+      '분식/야식',
+      '중식/아시안',
+      '일식/돈가스',
+      '치킨/피자/버거',
+      '카페/디저트',
+    ],
+    []
+  );
+
+  const filteredB2bMenus = useMemo(() => {
+    const q = b2bSearch.trim().toLowerCase();
+    return availableMenus.filter((m) => {
+      const st = storeMap.get(m.storeId);
+      if (!st) return false;
+      if (b2bNearbyOnly && activeLocation && !isStoreDeliverableToLocation(st, activeLocation)) {
+        return false;
+      }
+      if (b2bCategory !== '전체' && st.categoryGroup !== b2bCategory) {
+        return false;
+      }
+      if (q) {
+        const hay = `${m.name} ${st.name} ${st.category} ${st.areaLabel} ${m.tags.join(' ')}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [availableMenus, storeMap, b2bNearbyOnly, activeLocation, b2bCategory, b2bSearch]);
+
   const [b2bMenuId, setB2bMenuId] = useState<string>(availableMenus[0]?.id ?? 'm1');
   const selectedB2bMenu =
-    menus.find((m) => m.id === b2bMenuId) ?? availableMenus[0] ?? menus[0];
+    menus.find((m) => m.id === b2bMenuId) ?? filteredB2bMenus[0] ?? availableMenus[0] ?? menus[0];
   const selectedB2bStore = selectedB2bMenu
     ? storeMap.get(selectedB2bMenu.storeId)
     : undefined;
+  const detailMenu = detailMenuId ? menuMap.get(detailMenuId) ?? null : null;
+  const detailStore = detailMenu ? storeMap.get(detailMenu.storeId) ?? null : null;
 
   const [b2bServings, setB2bServings] = useState<number>(
     Math.min(5, Math.max(1, selectedB2bMenu?.stock ?? 1))
@@ -639,38 +692,158 @@ export function SuperAppHubView({
               )}
 
               <div className="space-y-3">
-                <div>
-                  <label
-                    htmlFor="b2b-menu"
-                    className="block text-xs font-semibold text-[#1A1D1A] mb-1"
-                  >
-                    단체 주문 메뉴
-                  </label>
-                  <select
-                    id="b2b-menu"
-                    value={selectedB2bMenu?.id ?? ''}
-                    onChange={(e) => {
-                      const nextId = e.target.value;
-                      setB2bMenuId(nextId);
-                      const nextM = menus.find((m) => m.id === nextId);
-                      if (nextM) {
-                        setB2bServings((prev) =>
-                          Math.min(Math.max(1, prev), Math.max(1, nextM.stock))
-                        );
-                      }
-                    }}
-                    className="w-full min-h-[42px] px-3.5 bg-white border border-[#E8ECE4] rounded-xl text-xs sm:text-sm"
-                  >
-                    {availableMenus.map((m) => {
-                      const st = storeMap.get(m.storeId);
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor="b2b-menu-search"
+                      className="block text-xs font-semibold text-[#1A1D1A]"
+                    >
+                      단체 주문 메뉴 검색 · 선택 ({filteredB2bMenus.length}개)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setB2bNearbyOnly((prev) => !prev)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors cursor-pointer ${
+                        b2bNearbyOnly
+                          ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                          : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064]'
+                      }`}
+                    >
+                      {b2bNearbyOnly
+                        ? `내 주변(${activeLocation?.areaName.split(' ').slice(-1)[0] ?? '기본'})만`
+                        : '전국/대구 전체'}
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-[#687064] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      id="b2b-menu-search"
+                      type="text"
+                      value={b2bSearch}
+                      onChange={(e) => setB2bSearch(e.target.value)}
+                      placeholder="메뉴명 · 매장명 · 동네 검색 (예: 김치찌개, 국밥, 범어동)"
+                      className="w-full min-h-[40px] pl-9 pr-9 bg-white border border-[#E8ECE4] rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#4E6E2A]"
+                    />
+                    {b2bSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setB2bSearch('')}
+                        aria-label="검색어 지우기"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#687064] hover:text-[#1A1D1A] cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {b2bCategories.map((cat) => {
+                      const active = b2bCategory === cat;
                       return (
-                        <option key={m.id} value={m.id}>
-                          {st?.name} · {m.name} ({formatWon(m.pricePerPerson)} / 재고{' '}
-                          {m.stock}개)
-                        </option>
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setB2bCategory(cat)}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
+                            active
+                              ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                              : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
+                          }`}
+                        >
+                          {cat}
+                        </button>
                       );
                     })}
-                  </select>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto pr-1 space-y-2 rounded-2xl border border-[#E8ECE4] bg-[#F7F8F5] p-2">
+                    {filteredB2bMenus.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-[#687064] space-y-2">
+                        <p>조건에 맞는 단체 주문 메뉴가 없습니다.</p>
+                        {b2bNearbyOnly && (
+                          <button
+                            type="button"
+                            onClick={() => setB2bNearbyOnly(false)}
+                            className="px-3 py-1.5 rounded-xl bg-white border border-[#DCE7CF] text-[#3D5720] font-bold cursor-pointer"
+                          >
+                            전체 지역에서 찾기
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      filteredB2bMenus.slice(0, 60).map((m) => {
+                        const st = storeMap.get(m.storeId);
+                        if (!st) return null;
+                        const isSelected = selectedB2bMenu?.id === m.id;
+                        const reviewCnt = reviews.filter((r) => r.menuId === m.id).length;
+                        return (
+                          <div
+                            key={m.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              setB2bMenuId(m.id);
+                              setB2bServings((prev) =>
+                                Math.min(Math.max(1, prev), Math.max(1, m.stock))
+                              );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setB2bMenuId(m.id);
+                                setB2bServings((prev) =>
+                                  Math.min(Math.max(1, prev), Math.max(1, m.stock))
+                                );
+                              }
+                            }}
+                            className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#EAF1E2] border-[#4E6E2A] ring-1 ring-[#4E6E2A]/25'
+                                : 'bg-white border-[#E8ECE4] hover:border-[#82B440]'
+                            }`}
+                          >
+                            <FoodImage
+                              src={m.image}
+                              alt={m.name}
+                              className="w-12 h-12 rounded-lg object-cover shrink-0 border border-[#E8ECE4]"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1 text-[11px] text-[#687064]">
+                                <span className="truncate font-medium">{st.name}</span>
+                                <span className="inline-flex items-center gap-0.5 text-[#1A1D1A] font-semibold shrink-0">
+                                  <Star className="w-3 h-3 fill-[#82B440] text-[#82B440]" />
+                                  {(st.rating ?? 4.9).toFixed(1)}
+                                </span>
+                              </div>
+                              <div className="text-xs font-bold text-[#1A1D1A] truncate">
+                                {m.name}
+                              </div>
+                              <div className="text-[11px] text-[#4E6E2A] font-semibold tabular-nums">
+                                {formatWon(getEffectiveMenuPrice(m))} · 재고 {m.stock}개
+                                {reviewCnt > 0 ? ` · 리뷰 ${reviewCnt}건` : ''}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetailMenuId(m.id);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#F0F3EC] border border-[#DCE7CF] text-[11px] font-bold text-[#3D5720] shrink-0 cursor-pointer"
+                            >
+                              상세 · 리뷰
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                    {filteredB2bMenus.length > 60 && (
+                      <p className="text-center text-[11px] text-[#687064] py-1">
+                        상위 60개만 표시 중입니다. 검색어로 더 정확히 찾아보세요.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -747,10 +920,33 @@ export function SuperAppHubView({
 
             <div className="lg:col-span-5 os-card rounded-3xl p-6 space-y-3.5">
               <h4 className="text-sm font-bold text-[#1A1D1A]">
-                법인 정산 요약
+                선택 메뉴 & 법인 정산 요약
               </h4>
               {selectedB2bMenu && selectedB2bStore ? (
-                <dl className="space-y-2 text-xs sm:text-sm">
+                <>
+                  <div className="p-3 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] flex items-center gap-3">
+                    <FoodImage
+                      src={selectedB2bMenu.image}
+                      alt={selectedB2bMenu.name}
+                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-[#E8ECE4]"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="text-[11px] font-medium text-[#687064] truncate">
+                        {selectedB2bStore.name} · ★ {(selectedB2bStore.rating ?? 4.9).toFixed(1)}
+                      </div>
+                      <div className="text-sm font-bold text-[#1A1D1A] truncate">
+                        {selectedB2bMenu.name}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDetailMenuId(selectedB2bMenu.id)}
+                        className="text-[11px] font-bold text-[#4E6E2A] hover:underline cursor-pointer"
+                      >
+                        이미지 · 리뷰 자세히 보기 →
+                      </button>
+                    </div>
+                  </div>
+                  <dl className="space-y-2 text-xs sm:text-sm">
                   <div className="flex justify-between text-[#687064]">
                     <dt>매장</dt>
                     <dd className="font-semibold text-[#1A1D1A]">
@@ -788,7 +984,8 @@ export function SuperAppHubView({
                       {formatWon(b2bTotal)}
                     </dd>
                   </div>
-                </dl>
+                  </dl>
+                </>
               ) : (
                 <p className="text-xs text-[#687064]">주문 가능한 메뉴가 없습니다.</p>
               )}
@@ -1123,6 +1320,19 @@ export function SuperAppHubView({
           </div>
         )}
       </section>
+
+      <MenuDetailReviewModal
+        menu={detailMenu}
+        store={detailStore}
+        reviews={reviews}
+        reviewReplies={reviewReplies}
+        onClose={() => setDetailMenuId(null)}
+        onQuickOrder={(menuId, servings) => {
+          setB2bMenuId(menuId);
+          setB2bServings(servings);
+          setDetailMenuId(null);
+        }}
+      />
     </div>
   );
 }

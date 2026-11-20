@@ -2806,6 +2806,8 @@ export default function App() {
             onChangeTab={setSuperAppTab}
             stores={appState.stores}
             menus={appState.menus}
+            reviews={INITIAL_REVIEWS}
+            reviewReplies={appState.reviewReplies}
             errands={appState.errands}
             latestOrder={appState.orders[0]}
             activeLocation={activeLocation}
