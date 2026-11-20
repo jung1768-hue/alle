@@ -84,6 +84,34 @@ import {
   StorageMode,
 } from './utils/storage';
 
+const AGENCY_RIDER_NAMES = [
+  '김도현 전문 라이더',
+  '이준호 전문 라이더',
+  '박민수 전문 라이더',
+  '정우성 전문 라이더',
+  '최지훈 전문 라이더',
+  '강태오 전문 라이더',
+  '윤성민 전문 라이더',
+  '한재현 전문 라이더',
+];
+
+const NEIGHBOR_WALKER_NAMES = [
+  '박서연 이웃 배달 파트너',
+  '김지민 이웃 배달 파트너',
+  '이하은 이웃 배달 파트너',
+  '최수빈 이웃 배달 파트너',
+  '정다은 이웃 배달 파트너',
+  '조유진 이웃 배달 파트너',
+];
+
+function pickRandomRiderName(mode: DispatchMode): string {
+  const pool =
+    mode === DispatchMode.AGENCY_RIDER
+      ? AGENCY_RIDER_NAMES
+      : NEIGHBOR_WALKER_NAMES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function formatNowTime(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -953,10 +981,7 @@ export default function App() {
       order.sharedDeliveryApplied || order.deliveryFee <= 1800
         ? DispatchMode.NEIGHBOR_WALK
         : DispatchMode.AGENCY_RIDER;
-    const riderLabel =
-      dispatchMode === DispatchMode.AGENCY_RIDER
-        ? '김도현 전문 라이더'
-        : '박서연 이웃 배달 파트너';
+    const riderLabel = order.riderName ?? pickRandomRiderName(dispatchMode);
     const departEta = Math.max(8, estimatedMinutes - 6);
 
     const tDepart = window.setTimeout(() => {
@@ -1428,10 +1453,7 @@ export default function App() {
     const chosenMode =
       dispatchMode ?? currentOrder?.dispatchMode ?? DispatchMode.AGENCY_RIDER;
     const riderLabel =
-      currentOrder?.riderName ??
-      (chosenMode === DispatchMode.AGENCY_RIDER
-        ? '김도현 전문 라이더'
-        : '박서연 이웃 배달 파트너');
+      currentOrder?.riderName ?? pickRandomRiderName(chosenMode);
     const nextStage: DeliveryProgressStage | undefined =
       nextStatus === OrderStatus.PICKUP
         ? 'DEPARTED'

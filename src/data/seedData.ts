@@ -2177,23 +2177,16 @@ export const INITIAL_SAVED_LOCATIONS: SavedLocation[] = [
   {
     id: 'loc-home',
     label: '우리집',
-    areaName: '서울 강남구 역삼동',
-    detailAddress: '강남구 역삼동 수령지 A',
+    areaName: '대구 북구 산격동',
+    detailAddress: '북구 산격동 수령지 A',
     tag: 'home',
   },
   {
     id: 'loc-work',
     label: '회사',
-    areaName: '경기 성남시 분당구',
-    detailAddress: '성남시 분당구 정자동 오피스 A',
+    areaName: '대구 중구 동성로',
+    detailAddress: '중구 동성로 오피스 A',
     tag: 'work',
-  },
-  {
-    id: 'loc-busan',
-    label: '부산 출장',
-    areaName: '부산 해운대구 우동',
-    detailAddress: '해운대구 우동 수령지 B',
-    tag: 'etc',
   },
   {
     id: 'loc-daegu',
