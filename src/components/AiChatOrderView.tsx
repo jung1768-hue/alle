@@ -1127,21 +1127,51 @@ export function AiChatOrderView({
     const summary = buildVoiceCheckoutSummary(draft);
     if (!summary) return;
     setVoiceCheckoutDraft(draft);
-    const couponPart =
+    const feeText =
+      summary.deliveryFee === 0
+        ? '배달비 무료'
+        : `배달비 ${formatWon(summary.deliveryFee)}`;
+    const discountText =
       summary.couponDiscount > 0 && summary.bestCoupon
-        ? `${summary.bestCoupon.label} 쿠폰까지 자동 적용해 `
+        ? ` · ${summary.bestCoupon.label} -${formatWon(summary.couponDiscount)}`
         : '';
     const notePart = draft.customerNote.trim()
       ? ` · 요청 "${draft.customerNote.trim()}"`
       : '';
-    const spoken = `${leadPrefix ? `${leadPrefix} ` : ''}${summary.store.name} ${summary.menu.name} ${summary.qty}인분, ${couponPart}최종 결제 금액은 ${formatWon(summary.finalTotal)}입니다. ${summary.paymentOption.label}로 바로 결제할까요? 결제해줘 또는 취소라고 말씀해 주세요.`;
+
+    const availableOpts = summary.menu.options ?? [];
+    const selectedOpts = summary.selectedOpts ?? [];
+    let optionQuestionText = '';
+    let optionQuestionSpoken = '';
+
+    if (availableOpts.length > 0 && selectedOpts.length === 0) {
+      const previewOpts = availableOpts
+        .slice(0, 3)
+        .map((o) => `${o.name}(+${formatWon(o.priceDelta)})`)
+        .join(', ');
+      optionQuestionText = `추가 옵션(${previewOpts})을 넣으실래요, 아니면 그대로 ${summary.paymentOption.label}로 결제할까요?`;
+      optionQuestionSpoken = `추가 옵션으로 ${availableOpts
+        .slice(0, 3)
+        .map((o) => `${o.name} ${formatWon(o.priceDelta)}`)
+        .join(', ')} 선택할 수 있어요. 추가할 옵션이 있나요, 아니면 그대로 ${summary.paymentOption.label}로 결제할까요?`;
+    } else if (selectedOpts.length > 0) {
+      const selectedNames = selectedOpts.map((o) => o.name).join(', ');
+      optionQuestionText = `선택 옵션(${selectedNames}) 반영 완료. 더 바꾸실 옵션이 있나요, 바로 ${summary.paymentOption.label}로 결제할까요?`;
+      optionQuestionSpoken = `${selectedNames} 옵션 포함입니다. 더 바꾸실 옵션이 있나요, 바로 ${summary.paymentOption.label}로 결제할까요?`;
+    } else {
+      optionQuestionText = `추가 옵션은 없고, 바로 ${summary.paymentOption.label}로 결제할까요?`;
+      optionQuestionSpoken = `추가 옵션은 없고, 바로 ${summary.paymentOption.label}로 결제할까요?`;
+    }
+
+    const priceHeadline = `${summary.qty}인분 핵심 가격: 총 ${formatWon(summary.finalTotal)} (메뉴 ${formatWon(summary.menuSubtotal)} · ${feeText}${discountText}${notePart})`;
+    const spoken = `${leadPrefix ? `${leadPrefix} ` : ''}${summary.qty}인분 총 ${formatWon(summary.finalTotal)}입니다. ${optionQuestionSpoken}`;
 
     setMessages((prev) => [
       ...prev,
       {
         id: `b-checkout-${Date.now() + 1}`,
         sender: 'bot',
-        text: `${summary.store.name} · ${summary.menu.name} ${summary.qty}인분 최종 결제 금액 ${formatWon(summary.finalTotal)}${notePart}. 아래 카드에서 결제 수단을 확인하시거나 말씀으로 '결제해줘'라고 해주세요.`,
+        text: `${leadPrefix ? `${leadPrefix} ` : ''}${priceHeadline}. ${optionQuestionText}`,
         spokenText: spoken,
         stagedMenuId: draft.menuId,
         checkoutDraftSnapshot: draft,
@@ -1419,8 +1449,12 @@ export function AiChatOrderView({
     }
 
     const parsedInline = parseConditionInput(trimmed);
-    const activeMenu = latestStagedMenuId
-      ? menuMap.get(latestStagedMenuId)
+    const spotlightActiveMenuId = recommendedSpotlight
+      ? recommendedSpotlight.menuIds[recommendedSpotlight.activeIndex]
+      : undefined;
+    const focusedMenuId = spotlightActiveMenuId ?? latestStagedMenuId;
+    const activeMenu = focusedMenuId
+      ? menuMap.get(focusedMenuId)
       : undefined;
     const activeStore = activeMenu
       ? storeMap.get(activeMenu.storeId)
@@ -1557,11 +1591,16 @@ export function AiChatOrderView({
       } else {
         const spokenPay = detectPaymentMethodFromSpeech(trimmed);
         const spokenQty = extractExplicitQuantity(trimmed);
+        const compactDraftInput = trimmed.replace(/\s+/g, '').toLowerCase();
+        const matchedDraftOpt = currentSummary?.menu.options.find((opt) => {
+          const optKey = opt.name.replace(/\s+/g, '').toLowerCase();
+          return optKey.length >= 2 && compactDraftInput.includes(optKey);
+        });
         const isConfirm =
-          /^(네|예|응|어|좋아|오케이|ok|확인|진행|결제|결재|주문)/.test(
+          /^(네|예|응|어|좋아|오케이|ok|확인|진행|결제|결재|주문|그대로)/.test(
             trimmed.toLowerCase()
           ) ||
-          /(결제\s*해|결재\s*해|주문\s*해|진행\s*해|바로\s*결제|그렇게\s*해|해\s*줘|할게)/.test(
+          /(결제\s*해|결재\s*해|주문\s*해|진행\s*해|바로\s*결제|그대로\s*결제|그렇게\s*해|해\s*줘|할게)/.test(
             trimmed
           );
         const isNoteEdit = /(문\s*앞|벨|노크|조심히|전화|요청|적어)/.test(
@@ -1573,6 +1612,7 @@ export function AiChatOrderView({
           hasFoodPreference &&
           !matchesCurrentStagedDish &&
           !spokenPay &&
+          !matchedDraftOpt &&
           !isConfirm
         ) {
           setVoiceCheckoutDraft(null);
@@ -1590,19 +1630,37 @@ export function AiChatOrderView({
               ),
             };
           }
+          if (matchedDraftOpt) {
+            const curOpts = updatedDraft.selectedOptionIds ?? [];
+            const isRemoving = /(빼|제외|취소)/.test(trimmed);
+            const nextOpts = isRemoving
+              ? curOpts.filter((id) => id !== matchedDraftOpt.id)
+              : curOpts.includes(matchedDraftOpt.id)
+                ? curOpts
+                : [...curOpts, matchedDraftOpt.id];
+            updatedDraft = { ...updatedDraft, selectedOptionIds: nextOpts };
+            setStagedOptions((prev) => ({
+              ...prev,
+              [updatedDraft.menuId]: nextOpts,
+            }));
+          }
           if (isNoteEdit) {
             updatedDraft = { ...updatedDraft, customerNote: trimmed };
           }
 
-          if (isConfirm && !spokenQty && !isNoteEdit) {
+          if (isConfirm && !spokenQty && !isNoteEdit && !matchedDraftOpt) {
             executeVoiceOrder(updatedDraft);
             return;
           }
 
-          if (spokenPay || spokenQty || isNoteEdit) {
+          if (spokenPay || spokenQty || matchedDraftOpt || isNoteEdit) {
             openCheckoutDraftMessage(
               updatedDraft,
-              spokenPay ? '결제 수단을 반영했어요.' : '주문 내용을 수정했어요.'
+              matchedDraftOpt
+                ? `${matchedDraftOpt.name} 옵션을 반영했어요.`
+                : spokenPay
+                  ? '결제 수단을 반영했어요.'
+                  : '주문 내용을 수정했어요.'
             );
             return;
           }
