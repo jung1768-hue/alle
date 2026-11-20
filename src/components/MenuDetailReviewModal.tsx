@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   Clock,
   MessageSquare,
@@ -29,6 +30,20 @@ export function MenuDetailReviewModal({
   onClose,
   onQuickOrder,
 }: MenuDetailReviewModalProps) {
+  const isOpen = Boolean(menu && store);
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, [isOpen]);
+
   if (!menu || !store) return null;
 
   const menuReviews = reviews.filter((r) => r.menuId === menu.id);
@@ -42,11 +57,11 @@ export function MenuDetailReviewModal({
       aria-modal="true"
       aria-label={`${menu.name} 상세 및 리뷰`}
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-lg max-h-[88vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl p-5 sm:p-6 space-y-4"
+        className="w-full sm:max-w-lg max-h-[88vh] overflow-y-auto overscroll-contain touch-pan-y bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl p-5 sm:p-6 space-y-4"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

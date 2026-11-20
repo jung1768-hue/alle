@@ -368,6 +368,7 @@ function speakWithBrowserSynthesis(
   myGen: number,
   options?: {
     onStart?: () => void;
+    onNearEnd?: () => void;
     onEnd?: () => void;
     onError?: () => void;
   }
@@ -385,6 +386,7 @@ function speakWithBrowserSynthesis(
   let settled = false;
   let safetyTimer: number | null = null;
   let startedNotified = false;
+  let nearEndNotified = false;
 
   const finish = (kind: 'end' | 'error') => {
     if (settled) return;
@@ -427,6 +429,14 @@ function speakWithBrowserSynthesis(
           startedNotified = true;
           options?.onStart?.();
         }
+        if (
+          myGen === speechGeneration &&
+          !nearEndNotified &&
+          idx === sentences.length - 1
+        ) {
+          nearEndNotified = true;
+          options?.onNearEnd?.();
+        }
       };
 
       utterance.onend = () => {
@@ -452,6 +462,7 @@ export function speakKoreanText(
   rawText: string,
   options?: {
     onStart?: () => void;
+    onNearEnd?: () => void;
     onEnd?: () => void;
     onError?: () => void;
   }
@@ -479,11 +490,24 @@ export function speakKoreanText(
       const audio = new Audio(objectUrl);
       activeAudio = audio;
       let started = false;
+      let nearEndNotified = false;
 
       audio.onplay = () => {
         if (myGen === speechGeneration && !started) {
           started = true;
           options?.onStart?.();
+        }
+      };
+      audio.ontimeupdate = () => {
+        if (
+          myGen === speechGeneration &&
+          !nearEndNotified &&
+          Number.isFinite(audio.duration) &&
+          audio.duration > 0 &&
+          audio.duration - audio.currentTime <= 1.2
+        ) {
+          nearEndNotified = true;
+          options?.onNearEnd?.();
         }
       };
       audio.onended = () => {

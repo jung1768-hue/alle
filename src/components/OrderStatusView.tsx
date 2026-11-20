@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import {
   Calendar as CalendarIcon,
+  Camera,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -10,6 +11,7 @@ import {
   MessageCircle,
   Store as StoreIcon,
   Truck,
+  X,
   XCircle,
 } from 'lucide-react';
 import {
@@ -17,6 +19,7 @@ import {
   DispatchMode,
   ErrandRequest,
   ErrandStatus,
+  EvidencePhoto,
   EvidenceRecord,
   MenuItem,
   Order,
@@ -196,22 +199,77 @@ export function OrderStatusView({
   const [customerEvidenceNote, setCustomerEvidenceNote] = useState<string>(
     '국물 용기 실링 및 도착 상태 확인 요청'
   );
+  const [evidencePhotos, setEvidencePhotos] = useState<EvidencePhoto[]>([]);
+
+  const handleEvidenceFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []).slice(
+      0,
+      Math.max(0, 3 - evidencePhotos.length)
+    );
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    const readCompressed = (file: File): Promise<EvidencePhoto | null> =>
+      new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const rawUrl = typeof reader.result === 'string' ? reader.result : '';
+          if (!rawUrl) {
+            resolve(null);
+            return;
+          }
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 720;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve({ name: file.name, dataUrl: rawUrl });
+              return;
+            }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve({
+              name: file.name,
+              dataUrl: canvas.toDataURL('image/jpeg', 0.72),
+            });
+          };
+          img.onerror = () => resolve({ name: file.name, dataUrl: rawUrl });
+          img.src = rawUrl;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+
+    const loaded = (await Promise.all(files.map(readCompressed))).filter(
+      (item): item is EvidencePhoto => Boolean(item)
+    );
+    if (loaded.length > 0) {
+      setEvidencePhotos((prev) => [...prev, ...loaded].slice(0, 3));
+    }
+  };
 
   const buildAiMediationVerdict = (
     order: Order,
     type: AiMediationVerdict['claimType'],
     ownerSealed: boolean,
-    courierChecked: boolean
+    courierChecked: boolean,
+    photoCount = 0
   ): AiMediationVerdict => {
+    const photoSuffix =
+      photoCount > 0 ? ` (고객 현장 사진 증빙 ${photoCount}장 교차 검증 반영)` : '';
+    const photoConfidenceBoost = photoCount > 0 ? 2 : 0;
+
     if (order.totalAmount > 100000) {
       return {
         claimType: type,
         faultParty: 'escalated',
         faultLabel: '인간 관리자 에스컬레이션 (10만 원 초과)',
-        confidencePercent: 84,
+        confidencePercent: Math.min(99, 84 + photoConfidenceBoost),
         processedSeconds: 1.8,
-        summary:
-          '10만 원 초과 대량 주문 건으로 자동 에스크로 동결 후 전담 CS 감독관 검토 큐로 즉시 연결되었습니다.',
+        summary: `10만 원 초과 대량 주문 건으로 자동 에스크로 동결 후 전담 CS 감독관 검토 큐로 즉시 연결되었습니다.${photoSuffix}`,
         customerAction: '에스크로 보호 대기 (우선 연락)',
         ownerAction: '제출 증빙 검토 후 정산 확정',
         courierAction: '배송 로그 보존',
@@ -224,11 +282,13 @@ export function OrderStatusView({
         claimType: type,
         faultParty: faultOwner ? 'owner' : 'courier',
         faultLabel: faultOwner ? '가맹점주 포장 귀책' : '배달 파트너 이동 중 파손',
-        confidencePercent: 96,
+        confidencePercent: Math.min(99, 96 + photoConfidenceBoost),
         processedSeconds: 2.3,
-        summary: faultOwner
-          ? '점주 용기 실링 미확인 상태로 출고되어 포장 미흡으로 판정되었습니다.'
-          : '점주 실링 정상 + 이동 중 충격/기울어짐 로그 교차 검증으로 배달 중 파손 판정되었습니다.',
+        summary: `${
+          faultOwner
+            ? '점주 용기 실링 미확인 상태로 출고되어 포장 미흡으로 판정되었습니다.'
+            : '점주 실링 정상 + 이동 중 충격/기울어짐 로그 교차 검증으로 배달 중 파손 판정되었습니다.'
+        }${photoSuffix}`,
         customerAction: `${formatWon(order.totalAmount)} 즉시 환불 + 위로 포인트 3,000원`,
         ownerAction: faultOwner
           ? '해당 주문 정산 보류'
@@ -244,10 +304,9 @@ export function OrderStatusView({
         claimType: type,
         faultParty: 'owner',
         faultLabel: '가맹점주 품목 누락',
-        confidencePercent: 94,
+        confidencePercent: Math.min(99, 94 + photoConfidenceBoost),
         processedSeconds: 2.1,
-        summary:
-          '주문 영수증 품목 리스트와 수령 구성품 대조 결과 일부 품목 누락이 감지되었습니다.',
+        summary: `주문 영수증 품목 리스트와 수령 구성품 대조 결과 일부 품목 누락이 감지되었습니다.${photoSuffix}`,
         customerAction: '누락 품목 즉시 부분 환불 + 1,000원 alle 캐시',
         ownerAction: '누락 품목 금액만 에스크로 자동 차감',
         courierAction: '배달비 100% 정상 지급',
@@ -259,11 +318,13 @@ export function OrderStatusView({
         claimType: type,
         faultParty: 'courier',
         faultLabel: '배달 파트너 오배송 (호수 불일치)',
-        confidencePercent: 97,
+        confidencePercent: Math.min(99, 97 + photoConfidenceBoost),
         processedSeconds: 1.9,
-        summary: courierChecked
-          ? '문 앞 사진 호수 번호판 OCR과 수령지 주소 불일치가 감지되어 즉시 재배치 알림을 전송했습니다.'
-          : '수령지 호수 불일치 및 이동 로그 미확인으로 전액 환불 처리되었습니다.',
+        summary: `${
+          courierChecked
+            ? '문 앞 사진 호수 번호판 OCR과 수령지 주소 불일치가 감지되어 즉시 재배치 알림을 전송했습니다.'
+            : '수령지 호수 불일치 및 이동 로그 미확인으로 전액 환불 처리되었습니다.'
+        }${photoSuffix}`,
         customerAction: `${formatWon(order.totalAmount)} 즉시 환불 또는 원클릭 재주문`,
         ownerAction: '음식값 100% 정상 정산 입금',
         courierAction: '5분 내 위치 이동 알림 (미조치 시 배달료 미지급)',
@@ -274,15 +335,153 @@ export function OrderStatusView({
       claimType: type,
       faultParty: 'platform_buffer',
       faultLabel: '상생 버퍼 기금 중재',
-      confidencePercent: 91,
+      confidencePercent: Math.min(99, 91 + photoConfidenceBoost),
       processedSeconds: 2.6,
-      summary:
-        '점주 실링·배달 상태 모두 정상으로 확인되어 플랫폼 상생 버퍼 기금으로 원만히 보상합니다.',
+      summary: `점주 실링·배달 상태 모두 정상으로 확인되어 플랫폼 상생 버퍼 기금으로 원만히 보상합니다.${photoSuffix}`,
       customerAction: '상생 버퍼 기금 2,000원 위로 쿠폰 즉시 지급',
       ownerAction: '음식값 100% 정상 정산 입금',
       courierAction: '배달비 100% 정상 지급',
     };
   };
+
+  const renderEvidenceForm = (order: Order) => (
+    <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
+      <div className="font-bold text-[#1A1D1A]">
+        4단계 디지털 증적 제출 · 10초 자동 중재
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            ['spill', '국물 쏟아짐/파손'],
+            ['missing', '품목 누락'],
+            ['misdelivery', '오배송(호수 불일치)'],
+            ['quality', '단순 변심/품질 문의'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setClaimType(key)}
+            className={`px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
+              claimType === key
+                ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                : 'bg-white border-[#E8ECE4] text-[#434B40]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-3 text-[#1A1D1A]">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={ownerSealCheck}
+            onChange={(e) => setOwnerSealCheck(e.target.checked)}
+            className="accent-[#4E6E2A]"
+          />
+          <span>1. 점주 실링/영수증 정상</span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={courierCheck}
+            onChange={(e) => setCourierCheck(e.target.checked)}
+            className="accent-[#4E6E2A]"
+          />
+          <span>2. 파트너 이동/센서 로그 확인</span>
+        </label>
+      </div>
+      <input
+        type="text"
+        value={customerEvidenceNote}
+        onChange={(e) => setCustomerEvidenceNote(e.target.value)}
+        className="w-full min-h-[38px] px-3 bg-white border border-[#D4E1C5] rounded-xl text-[#1A1D1A]"
+        placeholder="3. 고객 클레임 내용"
+      />
+      <div className="p-2.5 rounded-xl bg-white border border-dashed border-[#82B440]/70 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-semibold text-[#3D5720]">
+            4. 현장 사진 · 영수증 증거 첨부 (최대 3장)
+          </span>
+          <label className="min-h-[32px] px-3 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] font-bold inline-flex items-center gap-1.5 cursor-pointer">
+            <Camera className="w-3.5 h-3.5" />
+            <span>사진 올리기</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleEvidenceFileChange}
+              disabled={evidencePhotos.length >= 3}
+              className="hidden"
+            />
+          </label>
+        </div>
+        {evidencePhotos.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {evidencePhotos.map((photo, idx) => (
+              <div key={`${photo.name}-${idx}`} className="relative">
+                <img
+                  src={photo.dataUrl}
+                  alt={photo.name}
+                  className="w-16 h-16 rounded-lg object-cover border border-[#D4E1C5]"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEvidencePhotos((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  aria-label="첨부 사진 삭제"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#1A1D1A] text-white flex items-center justify-center cursor-pointer shadow-xs"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const aiVerdict = buildAiMediationVerdict(
+              order,
+              claimType,
+              ownerSealCheck,
+              courierCheck,
+              evidencePhotos.length
+            );
+            onAttachEvidence(order.id, {
+              ownerSealingChecked: ownerSealCheck,
+              courierConditionChecked: courierCheck,
+              customerMemoNote:
+                customerEvidenceNote.trim() || '고객 확인 메모',
+              escrowStatus: '에스크로 자동 정산 집행 완료',
+              evidencePhotos:
+                evidencePhotos.length > 0 ? evidencePhotos : undefined,
+              aiVerdict,
+            });
+            setEvidencePhotos([]);
+            setEvidenceOrderId(null);
+          }}
+          className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
+        >
+          10초 자동 중재 실행
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEvidencePhotos([]);
+            setEvidenceOrderId(null);
+          }}
+          className="min-h-[38px] px-3 py-1.5 border border-[#D4E1C5] bg-white text-[#555E52] font-semibold rounded-xl cursor-pointer"
+        >
+          닫기
+        </button>
+      </div>
+    </div>
+  );
 
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
 
@@ -1049,6 +1248,25 @@ export function OrderStatusView({
                     <p className="text-[#555E52]">
                       고객 메모: {order.evidenceRecord.customerMemoNote}
                     </p>
+                    {order.evidenceRecord.evidencePhotos &&
+                      order.evidenceRecord.evidencePhotos.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="text-[11px] font-bold text-[#3D5720]">
+                            첨부된 현장 사진 · 영수증 증거 (
+                            {order.evidenceRecord.evidencePhotos.length}장)
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {order.evidenceRecord.evidencePhotos.map((photo, idx) => (
+                              <img
+                                key={`${photo.name}-${idx}`}
+                                src={photo.dataUrl}
+                                alt={photo.name}
+                                className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5] bg-white"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     {order.evidenceRecord.aiVerdict && (
                       <div className="p-3 bg-white border border-[#D4E1C5] rounded-xl space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -1129,95 +1347,8 @@ export function OrderStatusView({
 
                     {order.status === OrderStatus.COMPLETED &&
                       evidenceOrderId === order.id &&
-                      !order.evidenceRecord && (
-                        <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
-                          <div className="font-bold text-[#1A1D1A]">
-                            4단계 디지털 증적 제출 · 10초 자동 중재
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {(
-                              [
-                                ['spill', '국물 쏟아짐/파손'],
-                                ['missing', '품목 누락'],
-                                ['misdelivery', '오배송(호수 불일치)'],
-                                ['quality', '단순 변심/품질 문의'],
-                              ] as const
-                            ).map(([key, label]) => (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => setClaimType(key)}
-                                className={`px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
-                                  claimType === key
-                                    ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                                    : 'bg-white border-[#E8ECE4] text-[#434B40]'
-                                }`}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="flex flex-wrap gap-3 text-[#1A1D1A]">
-                            <label className="flex items-center gap-1.5 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={ownerSealCheck}
-                                onChange={(e) => setOwnerSealCheck(e.target.checked)}
-                                className="accent-[#4E6E2A]"
-                              />
-                              <span>1. 점주 실링/영수증 정상</span>
-                            </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={courierCheck}
-                                onChange={(e) => setCourierCheck(e.target.checked)}
-                                className="accent-[#4E6E2A]"
-                              />
-                              <span>2. 파트너 이동/센서 로그 확인</span>
-                            </label>
-                          </div>
-                          <input
-                            type="text"
-                            value={customerEvidenceNote}
-                            onChange={(e) => setCustomerEvidenceNote(e.target.value)}
-                            className="w-full min-h-[38px] px-3 bg-white border border-[#D4E1C5] rounded-xl text-[#1A1D1A]"
-                            placeholder="3. 고객 클레임 내용"
-                          />
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const aiVerdict = buildAiMediationVerdict(
-                                  order,
-                                  claimType,
-                                  ownerSealCheck,
-                                  courierCheck
-                                );
-                                onAttachEvidence(order.id, {
-                                  ownerSealingChecked: ownerSealCheck,
-                                  courierConditionChecked: courierCheck,
-                                  customerMemoNote:
-                                    customerEvidenceNote.trim() || '고객 확인 메모',
-                                  escrowStatus: '에스크로 자동 정산 집행 완료',
-                                  aiVerdict,
-                                });
-                                setEvidenceOrderId(null);
-                              }}
-                              className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
-                            >
-                              10초 자동 중재 실행
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEvidenceOrderId(null)}
-                              className="min-h-[38px] px-3 py-1.5 border border-[#D4E1C5] bg-white text-[#555E52] font-semibold rounded-xl cursor-pointer"
-                            >
-                              닫기
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      !order.evidenceRecord &&
+                      renderEvidenceForm(order)}
                   </div>
                 )}
 
@@ -1313,95 +1444,9 @@ export function OrderStatusView({
                           </div>
                         )}
 
-                        {evidenceOrderId === order.id && !order.evidenceRecord && (
-                          <div className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-2.5 text-xs">
-                            <div className="font-bold text-[#1A1D1A]">
-                              4단계 디지털 증적 제출 · 10초 자동 중재
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {(
-                                [
-                                  ['spill', '국물 쏟아짐/파손'],
-                                  ['missing', '품목 누락'],
-                                  ['misdelivery', '오배송(호수 불일치)'],
-                                  ['quality', '단순 변심/품질 문의'],
-                                ] as const
-                              ).map(([key, label]) => (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  onClick={() => setClaimType(key)}
-                                  className={`px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
-                                    claimType === key
-                                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                                      : 'bg-white border-[#E8ECE4] text-[#434B40]'
-                                  }`}
-                                >
-                                  {label}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="flex flex-wrap gap-3 text-[#1A1D1A]">
-                              <label className="flex items-center gap-1.5 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={ownerSealCheck}
-                                  onChange={(e) => setOwnerSealCheck(e.target.checked)}
-                                  className="accent-[#4E6E2A]"
-                                />
-                                <span>1. 점주 실링/영수증 정상</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={courierCheck}
-                                  onChange={(e) => setCourierCheck(e.target.checked)}
-                                  className="accent-[#4E6E2A]"
-                                />
-                                <span>2. 파트너 이동/센서 로그 확인</span>
-                              </label>
-                            </div>
-                            <input
-                              type="text"
-                              value={customerEvidenceNote}
-                              onChange={(e) => setCustomerEvidenceNote(e.target.value)}
-                              className="w-full min-h-[38px] px-3 bg-white border border-[#D4E1C5] rounded-xl text-[#1A1D1A]"
-                              placeholder="3. 고객 클레임 내용"
-                            />
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const aiVerdict = buildAiMediationVerdict(
-                                    order,
-                                    claimType,
-                                    ownerSealCheck,
-                                    courierCheck
-                                  );
-                                  onAttachEvidence(order.id, {
-                                    ownerSealingChecked: ownerSealCheck,
-                                    courierConditionChecked: courierCheck,
-                                    customerMemoNote:
-                                      customerEvidenceNote.trim() || '고객 확인 메모',
-                                    escrowStatus: '에스크로 자동 정산 집행 완료',
-                                    aiVerdict,
-                                  });
-                                  setEvidenceOrderId(null);
-                                }}
-                                className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
-                              >
-                                10초 자동 중재 실행
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEvidenceOrderId(null)}
-                                className="min-h-[38px] px-3 py-1.5 border border-[#D4E1C5] bg-white text-[#555E52] font-semibold rounded-xl cursor-pointer"
-                              >
-                                닫기
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                        {evidenceOrderId === order.id &&
+                          !order.evidenceRecord &&
+                          renderEvidenceForm(order)}
                       </div>
                     )}
                   </div>

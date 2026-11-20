@@ -530,6 +530,8 @@ export function AiChatOrderView({
   const viewModeRef = useRef(viewMode);
   const isListeningRef = useRef(isListening);
   const isSpeakingRef = useRef(isSpeaking);
+  const isNearSpeechEndRef = useRef(false);
+  const pendingVoiceQueryRef = useRef<string | null>(null);
   const currentSpokenTextRef = useRef('');
   const lastBotSpeechEndedAtRef = useRef(0);
   const lastTranscriptRef = useRef<{ text: string; at: number }>({
@@ -776,11 +778,8 @@ export function AiChatOrderView({
         }
         heardSpeechInSession = true;
         consecutiveEmptyListenRef.current = 0;
-        setInterimTranscript(cleaned);
-        if (isSpeakingRef.current && cleaned.length >= 4) {
-          stopSpeaking();
-          setIsSpeaking(false);
-          isSpeakingRef.current = false;
+        if (!isSpeakingRef.current || isNearSpeechEndRef.current) {
+          setInterimTranscript(cleaned);
         }
       },
       onTranscript: (text) => {
@@ -808,10 +807,13 @@ export function AiChatOrderView({
         }
         lastTranscriptRef.current = { text: cleaned, at: now };
 
+        // Do NOT cut off AI speech mid-sentence unless user explicitly presses a button.
+        // If spoken right near the end of AI speech, queue it to execute right when AI finishes.
         if (isSpeakingRef.current) {
-          stopSpeaking();
-          setIsSpeaking(false);
-          isSpeakingRef.current = false;
+          if (isNearSpeechEndRef.current) {
+            pendingVoiceQueryRef.current = cleaned;
+          }
+          return;
         }
         void runChatQueryRef.current(cleaned);
       },
@@ -889,11 +891,14 @@ export function AiChatOrderView({
     currentSpokenTextRef.current = spokenMessage;
     shouldContinueListeningRef.current = allowAutoListen;
     consecutiveEmptyListenRef.current = 0;
+    isNearSpeechEndRef.current = false;
+    pendingVoiceQueryRef.current = null;
 
     speakKoreanText(spokenMessage, {
       onStart: () => {
         setIsSpeaking(true);
         isSpeakingRef.current = true;
+        isNearSpeechEndRef.current = false;
         setVoiceAutoplayBlocked(false);
         // Keep mic active while bot is speaking; echo filter blocks self-voice
         if (
@@ -910,10 +915,20 @@ export function AiChatOrderView({
           }, 200);
         }
       },
+      onNearEnd: () => {
+        isNearSpeechEndRef.current = true;
+      },
       onEnd: () => {
         setIsSpeaking(false);
         isSpeakingRef.current = false;
+        isNearSpeechEndRef.current = false;
         lastBotSpeechEndedAtRef.current = Date.now();
+        const queuedCommand = pendingVoiceQueryRef.current;
+        pendingVoiceQueryRef.current = null;
+        if (queuedCommand) {
+          void runChatQueryRef.current(queuedCommand);
+          return;
+        }
         if (
           allowAutoListen &&
           voiceReplyEnabledRef.current &&
@@ -961,6 +976,18 @@ export function AiChatOrderView({
       setRecommendedSpotlight(null);
     }
   }, [voiceCheckoutDraft]);
+
+  useEffect(() => {
+    if (!recommendedSpotlight || typeof document === 'undefined') return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, [recommendedSpotlight]);
 
   useEffect(() => {
     if (viewMode !== 'chat' || messages.length === 0) return;
@@ -3467,7 +3494,7 @@ export function AiChatOrderView({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${spotMenu.name} 올이 추천 설명`}
-                className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
+                className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
               >
                 <motion.div
                   initial={{ y: 28, opacity: 0, scale: 0.97 }}
@@ -3475,7 +3502,7 @@ export function AiChatOrderView({
                   exit={{ y: 20, opacity: 0, scale: 0.97 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full sm:max-w-lg max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#DCE7CF] shadow-2xl overflow-hidden flex flex-col"
+                  className="w-full sm:max-w-lg max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#DCE7CF] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
                 >
                   {/* Top Visual Image */}
                   <div className="relative h-44 sm:h-48 w-full shrink-0 overflow-hidden bg-[#F7F8F5]">
@@ -3545,7 +3572,7 @@ export function AiChatOrderView({
                   </div>
 
                   {/* Scrollable Body */}
-                  <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
+                  <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto overscroll-contain touch-pan-y flex-1">
                     {/* Clear Store & Menu Title Below Image */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2 text-xs text-[#687064] font-medium">

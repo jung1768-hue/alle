@@ -127,12 +127,18 @@ export interface AiMediationVerdict {
   courierAction: string;
 }
 
+export interface EvidencePhoto {
+  name: string;
+  dataUrl: string;
+}
+
 export interface EvidenceRecord {
   ownerSealingChecked: boolean;
   courierConditionChecked: boolean;
   customerMemoNote: string;
   escrowStatus: string;
   recordedAt: string;
+  evidencePhotos?: EvidencePhoto[];
   aiVerdict?: AiMediationVerdict;
 }
 
