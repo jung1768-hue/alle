@@ -538,6 +538,7 @@ export function AiChatOrderView({
   });
   const voiceDeniedRef = useRef(false);
   const shouldContinueListeningRef = useRef(true);
+  const consecutiveEmptyListenRef = useRef(0);
   const voiceCheckoutCompletedRef = useRef(voiceCheckoutCompleted);
   const startListeningRef = useRef<() => void>(() => {});
   const runChatQueryRef = useRef<(rawText: string) => void>(() => {});
@@ -752,6 +753,8 @@ export function AiChatOrderView({
     setIsListening(true);
     isListeningRef.current = true;
 
+    const sessionStartedAt = Date.now();
+    let heardSpeechInSession = false;
     let lastErrCode = '';
     stopVoiceRef.current = startKoreanVoiceInput({
       continuous: true,
@@ -772,6 +775,8 @@ export function AiChatOrderView({
         ) {
           return;
         }
+        heardSpeechInSession = true;
+        consecutiveEmptyListenRef.current = 0;
         setInterimTranscript(cleaned);
       },
       onTranscript: (text) => {
@@ -789,6 +794,8 @@ export function AiChatOrderView({
         ) {
           return;
         }
+        heardSpeechInSession = true;
+        consecutiveEmptyListenRef.current = 0;
         const now = Date.now();
         if (
           lastTranscriptRef.current.text === cleaned &&
@@ -809,6 +816,12 @@ export function AiChatOrderView({
         ) {
           voiceDeniedRef.current = true;
           shouldContinueListeningRef.current = false;
+        } else if (
+          err === 'network' ||
+          err === 'audio-capture' ||
+          err === 'aborted'
+        ) {
+          shouldContinueListeningRef.current = false;
         }
       },
       onUnavailableOrError: () => {
@@ -827,7 +840,23 @@ export function AiChatOrderView({
         setInterimTranscript('');
         setIsListening(false);
         isListeningRef.current = false;
+        const elapsed = Date.now() - sessionStartedAt;
+        if (!heardSpeechInSession) {
+          consecutiveEmptyListenRef.current += 1;
+        }
+        const fatalOrLoopErr =
+          lastErrCode === 'network' ||
+          lastErrCode === 'audio-capture' ||
+          lastErrCode === 'aborted' ||
+          lastErrCode === 'not-allowed' ||
+          lastErrCode === 'service-not-allowed' ||
+          lastErrCode === 'not-supported';
+
         if (
+          !fatalOrLoopErr &&
+          elapsed >= 1500 &&
+          consecutiveEmptyListenRef.current <= 1 &&
+          !isSpeakingRef.current &&
           shouldContinueListeningRef.current &&
           voiceReplyEnabledRef.current &&
           viewModeRef.current === 'chat' &&
@@ -837,7 +866,9 @@ export function AiChatOrderView({
         ) {
           restartListenTimerRef.current = window.setTimeout(() => {
             startListeningRef.current();
-          }, 350);
+          }, 700);
+        } else {
+          shouldContinueListeningRef.current = false;
         }
       },
     });
@@ -852,6 +883,7 @@ export function AiChatOrderView({
 
     // Mute/pause mic while bot is speaking so it never hears its own speaker output
     shouldContinueListeningRef.current = false;
+    consecutiveEmptyListenRef.current = 0;
     stopVoiceRef.current?.();
     setIsListening(false);
     isListeningRef.current = false;
