@@ -527,6 +527,7 @@ export function AiChatOrderView({
   const [stagedOptions, setStagedOptions] = useState<Record<string, string[]>>({});
   const [recommendedSpotlight, setRecommendedSpotlight] =
     useState<RecommendedSpotlightState | null>(null);
+  const spotlightPillRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const stopVoiceRef = useRef<(() => void) | null>(null);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const lastSpokenMsgIdRef = useRef<string | null>(null);
@@ -979,6 +980,19 @@ export function AiChatOrderView({
       setRecommendedSpotlight(null);
     }
   }, [voiceCheckoutDraft]);
+
+  useEffect(() => {
+    if (!recommendedSpotlight) return;
+    const activePill =
+      spotlightPillRefs.current[recommendedSpotlight.activeIndex];
+    if (activePill) {
+      activePill.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
+    }
+  }, [recommendedSpotlight?.activeIndex, recommendedSpotlight?.msgId]);
 
   useEffect(() => {
     if (!recommendedSpotlight || typeof document === 'undefined') return;
@@ -4156,6 +4170,9 @@ export function AiChatOrderView({
                           return (
                             <button
                               key={mId}
+                              ref={(el) => {
+                                spotlightPillRefs.current[idx] = el;
+                              }}
                               type="button"
                               onClick={() => switchSpotlightIndex(idx)}
                               className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer transition-colors ${
