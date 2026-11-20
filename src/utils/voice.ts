@@ -59,6 +59,8 @@ export function startKoreanVoiceInput(callbacks: {
   let stopped = false;
   let deliveredFinal = false;
   let processedFinalCount = 0;
+  let lastContinuousFinal = '';
+  let lastContinuousFinalAt = 0;
 
   try {
     const recognition = new Ctor();
@@ -100,6 +102,12 @@ export function startKoreanVoiceInput(callbacks: {
             if (part.length < 2 && !isShortAffirm) {
               continue;
             }
+            const nowTs = Date.now();
+            if (part === lastContinuousFinal && nowTs - lastContinuousFinalAt < 2500) {
+              continue;
+            }
+            lastContinuousFinal = part;
+            lastContinuousFinalAt = nowTs;
             callbacks.onTranscript(part);
           } else if (part.length >= 2) {
             interimText += `${part} `;

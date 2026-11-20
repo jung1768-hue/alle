@@ -1924,7 +1924,7 @@ export function AiChatOrderView({
     // 5. Modify quantity on active staged menu without switching dish
     const spokenQtyOnly = extractExplicitQuantity(trimmed);
     const wantsCheckoutNow =
-      /(결제|결재|주문\s*해|시켜\s*줘|바로\s*주문|이걸로\s*할|그걸로\s*할|그거로\s*할|할게)/.test(
+      /(결제|결재|주문|시켜|바로\s*주문|바로\s*할|이걸로|이거로|그걸로|그거로|이거\s*해|그거\s*해|이거\s*주|그거\s*주|할게|먹을래|배달\s*해)/.test(
         trimmed
       ) || Boolean(detectPaymentMethodFromSpeech(trimmed));
 
@@ -1992,10 +1992,13 @@ export function AiChatOrderView({
 
     const isProceedToCheckoutIntent =
       (!hasDishCategory || matchesCurrentStagedDish) &&
+      !hasFoodPreference &&
       Boolean(activeMenu && activeStore) &&
       (wantsCheckoutNow ||
         (canAffirmFromLastBot &&
-          /^(네|예|응|어|좋아|오케이|ok)$/.test(trimmed.toLowerCase())));
+          /(?:^|\s)(네|예|응|어|좋아|좋아요|오케이|ok|그래|그래요|알겠어|부탁해|해\s*줘|주세요)(?:\s|$|[,.!])/.test(
+            trimmed.toLowerCase()
+          )));
 
     if (isProceedToCheckoutIntent && activeMenu && activeStore) {
       const baseQty =
@@ -2229,10 +2232,15 @@ export function AiChatOrderView({
     let aiConversationalReply: string | undefined;
 
     // On-device-first fast path: respond immediately (<5ms) when local parser understands clearly.
-    // Only escalate to cloud AI when the request is complex or unrecognized.
+    // Escalate to cloud AI whenever the new utterance itself has no recognized local tags/constraints.
+    const localUnderstoodNewInput =
+      parsedInline.tags.length > 0 ||
+      (parsedInline.excludeTags?.length ?? 0) > 0 ||
+      parsedInline.maxBudget !== null ||
+      parsedInline.maxMinutes !== null;
     const needsCloudFallback =
       merged.needsConfirmation ||
-      (merged.tags.length === 0 && trimmed.length >= 6);
+      (!localUnderstoodNewInput && trimmed.length >= 2);
 
     if (
       needsCloudFallback &&
@@ -2286,10 +2294,36 @@ export function AiChatOrderView({
       !merged.needsConfirmation && topMatches.length > 0
         ? topMatches[0].menu
         : undefined;
-    if (autoStaged) {
+
+    // Anti-repeat guard: never repeat the exact same menu recommendation script twice in a row
+    let finalStaged = autoStaged;
+    let finalMatchedIds = topMatches.map((m) => m.menu.id);
+    if (
+      lastBot &&
+      finalStaged &&
+      lastBot.stagedMenuId === finalStaged.id &&
+      spokenText &&
+      lastBot.spokenText === spokenText
+    ) {
+      if (topMatches.length > 1) {
+        const second = topMatches[1];
+        finalStaged = second.menu;
+        finalMatchedIds = [
+          second.menu.id,
+          ...topMatches.filter((m) => m.menu.id !== second.menu.id).map((m) => m.menu.id),
+        ];
+        botText = `조금 다른 후보로 ${second.store.name}의 ${second.menu.name}을 보여드릴게요. 배달비 포함 ${formatWon(second.estimatedTotal)}, 약 ${second.effectiveMinutes}분 도착입니다.`;
+        spokenText = `${second.store.name}의 ${second.menu.name}은 어떠세요? 배달비 포함 ${formatWon(second.estimatedTotal)}입니다. 이 메뉴로 주문할까요?`;
+      } else {
+        botText = `말씀하신 "${trimmed}" 내용을 반영해 ${topMatches[0].store.name} ${topMatches[0].menu.name}을 준비해 두었어요. 바로 주문하거나 원하시는 다른 음식 종류를 말씀해 주세요.`;
+        spokenText = `${topMatches[0].store.name} ${topMatches[0].menu.name}으로 바로 주문해 드릴까요, 아니면 다른 음식을 찾아드릴까요?`;
+      }
+    }
+
+    if (finalStaged) {
       setStagedServings((prev) => ({
         ...prev,
-        [autoStaged.id]: Math.min(merged.servings, Math.max(1, autoStaged.stock)),
+        [finalStaged.id]: Math.min(merged.servings, Math.max(1, finalStaged.stock)),
       }));
     }
 
@@ -2299,9 +2333,9 @@ export function AiChatOrderView({
       text: botText,
       spokenText,
       parsed: merged,
-      matchedMenuIds: topMatches.map((m) => m.menu.id),
+      matchedMenuIds: finalMatchedIds,
       servings: merged.servings,
-      stagedMenuId: autoStaged?.id,
+      stagedMenuId: finalStaged?.id,
       isEmptyRelaxPrompt,
       aiSource,
     };
