@@ -320,9 +320,9 @@ function isLikelyBotEcho(
 ): boolean {
   const trimmed = heardText.trim();
   if (!trimmed || !botSpeech.trim()) return false;
-  if (!isSpeakingNow && Date.now() - lastBotEndedAt > 700) return false;
+  if (!isSpeakingNow && Date.now() - lastBotEndedAt > 1100) return false;
   if (
-    /(잠깐|아니|그만|취소|바꿔|말고|다른|결제|결재|주문|다시|싼|빠른|리뷰|인기|배달비|마이크\s*꺼|조용히)/.test(
+    /(잠깐|아니|그만|취소|바꿔|말고|다른|결제|결재|주문|다시|싼|빠른|리뷰|인기|배달비|마이크\s*꺼|조용히|다음\s*메뉴|닫아)/.test(
       trimmed
     )
   ) {
@@ -332,14 +332,14 @@ function isLikelyBotEcho(
   const cleanBot = botSpeech.toLowerCase().replace(/[^가-힣a-z0-9\s]/g, ' ');
   const compactHeard = cleanHeard.replace(/\s+/g, '');
   const compactBot = cleanBot.replace(/\s+/g, '');
-  if (compactHeard.length >= 6 && compactBot.includes(compactHeard)) {
+  if (compactHeard.length >= 4 && compactBot.includes(compactHeard)) {
     return true;
   }
   const heardTokens = cleanHeard.split(/\s+/).filter((t) => t.length >= 1);
   const botTokens = new Set(cleanBot.split(/\s+/).filter((t) => t.length >= 1));
   if (heardTokens.length >= 2) {
     const overlapCount = heardTokens.filter((t) => botTokens.has(t)).length;
-    if (overlapCount / heardTokens.length >= 0.55) {
+    if (overlapCount / heardTokens.length >= 0.42) {
       return true;
     }
   }
@@ -742,7 +742,7 @@ export function AiChatOrderView({
       setShowVoiceTips(true);
       return;
     }
-    if (isSpeakingRef.current || isListeningRef.current) {
+    if (isListeningRef.current) {
       return;
     }
 
@@ -759,7 +759,6 @@ export function AiChatOrderView({
     stopVoiceRef.current = startKoreanVoiceInput({
       continuous: true,
       onInterim: (text) => {
-        if (isSpeakingRef.current) return;
         const cleaned = text.trim();
         if (!cleaned || isLikelyAmbientNoise(cleaned)) {
           setInterimTranscript('');
@@ -778,9 +777,13 @@ export function AiChatOrderView({
         heardSpeechInSession = true;
         consecutiveEmptyListenRef.current = 0;
         setInterimTranscript(cleaned);
+        if (isSpeakingRef.current && cleaned.length >= 4) {
+          stopSpeaking();
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+        }
       },
       onTranscript: (text) => {
-        if (isSpeakingRef.current) return;
         const cleaned = text.trim();
         setInterimTranscript('');
         if (!cleaned || isLikelyAmbientNoise(cleaned)) return;
@@ -805,6 +808,11 @@ export function AiChatOrderView({
         }
         lastTranscriptRef.current = { text: cleaned, at: now };
 
+        if (isSpeakingRef.current) {
+          stopSpeaking();
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+        }
         void runChatQueryRef.current(cleaned);
       },
       onErrorCode: (err) => {
@@ -856,7 +864,6 @@ export function AiChatOrderView({
           !fatalOrLoopErr &&
           elapsed >= 1500 &&
           consecutiveEmptyListenRef.current <= 1 &&
-          !isSpeakingRef.current &&
           shouldContinueListeningRef.current &&
           voiceReplyEnabledRef.current &&
           viewModeRef.current === 'chat' &&
@@ -880,26 +887,15 @@ export function AiChatOrderView({
     clearRestartListenTimer();
     if (!voiceReplyEnabledRef.current || viewModeRef.current !== 'chat') return;
     currentSpokenTextRef.current = spokenMessage;
-
-    // Mute/pause mic while bot is speaking so it never hears its own speaker output
-    shouldContinueListeningRef.current = false;
+    shouldContinueListeningRef.current = allowAutoListen;
     consecutiveEmptyListenRef.current = 0;
-    stopVoiceRef.current?.();
-    setIsListening(false);
-    isListeningRef.current = false;
-    setInterimTranscript('');
 
     speakKoreanText(spokenMessage, {
       onStart: () => {
         setIsSpeaking(true);
         isSpeakingRef.current = true;
         setVoiceAutoplayBlocked(false);
-      },
-      onEnd: () => {
-        setIsSpeaking(false);
-        isSpeakingRef.current = false;
-        lastBotSpeechEndedAtRef.current = Date.now();
-        shouldContinueListeningRef.current = allowAutoListen;
+        // Keep mic active while bot is speaking; echo filter blocks self-voice
         if (
           allowAutoListen &&
           voiceReplyEnabledRef.current &&
@@ -911,7 +907,25 @@ export function AiChatOrderView({
         ) {
           autoListenTimerRef.current = window.setTimeout(() => {
             startListeningRef.current();
-          }, 420);
+          }, 200);
+        }
+      },
+      onEnd: () => {
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+        lastBotSpeechEndedAtRef.current = Date.now();
+        if (
+          allowAutoListen &&
+          voiceReplyEnabledRef.current &&
+          viewModeRef.current === 'chat' &&
+          !voiceCheckoutCompletedRef.current &&
+          !voiceDeniedRef.current &&
+          !isListeningRef.current &&
+          getSpeechRecognitionConstructor()
+        ) {
+          autoListenTimerRef.current = window.setTimeout(() => {
+            startListeningRef.current();
+          }, 350);
         }
       },
       onError: () => {
@@ -2360,6 +2374,31 @@ export function AiChatOrderView({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {viewMode === 'chat' && getSpeechRecognitionConstructor() && (
+              <button
+                type="button"
+                onClick={handleMicToggle}
+                aria-pressed={isListening}
+                className={`min-h-[36px] px-2.5 py-1 text-xs font-bold rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
+                  isListening
+                    ? 'bg-red-50 border-red-300 text-red-700'
+                    : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
+                }`}
+              >
+                {isListening ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    <Mic className="w-3.5 h-3.5 shrink-0" />
+                    <span>마이크 ON</span>
+                  </>
+                ) : (
+                  <>
+                    <MicOff className="w-3.5 h-3.5 shrink-0" />
+                    <span>마이크 OFF</span>
+                  </>
+                )}
+              </button>
+            )}
             {aiReady && (
               <span className="hidden lg:inline-flex min-h-[36px] px-2.5 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -3164,7 +3203,7 @@ export function AiChatOrderView({
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
             <span className="inline-flex items-center gap-2">
               <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>올이가 말씀드리고 있어요 · 말이 끝나면 자동으로 듣기가 켜져요</span>
+              <span>올이가 말씀드리고 있어요 · 지금 바로 말씀하셔도 듣고 있어요</span>
             </span>
             <button
               type="button"
@@ -3417,7 +3456,6 @@ export function AiChatOrderView({
             const wished = wishlistIds.includes(spotMenu.id);
             const spotReviews = reviews.filter((r) => r.menuId === spotMenu.id);
             const reviewSummary = buildRuleReviewSummary(spotReviews);
-            const topReview = spotReviews[0];
 
             return (
               <motion.div
@@ -3440,13 +3478,13 @@ export function AiChatOrderView({
                   className="w-full sm:max-w-lg max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#DCE7CF] shadow-2xl overflow-hidden flex flex-col"
                 >
                   {/* Top Visual Image */}
-                  <div className="relative h-48 sm:h-52 w-full shrink-0 overflow-hidden bg-[#F7F8F5]">
+                  <div className="relative h-44 sm:h-48 w-full shrink-0 overflow-hidden bg-[#F7F8F5]">
                     <FoodImage
                       src={spotMenu.image}
                       alt={spotMenu.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-black/25" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/25" />
 
                     {/* Top Badges */}
                     <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
@@ -3489,136 +3527,137 @@ export function AiChatOrderView({
                       </div>
                     </div>
 
-                    {/* Bottom Image Overlay Badges */}
-                    <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
-                      <div className="min-w-0 text-white">
-                        <div className="flex items-center gap-1.5 text-xs text-white/90 font-medium">
-                          <span className="truncate">{spotStore.name}</span>
-                          <span className="inline-flex items-center gap-0.5 font-bold text-[#DCE7CF] shrink-0">
-                            <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
-                            {(spotStore.rating ?? 4.9).toFixed(1)}
-                          </span>
-                        </div>
-                        <h2 className="text-lg sm:text-xl font-extrabold leading-tight truncate mt-0.5">
-                          {spotMenu.name}
-                        </h2>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
+                    {/* Bottom-Right Price/Discount Pills Only (keeps photo uncluttered) */}
+                    {(isSameStore || hasClosingDiscount) && (
+                      <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
                         {isSameStore && (
-                          <span className="px-2 py-0.5 rounded-md bg-white/95 text-[#3D5720] text-[11px] font-bold">
+                          <span className="px-2.5 py-0.5 rounded-md bg-white/95 text-[#3D5720] text-[11px] font-bold shadow-sm">
                             매장 동일가 ✓
                           </span>
                         )}
                         {hasClosingDiscount && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-600 text-white text-[11px] font-bold">
+                          <span className="px-2.5 py-0.5 rounded-md bg-amber-600 text-white text-[11px] font-bold shadow-sm">
                             마감 -{spotMenu.closingDiscountPercent}%
                           </span>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Scrollable Body */}
                   <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
-                    {/* Price & Delivery ETA */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E8ECE4]">
-                      <div>
-                        <div className="text-xs text-[#687064]">
-                          1인분 {formatWon(effectivePrice)} · 배달비{' '}
-                          {spotStore.deliveryFee === 0
-                            ? '무료'
-                            : formatWon(spotStore.deliveryFee)}
-                        </div>
-                        <div className="text-base font-extrabold text-[#3D5720] tabular-nums mt-0.5">
-                          {spotServings}인분 합계 {formatWon(totalWithFee)}
-                        </div>
+                    {/* Clear Store & Menu Title Below Image */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-xs text-[#687064] font-medium">
+                        <span className="truncate font-semibold text-[#4E6E2A]">
+                          {spotStore.name}
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-bold text-[#1A1D1A] shrink-0">
+                          <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
+                          {(spotStore.rating ?? 4.9).toFixed(1)}
+                        </span>
                       </div>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] text-xs font-bold text-[#1A1D1A] tabular-nums">
-                        <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                        약 {effectiveMin}분 도착
-                      </div>
+                      <h2 className="text-lg sm:text-xl font-extrabold text-[#1A1D1A] leading-snug">
+                        {spotMenu.name}
+                      </h2>
                     </div>
 
-                    {/* AI Explanation Bubble */}
-                    <div className="p-3.5 rounded-2xl bg-[#EAF1E2] border border-[#DCE7CF] space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#3D5720]">
-                          <Sparkles className="w-3.5 h-3.5" />
-                          올이 추천 설명
-                        </span>
-                        {voiceReplyEnabled && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              speakBotReply(
-                                recommendedSpotlight.explanation,
-                                !voiceCheckoutCompletedRef.current
-                              )
-                            }
-                            className="text-[11px] font-bold text-[#4E6E2A] hover:underline inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                            다시 설명 듣기
-                          </button>
-                        )}
+                    {/* Price & Delivery Conditions Card */}
+                    <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs text-[#687064]">
+                            1인분 {formatWon(effectivePrice)} · 배달비{' '}
+                            {spotStore.deliveryFee === 0
+                              ? '무료'
+                              : formatWon(spotStore.deliveryFee)}
+                          </div>
+                          <div className="text-base font-extrabold text-[#3D5720] tabular-nums mt-0.5">
+                            {spotServings}인분 합계 {formatWon(totalWithFee)}
+                          </div>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#DCE7CF] text-xs font-bold text-[#1A1D1A] tabular-nums">
+                          <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                          약 {effectiveMin}분 도착
+                        </div>
                       </div>
-                      <p className="text-sm font-medium text-[#1A1D1A] leading-relaxed">
-                        {recommendedSpotlight.explanation}
-                      </p>
                       {spotMenu.aiReason && (
-                        <p className="text-xs text-[#3D5720] font-semibold">
-                          • 추천 포인트: {spotMenu.aiReason}
+                        <p className="text-xs text-[#3D5720] font-semibold pt-1.5 border-t border-[#E8ECE4]">
+                          ✓ {spotMenu.aiReason}
                         </p>
+                      )}
+                      {(spotMenu.description || spotMenu.tags.length > 0) && (
+                        <div className="space-y-1.5 pt-1">
+                          {spotMenu.description && (
+                            <p className="text-xs text-[#4A5048] leading-relaxed">
+                              {spotMenu.description}
+                            </p>
+                          )}
+                          {spotMenu.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {spotMenu.tags.slice(0, 5).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="px-2 py-0.5 rounded-full bg-white border border-[#E8ECE4] text-[11px] font-medium text-[#687064]"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
 
-                    {/* Menu Description & Tags */}
-                    {(spotMenu.description || spotMenu.tags.length > 0) && (
-                      <div className="space-y-2">
-                        {spotMenu.description && (
-                          <p className="text-xs text-[#4A5048] leading-relaxed">
-                            {spotMenu.description}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-1.5">
-                          {spotMenu.tags.slice(0, 5).map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[11px] font-medium text-[#687064]"
-                            >
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Real Customer Review Highlight */}
-                    {spotReviews.length > 0 && (
-                      <div className="p-3 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-[#1A1D1A] inline-flex items-center gap-1">
-                            <MessageSquare className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                            리뷰 요약 ({spotReviews.length}건)
-                          </span>
-                          <span className="font-semibold text-[#3D5720]">
+                    {/* Real Customer Reviews (Prominent & Readable) */}
+                    <div className="p-3.5 rounded-2xl bg-[#FAFCF8] border border-[#DCE7CF] space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold text-[#1A1D1A] inline-flex items-center gap-1.5">
+                          <MessageSquare className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                          실제 고객 리뷰 ({spotReviews.length}건)
+                        </span>
+                        {spotReviews.length > 0 && (
+                          <span className="font-bold text-[#3D5720]">
                             ★{' '}
                             {(
                               spotReviews.reduce((sum, r) => sum + r.rating, 0) /
                               spotReviews.length
                             ).toFixed(1)}
                           </span>
-                        </div>
-                        <p className="text-xs text-[#4E6E2A] font-semibold">
-                          {reviewSummary.headline}
-                        </p>
-                        {topReview && (
-                          <p className="text-xs text-[#687064] line-clamp-2">
-                            “{topReview.content}” — {topReview.author}
-                          </p>
                         )}
                       </div>
-                    )}
+                      {spotReviews.length === 0 ? (
+                        <p className="text-xs text-[#687064]">
+                          아직 등록된 상세 리뷰가 없습니다.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-[#4E6E2A] font-semibold">
+                            {reviewSummary.headline}
+                          </p>
+                          <div className="space-y-2">
+                            {spotReviews.slice(0, 3).map((rev) => (
+                              <div
+                                key={rev.id}
+                                className="p-2.5 rounded-xl bg-white border border-[#E8ECE4] space-y-1 text-xs"
+                              >
+                                <div className="flex items-center justify-between text-[#687064]">
+                                  <span className="font-bold text-[#1A1D1A]">
+                                    {rev.author}
+                                  </span>
+                                  <span className="font-mono font-semibold text-[#4E6E2A]">
+                                    ★ {rev.rating.toFixed(1)} · {rev.date}
+                                  </span>
+                                </div>
+                                <p className="text-[#1A1D1A] leading-relaxed">
+                                  {rev.content}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
 
                     {/* Switch Between Top Recommendations */}
                     {recommendedSpotlight.menuIds.length > 1 && (
@@ -3678,17 +3717,39 @@ export function AiChatOrderView({
                     )}
                   </div>
 
-                  {/* Sticky Bottom Actions + Always-On Voice Prompt Hint */}
+                  {/* Sticky Bottom Actions + Always-Visible Mic Status */}
                   <div className="p-4 bg-[#FAFCF8] border-t border-[#E8ECE4] space-y-2.5 shrink-0">
-                    {(isListening || interimTranscript) && (
-                      <div className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] text-[11px] font-semibold text-[#3D5720] flex items-center justify-between gap-2">
-                        <span className="truncate">
-                          {interimTranscript
-                            ? `🎙️ “${interimTranscript}”`
-                            : '🎙️ “이거로 주문해”, “다음 메뉴”, “창 닫아” 말씀해 보세요'}
-                        </span>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleMicToggle}
+                      className={`w-full px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-between gap-2 cursor-pointer transition-colors border ${
+                        isListening
+                          ? 'bg-red-50 border-red-200 text-red-700'
+                          : 'bg-[#F0F3EC] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-1.5 truncate">
+                        {isListening ? (
+                          <>
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                            <Mic className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">
+                              {interimTranscript
+                                ? `마이크 켜짐 · “${interimTranscript}”`
+                                : '마이크 켜짐 · “이거로 주문해”, “다음 메뉴”, “닫아”'}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <MicOff className="w-3.5 h-3.5 shrink-0" />
+                            <span>마이크 꺼짐 · 눌러서 켜기</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[10px] underline">
+                        {isListening ? '끄기' : '켜기'}
+                      </span>
+                    </button>
                     <div className="grid grid-cols-2 gap-2.5">
                       <button
                         type="button"
