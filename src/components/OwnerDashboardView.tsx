@@ -898,11 +898,13 @@ export function OwnerDashboardView({
               <p className="text-[#687064]">노출 입찰 없는 컨디션 맞춤 매칭</p>
             </div>
             <div className="space-y-1">
-              <span className="text-[#687064]">지자체 보조금 의존도</span>
+              <span className="text-[#687064]">🏢 B2B 기업 식대 · alle페이 정산</span>
               <div className="font-mono tabular-nums text-base font-bold text-[#4E6E2A]">
-                {analytics.profitComparison.subsidyDependencyRatioPercent}%
+                {analytics.b2bCount}건 · {formatWon(analytics.b2bRevenue)}
               </div>
-              <p className="text-[#687064]">B2B 식대 · 단골 패스 자생 순환</p>
+              <p className="text-[#687064]">
+                B2B 식대 우선 매칭 · alle페이 수수료 1.5% (일반 PG 3% 대비 절반)
+              </p>
             </div>
           </div>
         )}

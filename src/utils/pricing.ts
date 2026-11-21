@@ -14,6 +14,12 @@ import {
 /** 심부름 · 개인 라이더 건당 플랫폼 매칭 수수료 (원) */
 export const MATCHING_FEE_PER_CASE = 100;
 
+/** alle페이 자체 결제 수수료율 (1.5%, 일반 PG 약 3% 대비 절반) */
+export const ALLE_PAY_FEE_RATE = 0.015;
+
+/** B2B 기업 식대 정산·관제 서비스 이용료율 (3.5%) */
+export const B2B_SERVICE_FEE_RATE = 0.035;
+
 function formatWonInline(amount: number): string {
   return `${Math.round(amount).toLocaleString('ko-KR')}원`;
 }

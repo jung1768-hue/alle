@@ -551,6 +551,31 @@ export function ConditionHome({
         </div>
       </section>
 
+      {/* B2B Corporate Meal & Office Highlight Card */}
+      <section className="rounded-3xl bg-[#1A1D1A] text-white p-5 sm:p-6 border border-[#3A4038] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-2 text-xs font-extrabold text-[#EAF1E2]">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#4E6E2A] text-white">
+              🏢 B2B 기업 식대
+            </span>
+            <span>오피스 단체 · 임직원 복지 식권</span>
+          </div>
+          <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
+            법인 식대 포인트로 15분 오프피크 예약 · 1인 주문도 가능
+          </h2>
+          <p className="text-sm text-[#C8D0C4]">
+            중개수수료 0% 매장 동일가 · 법인 월말 통합 정산 · alle페이(수수료 1.5%) 상생 결제 지원
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onOpenSuperApp(SuperAppTab.B2B)}
+          className="min-h-[48px] px-5 py-2.5 rounded-2xl bg-[#82B440] hover:bg-[#72A135] text-[#111411] text-sm sm:text-base font-extrabold whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+        >
+          기업 식대 주문 →
+        </button>
+      </section>
+
       {/* Owner Store Events & Coupons Strip */}
       {featuredStoreEvents.length > 0 && (
         <section className="space-y-3">

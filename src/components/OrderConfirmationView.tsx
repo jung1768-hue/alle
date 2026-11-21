@@ -231,8 +231,9 @@ export function OrderConfirmationView({
         id: 'alle_pay',
         shortLabel: 'alle페이',
         label: 'alle페이 잔액',
-        subtitle: `잔액 ${formatWon(walletBalance)}`,
-        benefitText: '충전해 둔 alle페이 잔액으로 즉시 결제하고 취소 시 바로 환불됩니다.',
+        subtitle: `잔액 ${formatWon(walletBalance)} · 수수료 1.5%`,
+        benefitText:
+          '충전해 둔 alle페이 잔액으로 즉시 결제/환불되며, 결제 수수료 1.5%(타사 PG 약 3% 대비 절반)로 점주 상생에 기여합니다.',
       },
       {
         id: 'local_currency',

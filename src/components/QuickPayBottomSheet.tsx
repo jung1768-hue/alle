@@ -107,7 +107,7 @@ export function QuickPayBottomSheet({
       {
         id: 'alle_pay',
         shortLabel: `alle페이 (${formatWon(walletBalance)})`,
-        label: 'alle페이 잔액',
+        label: 'alle페이 잔액 (수수료 1.5%)',
       },
       {
         id: 'local_currency',
