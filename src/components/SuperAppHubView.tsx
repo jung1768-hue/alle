@@ -39,6 +39,7 @@ import {
   getEffectiveMenuPrice,
   isStoreDeliverableToLocation,
 } from '../utils/parser';
+import { MATCHING_FEE_PER_CASE } from '../utils/pricing';
 import { FoodImage } from './FoodImage';
 import { MenuDetailReviewModal } from './MenuDetailReviewModal';
 
@@ -1245,11 +1246,27 @@ export function SuperAppHubView({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs font-semibold text-[#4E6E2A] pt-1">
-                <span>에스크로 선예치</span>
-                <span className="font-mono tabular-nums text-sm">
-                  {formatWon(estimatedItemCost + errandFee)}
-                </span>
+              <div className="rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] p-3 space-y-1 text-xs">
+                <div className="flex items-center justify-between text-[#687064]">
+                  <span>예상 물품비 + 심부름비</span>
+                  <span className="font-mono tabular-nums">
+                    {formatWon(estimatedItemCost + errandFee)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[#687064]">
+                  <span>플랫폼 매칭 수수료 (건당 정액)</span>
+                  <span className="font-mono tabular-nums">
+                    +{formatWon(MATCHING_FEE_PER_CASE)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between font-bold text-[#4E6E2A] pt-1 border-t border-[#E8ECE4]">
+                  <span>에스크로 선예치 총액</span>
+                  <span className="font-mono tabular-nums text-sm">
+                    {formatWon(
+                      estimatedItemCost + errandFee + MATCHING_FEE_PER_CASE
+                    )}
+                  </span>
+                </div>
               </div>
 
               <button

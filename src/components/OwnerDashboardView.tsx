@@ -244,7 +244,7 @@ export function OwnerDashboardView({
     premium: 3,
   };
   const PLAN_LABEL: Record<PartnerPlanTier, string> = {
-    trial: '체험형 (2개월 무료)',
+    trial: '프로모션 (3개월 무료)',
     basic: '베이직 (월 2.9만 원)',
     pro: '프로 (월 5.9만 원)',
     premium: '프리미엄 (월 9.9만 원)',
@@ -1480,9 +1480,12 @@ export function OwnerDashboardView({
         <div className="space-y-6">
           {/* Store Selector */}
           <section className="os-card rounded-3xl p-5 sm:p-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-0.5">
-              <div className="text-xs font-bold text-[#4E6E2A]">
-                💚 수수료 0% 상생 지원 · 전체 무료 제공
+            <div className="space-y-1">
+              <div className="inline-flex flex-wrap items-center gap-1.5 text-xs font-bold text-[#4E6E2A]">
+                <span>🎁 홍보·쿠폰은 유료 플랜(베이직 월 2.9만 원~) 포함 ·</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  현재 프로모션 기간 3개월 무료 제공 중
+                </span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
                 가게 홍보 이벤트 · 쿠폰 · 상생 배달비 설정
@@ -1691,9 +1694,12 @@ export function OwnerDashboardView({
           <section className="os-card rounded-3xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                <h3 className="text-base font-bold text-[#1A1D1A] flex flex-wrap items-center gap-2">
                   <Megaphone className="w-4 h-4 text-[#4E6E2A]" />
                   <span>우리 가게 자체 이벤트 · 가게 홍보 등록</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-bold">
+                    유료 플랜 · 3개월 무료 프로모션
+                  </span>
                 </h3>
                 <p className="text-xs text-[#687064] mt-0.5">
                   등록한 이벤트는 고객 홈 화면과 가게 메뉴창 상단에 바로 노출됩니다.
@@ -1825,9 +1831,12 @@ export function OwnerDashboardView({
           {/* Card 3: Store Coupons */}
           <section className="os-card rounded-3xl p-6 space-y-4">
             <div>
-              <h3 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+              <h3 className="text-base font-bold text-[#1A1D1A] flex flex-wrap items-center gap-2">
                 <Ticket className="w-4 h-4 text-[#4E6E2A]" />
                 <span>가게 자체 쿠폰 발행 · 할인 설정</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-bold">
+                  유료 플랜 · 3개월 무료 프로모션
+                </span>
               </h3>
               <p className="text-xs text-[#687064] mt-0.5">
                 점주님이 발행한 쿠폰은 고객 결제 시 자동 적용 후보로 노출됩니다. 금액 조건을 비우면 1개 주문에도 즉시 할인됩니다.
@@ -2034,7 +2043,7 @@ export function OwnerDashboardView({
               <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
                 현재 선택:{' '}
                 {ownerSaasPlan === 'trial'
-                  ? '체험형 (2개월 무료)'
+                  ? '프로모션 (3개월 무료)'
                   : ownerSaasPlan === 'basic'
                     ? '베이직 (월 2.9만원)'
                     : ownerSaasPlan === 'pro'
@@ -2048,27 +2057,27 @@ export function OwnerDashboardView({
                 [
                   {
                     id: 'trial',
-                    name: '체험형',
-                    price: '2개월 무료',
-                    desc: '매장 등록 · 주문 접수',
+                    name: '프로모션 (오픈 기념)',
+                    price: '3개월 무료',
+                    desc: '매장 등록 · 홍보 이벤트·쿠폰 무료 체험',
                   },
                   {
                     id: 'basic',
                     name: '베이직',
                     price: '월 2.9만 원',
-                    desc: '주문·단골 관리 · 기본 추천 노출',
+                    desc: '홍보·쿠폰 발행 · 주문·단골 관리',
                   },
                   {
                     id: 'pro',
                     name: '프로 (기준)',
                     price: '월 5.9만 원',
-                    desc: '재방문 캠페인 · 매출 분석',
+                    desc: '홍보·쿠폰 + 재방문 캠페인 · 매출 분석',
                   },
                   {
                     id: 'premium',
                     name: '프리미엄',
                     price: '월 9.9만 원',
-                    desc: 'AI 마케팅 · 고급 고객 분석',
+                    desc: '전 기능 + AI 마케팅 · 고급 고객 분석',
                   },
                 ] as const
               ).map((tier) => {

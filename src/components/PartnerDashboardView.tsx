@@ -21,7 +21,10 @@ import {
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
-import { getDeliveryMethodMeta } from '../utils/pricing';
+import {
+  getDeliveryMethodMeta,
+  MATCHING_FEE_PER_CASE,
+} from '../utils/pricing';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
 interface PartnerDashboardViewProps {
@@ -93,7 +96,9 @@ export function PartnerDashboardView({
     [errands]
   );
 
-  const estimatedMockReward = completedDeliveries.length * 2000;
+  const grossReward = completedDeliveries.length * 2000;
+  const totalMatchingFee = completedDeliveries.length * MATCHING_FEE_PER_CASE;
+  const estimatedMockReward = Math.max(0, grossReward - totalMatchingFee);
 
   return (
     <div className="space-y-6">
@@ -150,12 +155,12 @@ export function PartnerDashboardView({
           </div>
         </div>
         <div className="bg-white border border-[#E8ECE4] rounded-2xl p-4">
-          <div className="text-xs font-semibold text-[#687064]">완료 건수 · 정산 예정</div>
+          <div className="text-xs font-semibold text-[#687064]">완료 건수 · 실정산 예정</div>
           <div className="text-2xl font-bold text-[#4E6E2A] font-mono tabular-nums mt-1">
             {formatWon(estimatedMockReward)}
           </div>
           <div className="text-xs text-[#687064] tabular-nums mt-0.5">
-            완료 {completedDeliveries.length}건 · 건당 2,000원
+            완료 {completedDeliveries.length}건 · 건당 2,000원 - 매칭 수수료 {formatWon(MATCHING_FEE_PER_CASE)}/건
           </div>
         </div>
       </div>
@@ -446,7 +451,9 @@ export function PartnerDashboardView({
                     {err.title}
                   </div>
                   <div className="text-xs font-bold text-[#4E6E2A] font-mono tabular-nums mt-1">
-                    심부름 보수 {formatWon(err.errandFee)} · 에스크로 예치됨
+                    심부름 보수 {formatWon(err.errandFee)} · 매칭 수수료{' '}
+                    {formatWon(MATCHING_FEE_PER_CASE)} (실수령{' '}
+                    {formatWon(Math.max(0, err.errandFee - MATCHING_FEE_PER_CASE))})
                   </div>
                 </div>
                 <button

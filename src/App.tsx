@@ -78,6 +78,7 @@ import {
   estimateCompetitorSavings,
   getDeliveryMethodMeta,
   getLocalCurrencyLabel,
+  MATCHING_FEE_PER_CASE,
 } from './utils/pricing';
 import { PlatformCategoryId } from './utils/categories';
 import { checkServerGeminiAvailable } from './utils/gemini';
@@ -1592,7 +1593,8 @@ export default function App() {
       dropoffAlias: payload.dropoffAlias,
       estimatedItemCost: payload.estimatedItemCost,
       errandFee: payload.errandFee,
-      escrowTotal: payload.estimatedItemCost + payload.errandFee,
+      escrowTotal:
+        payload.estimatedItemCost + payload.errandFee + MATCHING_FEE_PER_CASE,
       actualReceiptCost: null,
       refundDifference: null,
       status: ErrandStatus.OPEN,

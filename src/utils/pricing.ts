@@ -11,6 +11,9 @@ import {
   StoreCoupon,
 } from '../types/alle';
 
+/** 심부름 · 개인 라이더 건당 플랫폼 매칭 수수료 (원) */
+export const MATCHING_FEE_PER_CASE = 100;
+
 function formatWonInline(amount: number): string {
   return `${Math.round(amount).toLocaleString('ko-KR')}원`;
 }
