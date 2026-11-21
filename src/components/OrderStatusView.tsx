@@ -29,6 +29,7 @@ import {
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
 import { getDeliveryMethodMeta } from '../utils/pricing';
+import { B2BStatementModal } from './B2BStatementModal';
 import { FoodImage } from './FoodImage';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
@@ -139,6 +140,7 @@ export function OrderStatusView({
   const [calendarScope, setCalendarScope] = useState<'monthly' | 'yearly'>(
     'monthly'
   );
+  const [statementOrder, setStatementOrder] = useState<Order | null>(null);
 
   const defaultOrderDate = useMemo(() => {
     const latest = orders[0];
@@ -1043,11 +1045,23 @@ export function OrderStatusView({
                       {order.createdAt}
                       {order.paymentMethodLabel && ` · ${order.paymentMethodLabel}`}
                       {order.reservationSlot && ` · 도착 예약: ${order.reservationSlot}`}
-                      {order.sharedDeliveryApplied && ' · 이웃 묶음배달'}
+                      {order.sharedDeliveryApplied && ' · 자동 묶음배송'}
                       {order.selectedOptionNames.length > 0 &&
                         ` · 옵션: ${order.selectedOptionNames.join(', ')}`}
                       {order.customerNote && ` · 메모: ${order.customerNote}`}
                     </div>
+
+                    {order.isB2B && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setStatementOrder(order)}
+                          className="min-h-[32px] px-3 py-1 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>📄 거래명세표 · 법인 서류</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1502,6 +1516,11 @@ export function OrderStatusView({
           })}
         </div>
       )}
+
+      <B2BStatementModal
+        order={statementOrder}
+        onClose={() => setStatementOrder(null)}
+      />
     </div>
   );
 }

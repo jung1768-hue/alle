@@ -34,13 +34,15 @@ import {
   QuickPayBottomSheet,
   QuickPayResolvedItem,
 } from './components/QuickPayBottomSheet';
+import { B2BMealView } from './components/B2BMealView';
+import { ErrandView } from './components/ErrandView';
 import { RecommendationView } from './components/RecommendationView';
 import { StoreMenuModal } from './components/StoreMenuModal';
-import { SuperAppHubView } from './components/SuperAppHubView';
 import { WishlistView } from './components/WishlistView';
 import { INITIAL_REVIEWS, PROHIBITED_ERRAND_KEYWORDS } from './data/seedData';
 import {
   AllePersistedState,
+  B2BDocumentInfo,
   CartLineItem,
   CartState,
   ConsumerStep,
@@ -64,7 +66,6 @@ import {
   SavedLocation,
   StoreCoupon,
   StorePromotion,
-  SuperAppTab,
   UserPreferences,
 } from './types/alle';
 import {
@@ -74,6 +75,7 @@ import {
   parseConditionInput,
 } from './utils/parser';
 import {
+  B2B_SERVICE_FEE_RATE,
   calculateStoreDeliveryFee,
   estimateCompetitorSavings,
   getDeliveryMethodMeta,
@@ -189,9 +191,6 @@ export default function App() {
 
   const [role, setRole] = useState<DemoRole>(DemoRole.CONSUMER);
   const [step, setStep] = useState<ConsumerStep>(ConsumerStep.HOME);
-  const [superAppTab, setSuperAppTab] = useState<SuperAppTab>(
-    SuperAppTab.GROUP_BUY
-  );
 
   const [rawInput, setRawInput] = useState<string>(
     initialLoad.state.lastConditionInput
@@ -297,7 +296,7 @@ export default function App() {
   const skipNextFirestorePushRef = useRef<boolean>(false);
   const isPopstateNavRef = useRef<boolean>(false);
   const lastHistoryKeyRef = useRef<string>(
-    `${DemoRole.CONSUMER}:${ConsumerStep.HOME}:${SuperAppTab.GROUP_BUY}`
+    `${DemoRole.CONSUMER}:${ConsumerStep.HOME}`
   );
   const lastSharedJsonRef = useRef<string>(
     JSON.stringify(extractSharedState(initialLoad.state))
@@ -308,7 +307,6 @@ export default function App() {
       {
         role: DemoRole.CONSUMER,
         step: ConsumerStep.HOME,
-        superAppTab: SuperAppTab.GROUP_BUY,
       },
       '',
       window.location.href
@@ -318,7 +316,6 @@ export default function App() {
       const navState = event.state as {
         role?: DemoRole;
         step?: ConsumerStep;
-        superAppTab?: SuperAppTab;
       } | null;
 
       setShowFutureModal(false);
@@ -330,14 +327,9 @@ export default function App() {
 
       if (navState?.role && navState?.step) {
         isPopstateNavRef.current = true;
-        lastHistoryKeyRef.current = `${navState.role}:${navState.step}:${
-          navState.superAppTab ?? SuperAppTab.GROUP_BUY
-        }`;
+        lastHistoryKeyRef.current = `${navState.role}:${navState.step}`;
         setRole(navState.role);
         setStep(navState.step);
-        if (navState.superAppTab) {
-          setSuperAppTab(navState.superAppTab);
-        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
@@ -347,7 +339,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const nextKey = `${role}:${step}:${superAppTab}`;
+    const nextKey = `${role}:${step}`;
     if (isPopstateNavRef.current) {
       isPopstateNavRef.current = false;
       lastHistoryKeyRef.current = nextKey;
@@ -355,13 +347,9 @@ export default function App() {
     }
     if (nextKey !== lastHistoryKeyRef.current) {
       lastHistoryKeyRef.current = nextKey;
-      window.history.pushState(
-        { role, step, superAppTab },
-        '',
-        window.location.href
-      );
+      window.history.pushState({ role, step }, '', window.location.href);
     }
-  }, [role, step, superAppTab]);
+  }, [role, step]);
 
   useEffect(() => {
     void checkServerGeminiAvailable();
@@ -976,19 +964,16 @@ export default function App() {
     });
   };
 
-  const handleOpenSuperApp = (tab: SuperAppTab) => {
+  const handleOpenB2BMeal = () => {
     setRole(DemoRole.CONSUMER);
-    setSuperAppTab(tab);
-    setStep(ConsumerStep.SUPERAPP);
+    setStep(ConsumerStep.B2B_MEAL);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleJoinGroupBuy = (menuId: string) => {
-    handleQuickReorderToConfirm(menuId, 1, {
-      deliveryMethod: 'auto_bundle',
-      sharedDeliveryApplied: true,
-    });
-    showToast('이웃 공동구매 · 자동 묶음배송 배달비 절약이 적용되었습니다.');
+  const handleOpenErrand = () => {
+    setRole(DemoRole.CONSUMER);
+    setStep(ConsumerStep.ERRAND);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleQuickRelaxCondition = (patch: Partial<ParsedCondition>) => {
@@ -1476,7 +1461,10 @@ export default function App() {
     servings: number;
     reservationSlot: string;
     customerNote: string;
-  }): { ok: boolean; error?: string } => {
+    paymentMethod: PaymentMethod;
+    paymentMethodLabel: string;
+    b2bDocumentInfo?: B2BDocumentInfo | null;
+  }): { ok: boolean; error?: string; order?: Order } => {
     if (orderSubmitLockRef.current) {
       return { ok: false, error: '주문이 이미 처리 중입니다.' };
     }
@@ -1501,10 +1489,22 @@ export default function App() {
       };
     }
 
-    orderSubmitLockRef.current = true;
     const effectiveUnitPrice = getEffectiveMenuPrice(targetMenu);
     const menuSubtotal = effectiveUnitPrice * payload.servings;
-    const totalAmount = menuSubtotal + targetStore.deliveryFee;
+    const b2bServiceFee = Math.round(menuSubtotal * B2B_SERVICE_FEE_RATE);
+    const totalAmount = menuSubtotal + targetStore.deliveryFee + b2bServiceFee;
+
+    if (
+      payload.paymentMethod === 'alle_pay' &&
+      appState.walletBalance < totalAmount
+    ) {
+      return {
+        ok: false,
+        error: `alle페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
+      };
+    }
+
+    orderSubmitLockRef.current = true;
     const nowStr = formatNowTime();
     const nextNumber = 101 + appState.orders.length;
     const newOrderId = `ord-b2b-${Date.now()}`;
@@ -1516,8 +1516,8 @@ export default function App() {
       menuId: targetMenu.id,
       menuName: targetMenu.name,
       storeName: targetStore.name,
-      customerAlias: '오피스 A',
-      addressAlias: '오피스 구역 A',
+      customerAlias: payload.b2bDocumentInfo?.companyName || '법인 고객',
+      addressAlias: activeLocation.detailAddress,
       servings: payload.servings,
       selectedOptionIds: [],
       selectedOptionNames: [],
@@ -1526,6 +1526,10 @@ export default function App() {
       deliveryFee: targetStore.deliveryFee,
       reservationSlot: payload.reservationSlot,
       isB2B: true,
+      b2bServiceFee,
+      b2bDocumentInfo: payload.b2bDocumentInfo ?? null,
+      paymentMethod: payload.paymentMethod,
+      paymentMethodLabel: payload.paymentMethodLabel,
       couponCode: null,
       couponDiscount: 0,
       totalAmount,
@@ -1543,6 +1547,10 @@ export default function App() {
 
     setAppState((prev) => ({
       ...prev,
+      walletBalance:
+        payload.paymentMethod === 'alle_pay'
+          ? Math.max(0, prev.walletBalance - totalAmount)
+          : prev.walletBalance,
       menus: prev.menus.map((m) => {
         if (m.id !== targetMenu.id) return m;
         const nextStock = Math.max(0, m.stock - payload.servings);
@@ -1556,15 +1564,13 @@ export default function App() {
     }));
 
     setHighlightedOrderId(newOrderId);
-    setStep(ConsumerStep.STATUS);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(`${b2bOrder.orderCode} 단체 예약 주문이 접수되었습니다.`);
+    showToast(`${b2bOrder.orderCode} B2B 단체 결제 · 주문이 완료되었습니다.`);
 
     window.setTimeout(() => {
       orderSubmitLockRef.current = false;
     }, 300);
 
-    return { ok: true };
+    return { ok: true, order: b2bOrder };
   };
 
   const handleCreateErrand = (payload: {
@@ -2021,126 +2027,6 @@ export default function App() {
     showToast('가게 쿠폰이 삭제되었습니다.');
   };
 
-  const handleCreateMarketBundleOrder = (payload: {
-    items: Array<{ menuId: string; quantity: number }>;
-    customerNote: string;
-  }): { ok: boolean; error?: string } => {
-    if (orderSubmitLockRef.current) {
-      return { ok: false, error: '주문이 이미 처리 중입니다.' };
-    }
-    if (payload.items.length === 0) {
-      return { ok: false, error: '최소 1개 이상의 메뉴를 담아주세요.' };
-    }
-
-    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
-    const storeMap = new Map(appState.stores.map((s) => [s.id, s]));
-
-    let subtotal = 0;
-    const summaryLabels: string[] = [];
-    const storeNames = new Set<string>();
-    let leadMenu: MenuItem | null = null;
-    let leadStoreName = '';
-
-    for (const entry of payload.items) {
-      const m = menuMap.get(entry.menuId);
-      const st = m ? storeMap.get(m.storeId) : undefined;
-      if (!m || !st || !st.isOpen || m.isSoldOut || m.stock < entry.quantity) {
-        return {
-          ok: false,
-          error: `${m?.name ?? '선택 메뉴'}의 재고가 부족하거나 영업 중이 아닙니다.`,
-        };
-      }
-      if (!leadMenu) {
-        leadMenu = m;
-        leadStoreName = st.name;
-      }
-      storeNames.add(st.name);
-      subtotal += getEffectiveMenuPrice(m) * entry.quantity;
-      summaryLabels.push(`[${st.name}] ${m.name}×${entry.quantity}`);
-    }
-
-    if (!leadMenu) {
-      return { ok: false, error: '주문 항목을 확인할 수 없습니다.' };
-    }
-
-    orderSubmitLockRef.current = true;
-    const bundleDeliveryFee = 1500;
-    const totalAmount = subtotal + bundleDeliveryFee;
-    const nowStr = formatNowTime();
-    const nextNumber = 101 + appState.orders.length;
-    const newOrderId = `ord-mkt-${Date.now()}`;
-
-    const bundleOrder: Order = {
-      id: newOrderId,
-      orderCode: `MKT-${nextNumber}`,
-      storeId: leadMenu.storeId,
-      menuId: leadMenu.id,
-      menuName:
-        payload.items.length > 1
-          ? `${leadMenu.name} 외 ${payload.items.length - 1}건 (시장·골목 묶음)`
-          : leadMenu.name,
-      storeName:
-        storeNames.size > 1
-          ? `${leadStoreName} 외 ${storeNames.size - 1}곳 묶음`
-          : leadStoreName,
-      customerAlias: '이웃 고객',
-      addressAlias: activeLocation.areaName,
-      servings: payload.items.reduce((sum, item) => sum + item.quantity, 0),
-      selectedOptionIds: [],
-      selectedOptionNames: summaryLabels,
-      menuSubtotal: subtotal,
-      optionsSubtotal: 0,
-      deliveryFee: bundleDeliveryFee,
-      sharedDeliveryApplied: true,
-      paymentMethod: 'local_currency',
-      paymentMethodLabel: '대구로페이 / 골목 묶음',
-      couponCode: null,
-      couponDiscount: 0,
-      totalAmount,
-      status: OrderStatus.PENDING,
-      dispatchMode: DispatchMode.NEIGHBOR_WALK,
-      createdAt: nowStr,
-      updatedAt: nowStr,
-      stockDeducted: true,
-      stockRestored: false,
-      mockRefunded: false,
-      cancelRequested: false,
-      cancelRequestReason: null,
-      cancelRequestedAt: null,
-      customerNote: `${summaryLabels.join(' + ')}${
-        payload.customerNote ? ` / ${payload.customerNote}` : ''
-      }`,
-    };
-
-    const qtyByMenu = new Map(payload.items.map((i) => [i.menuId, i.quantity]));
-
-    setAppState((prev) => ({
-      ...prev,
-      menus: prev.menus.map((m) => {
-        const deduct = qtyByMenu.get(m.id);
-        if (!deduct) return m;
-        const nextStock = Math.max(0, m.stock - deduct);
-        return {
-          ...m,
-          stock: nextStock,
-          isSoldOut: nextStock === 0 ? true : m.isSoldOut,
-        };
-      }),
-      orders: [bundleOrder, ...prev.orders],
-    }));
-
-    setHighlightedOrderId(newOrderId);
-    setStep(ConsumerStep.STATUS);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(`${bundleOrder.orderCode} 골목·시장 한 바구니 묶음 주문이 접수되었습니다.`);
-
-    window.setTimeout(() => {
-      orderSubmitLockRef.current = false;
-    }, 300);
-
-    return { ok: true };
-  };
-
   const handleAdjustMenuStock = (menuId: string, delta: number) => {
     setAppState((prev) => ({
       ...prev,
@@ -2320,7 +2206,7 @@ export default function App() {
   };
 
   const handleJumpDemoScene = (
-    scene: 'customer_home' | 'customer_chat' | 'b2b_checkout' | 'owner_dashboard' | 'superapp_hub'
+    scene: 'customer_home' | 'customer_chat' | 'b2b_checkout' | 'owner_dashboard' | 'b2b_meal'
   ) => {
     if (scene === 'customer_home') {
       setAiChatInitialPrompt(undefined);
@@ -2368,11 +2254,10 @@ export default function App() {
     } else if (scene === 'owner_dashboard') {
       setRole(DemoRole.OWNER);
       showToast('③ 점주 실시간 주문 접수 · 순수익 비교 대시보드');
-    } else if (scene === 'superapp_hub') {
+    } else if (scene === 'b2b_meal') {
       setRole(DemoRole.CONSUMER);
-      setSuperAppTab(SuperAppTab.GROUP_BUY);
-      setStep(ConsumerStep.SUPERAPP);
-      showToast('④ 음식-이동 크로스 도메인 슈퍼앱 허브');
+      setStep(ConsumerStep.B2B_MEAL);
+      showToast('④ B2B 기업 단체 선주문 · 거래명세표');
     }
     setShowDemoSwitcher(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2643,18 +2528,20 @@ export default function App() {
 
                     <button
                       type="button"
-                      onClick={() => handleJumpDemoScene('superapp_hub')}
+                      onClick={() => handleJumpDemoScene('b2b_meal')}
                       className={`w-full text-left rounded-xl border transition-colors p-2.5 cursor-pointer ${
-                        role === DemoRole.CONSUMER && step === ConsumerStep.SUPERAPP
+                        role === DemoRole.CONSUMER &&
+                        (step === ConsumerStep.B2B_MEAL ||
+                          step === ConsumerStep.ERRAND)
                           ? 'bg-[#4E6E2A]/35 border-[#82B440]/60'
                           : 'bg-white/5 border-white/10 hover:bg-white/10'
                       }`}
                     >
                       <p className="text-xs font-semibold text-white">
-                        ④ [확장] 동네 생활 확장 허브
+                        ④ [기업·생활] B2B 기업 단체 선주문 · 거래명세표
                       </p>
                       <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
-                        이웃 공동구매 · 오피스 B2B · 생활 심부름 통합
+                        자유 시간 예약 · 카드/계좌 즉시 결제 · 법인 증빙
                       </p>
                     </button>
                   </div>
@@ -2815,15 +2702,15 @@ export default function App() {
                     onClick={() => {
                       setShowNotifications(false);
                       setRole(DemoRole.CONSUMER);
-                      setStep(ConsumerStep.SUPERAPP);
+                      setStep(ConsumerStep.B2B_MEAL);
                     }}
                     className="w-full text-left p-2.5 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] transition-colors cursor-pointer"
                   >
                     <p className="font-semibold text-[#1A1D1A]">
-                      이웃 공동구매 · 오피스 B2B 예약 확인
+                      🏢 B2B 기업 단체 예약 · 거래명세표 확인
                     </p>
                     <p className="text-[#687064] mt-0.5">
-                      12:40 식사 도착 예정에 맞춘 이동 스케줄이 준비되었어요.
+                      원하는 도착 시간 예약과 법인 카드·계좌 즉시 결제를 바로 이용하세요.
                     </p>
                   </button>
                 </div>
@@ -2969,7 +2856,8 @@ export default function App() {
             onRawInputChange={handleRawInputChange}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
             onOpenQuickPay={handleOpenQuickPay}
-            onOpenSuperApp={handleOpenSuperApp}
+            onOpenB2BMeal={handleOpenB2BMeal}
+            onOpenErrand={handleOpenErrand}
             onOpenBrowse={handleOpenBrowse}
             onOpenStoreMenu={handleOpenStoreMenu}
             activeLocation={activeLocation}
@@ -3019,7 +2907,8 @@ export default function App() {
               setStep(ConsumerStep.HOME);
             }}
             onOpenAiSettings={() => setShowGeminiModal(true)}
-            onOpenSuperApp={handleOpenSuperApp}
+            onOpenB2BMeal={handleOpenB2BMeal}
+            onOpenErrand={handleOpenErrand}
             onUseRelayCoupon={(menuId) =>
               handleQuickReorderToConfirm(menuId, 1, { couponCode: 'RELAY1000' })
             }
@@ -3133,20 +3022,36 @@ export default function App() {
             }}
             onOpenLocationPicker={() => setShowLocationPicker(true)}
           />
-        ) : step === ConsumerStep.SUPERAPP ? (
-          <SuperAppHubView
-            activeTab={superAppTab}
-            onChangeTab={setSuperAppTab}
+        ) : step === ConsumerStep.B2B_MEAL ? (
+          <B2BMealView
             stores={appState.stores}
             menus={appState.menus}
+            orders={appState.orders}
             reviews={INITIAL_REVIEWS}
             reviewReplies={appState.reviewReplies}
-            errands={appState.errands}
-            latestOrder={appState.orders[0]}
             activeLocation={activeLocation}
-            onJoinGroupBuy={handleJoinGroupBuy}
+            walletBalance={appState.walletBalance}
+            onBackToHome={() => {
+              setRole(DemoRole.CONSUMER);
+              setStep(ConsumerStep.HOME);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onGoToOrderStatus={() => {
+              setRole(DemoRole.CONSUMER);
+              setStep(ConsumerStep.STATUS);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onCreateB2BOrder={handleCreateB2BOrder}
-            onCreateMarketBundleOrder={handleCreateMarketBundleOrder}
+          />
+        ) : step === ConsumerStep.ERRAND ? (
+          <ErrandView
+            errands={appState.errands}
+            activeLocation={activeLocation}
+            onBackToHome={() => {
+              setRole(DemoRole.CONSUMER);
+              setStep(ConsumerStep.HOME);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onCreateErrand={handleCreateErrand}
             onAdvanceErrand={handleAdvanceErrand}
           />
@@ -3370,8 +3275,7 @@ export default function App() {
               setStep(ConsumerStep.MY);
             }}
             className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
-              role === DemoRole.CONSUMER &&
-              (step === ConsumerStep.MY || step === ConsumerStep.SUPERAPP)
+              role === DemoRole.CONSUMER && step === ConsumerStep.MY
                 ? 'text-[#4E6E2A] font-semibold'
                 : 'text-[#687064] hover:text-[#1A1D1A]'
             }`}
@@ -3379,8 +3283,7 @@ export default function App() {
             <User
               className="w-5 h-5"
               strokeWidth={
-                role === DemoRole.CONSUMER &&
-                (step === ConsumerStep.MY || step === ConsumerStep.SUPERAPP)
+                role === DemoRole.CONSUMER && step === ConsumerStep.MY
                   ? 2.2
                   : 1.75
               }

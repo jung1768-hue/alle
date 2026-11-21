@@ -40,7 +40,6 @@ import {
   Store,
   StoreCoupon,
   StorePromotion,
-  SuperAppTab,
 } from '../types/alle';
 import { PlatformCategoryId } from '../utils/categories';
 import {
@@ -101,7 +100,7 @@ interface ChatMessage {
   aiSource?: 'gemini' | 'rule';
   actionLink?: {
     label: string;
-    tab?: SuperAppTab;
+    target?: 'b2b' | 'errand';
     relayMenuId?: string;
   };
 }
@@ -129,7 +128,8 @@ interface AiChatOrderViewProps {
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
   onOpenAiSettings?: () => void;
-  onOpenSuperApp?: (tab: SuperAppTab) => void;
+  onOpenB2BMeal?: () => void;
+  onOpenErrand?: () => void;
   onUseRelayCoupon?: (menuId: string) => void;
   onAddToCart?: (
     menuId: string,
@@ -422,7 +422,8 @@ export function AiChatOrderView({
   onToggleWishlist,
   onBackToHome,
   onOpenAiSettings: _onOpenAiSettings,
-  onOpenSuperApp,
+  onOpenB2BMeal,
+  onOpenErrand,
   onUseRelayCoupon,
   onAddToCart,
   onAddMultipleToCart,
@@ -2677,42 +2678,20 @@ export function AiChatOrderView({
       return;
     }
 
-    if (/(시장|한\s*바구니|여러\s*가게|합배송|골목\s*묶음)/.test(trimmed)) {
-      const marketText =
-        '전통시장과 골목 가게 여러 곳의 메뉴를 최소주문 제한 없이 1개씩 한 바구니에 담고, 이웃 도보 통합 배달비 1회(1,500원)로 한 번에 받아보실 수 있어요.';
+    if (/(심부름|장보기|세탁소|픽업\s*대행)/.test(trimmed)) {
+      const errandText =
+        '동네 장보기·편의점 생필품·세탁소 수령 등 생활 심부름을 요청하시면 가까운 파트너와 바로 매칭해 드려요.';
       setMessages((prev) => [
         ...prev,
         {
-          id: `b-market-${Date.now() + 1}`,
+          id: `b-errand-${Date.now() + 1}`,
           sender: 'bot',
-          text: marketText,
-          spokenText: marketText,
-          actionLink: onOpenSuperApp
+          text: errandText,
+          spokenText: errandText,
+          actionLink: onOpenErrand
             ? {
-                label: '전통시장·골목 한 바구니 담으러 가기 →',
-                tab: SuperAppTab.MARKET_BUNDLE,
-              }
-            : undefined,
-          aiSource: 'rule',
-        },
-      ]);
-      return;
-    }
-
-    if (/(공동구매|배달비\s*아끼|배달비\s*절약|배달비\s*반값|1\/n)/.test(trimmed)) {
-      const groupText =
-        '반경 300m 이웃과 주문을 묶으면 배달비가 절반으로 줄어들어요! 지금 참여 가능한 동네 공동구매 목록을 바로 열어드릴까요?';
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `b-group-${Date.now() + 1}`,
-          sender: 'bot',
-          text: groupText,
-          spokenText: groupText,
-          actionLink: onOpenSuperApp
-            ? {
-                label: '이웃 공동구매 참여하기 →',
-                tab: SuperAppTab.GROUP_BUY,
+                label: '생활 심부름 요청하러 가기 →',
+                target: 'errand',
               }
             : undefined,
           aiSource: 'rule',
@@ -2723,7 +2702,7 @@ export function AiChatOrderView({
 
     if (/(단체|회의|오피스|법인|야근\s*식사)/.test(trimmed)) {
       const b2bText =
-        '오피스·회의 단체 주문은 오프피크 15분 정밀 예약으로 딱 맞춰 받아보실 수 있어요. B2B 예약 화면으로 바로 연결해 드릴게요.';
+        '오피스·회의 단체 주문은 원하는 시간 예약과 법인/개인카드·계좌이체 즉시 결제, 거래명세표 발급까지 한 번에 가능합니다.';
       setMessages((prev) => [
         ...prev,
         {
@@ -2731,10 +2710,10 @@ export function AiChatOrderView({
           sender: 'bot',
           text: b2bText,
           spokenText: b2bText,
-          actionLink: onOpenSuperApp
+          actionLink: onOpenB2BMeal
             ? {
-                label: '오피스 B2B 15분 예약 열기 →',
-                tab: SuperAppTab.B2B,
+                label: 'B2B 기업 단체 선주문 열기 →',
+                target: 'b2b',
               }
             : undefined,
           aiSource: 'rule',
@@ -3246,8 +3225,13 @@ export function AiChatOrderView({
                     <button
                       type="button"
                       onClick={() => {
-                        if (msg.actionLink?.tab && onOpenSuperApp) {
-                          onOpenSuperApp(msg.actionLink.tab);
+                        if (msg.actionLink?.target === 'b2b' && onOpenB2BMeal) {
+                          onOpenB2BMeal();
+                        } else if (
+                          msg.actionLink?.target === 'errand' &&
+                          onOpenErrand
+                        ) {
+                          onOpenErrand();
                         } else if (
                           msg.actionLink?.relayMenuId &&
                           onUseRelayCoupon

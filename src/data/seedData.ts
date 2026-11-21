@@ -2,7 +2,6 @@ import {
   DispatchMode,
   ErrandRequest,
   ErrandStatus,
-  GroupBuyPool,
   MenuItem,
   MockCoupon,
   Order,
@@ -216,8 +215,18 @@ export const RESERVATION_SLOTS_15M = [
 export const B2B_OFFPEAK_SLOTS = [
   '오전 10:30 도착 (오프피크)',
   '오전 11:00 도착 (오프피크)',
+  '오전 11:30 도착 (오프피크)',
+  '오후 13:30 도착 (오프피크)',
   '오후 15:30 도착 (오프피크)',
   '오후 16:30 도착 (오프피크)',
+];
+
+export const B2B_GENERAL_SLOTS = [
+  '정오 12:00 도착 (점심)',
+  '오후 12:30 도착 (점심)',
+  '오후 13:00 도착 (점심)',
+  '오후 18:00 도착 (저녁/야근)',
+  '오후 19:00 도착 (저녁/야근)',
 ];
 
 export const PROHIBITED_ERRAND_KEYWORDS = [
@@ -239,45 +248,6 @@ export const PAPER_MENU_OCR_SAMPLE = [
   '우리동네 차돌 된장찌개 10000원 얼큰한 국물 한식',
   '진국 한우 수육국밥 11000원 담백한 국물 한식',
   '바삭 수제 새우돈가스 12000원 바삭한 일식 돈까스',
-];
-
-export const GROUP_BUY_POOLS: GroupBuyPool[] = [
-  {
-    id: 'gb-1',
-    storeId: 's1',
-    menuId: 'm1',
-    title: '역삼동 점심 국밥 묶음배달 (역삼 진국 소고기국밥)',
-    areaRadiusLabel: '서울 강남구 역삼동 반경 300m',
-    currentParticipants: 3,
-    targetParticipants: 5,
-    remainingTimeLabel: '마감 25분 전',
-    originalDeliveryFee: 2500,
-    sharedDeliveryFee: 1250,
-  },
-  {
-    id: 'gb-2',
-    storeId: 's9',
-    menuId: 'm15',
-    title: '역삼동 저녁 치킨 묶음배달 (바삭치킨 역삼점)',
-    areaRadiusLabel: '서울 강남구 역삼동 반경 300m',
-    currentParticipants: 4,
-    targetParticipants: 6,
-    remainingTimeLabel: '마감 35분 전',
-    originalDeliveryFee: 3000,
-    sharedDeliveryFee: 1500,
-  },
-  {
-    id: 'gb-3',
-    storeId: 's24',
-    menuId: 'm31',
-    title: '오피스 오후 커피·케이크 묶음배달 (카페 나무 역삼점)',
-    areaRadiusLabel: '서울 강남구 역삼동 반경 250m',
-    currentParticipants: 3,
-    targetParticipants: 4,
-    remainingTimeLabel: '마감 15분 전',
-    originalDeliveryFee: 2000,
-    sharedDeliveryFee: 1000,
-  },
 ];
 
 export const AVAILABLE_TAGS = [

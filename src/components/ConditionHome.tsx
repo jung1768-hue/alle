@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarClock,
-  Footprints,
   Megaphone,
   Mic,
   MicOff,
   Search,
   Sparkles,
   Ticket,
-  Users,
   Zap,
 } from 'lucide-react';
 import {
@@ -26,7 +23,6 @@ import {
   Store,
   StoreCoupon,
   StorePromotion,
-  SuperAppTab,
 } from '../types/alle';
 import {
   matchesMenuPlatformCategory,
@@ -71,7 +67,8 @@ interface ConditionHomeProps {
     paymentMethod?: PaymentMethod;
     customerNote?: string;
   }) => void;
-  onOpenSuperApp: (tab: SuperAppTab) => void;
+  onOpenB2BMeal: () => void;
+  onOpenErrand: () => void;
   onOpenBrowse?: (options?: {
     category?: PlatformCategoryId;
     query?: string;
@@ -116,7 +113,8 @@ export function ConditionHome({
   onRawInputChange,
   onQuickReorderToConfirm,
   onOpenQuickPay,
-  onOpenSuperApp,
+  onOpenB2BMeal,
+  onOpenErrand,
   onOpenBrowse,
   onOpenStoreMenu,
   activeLocation,
@@ -363,33 +361,6 @@ export function ConditionHome({
     });
   };
 
-  const quickServices = [
-    {
-      id: 'market-bundle',
-      label: '전통시장·골목 한 바구니 묶음',
-      icon: Sparkles,
-      onClick: () => onOpenSuperApp(SuperAppTab.MARKET_BUNDLE),
-    },
-    {
-      id: 'group-buy',
-      label: '이웃 공동구매 · 배달비 1/N',
-      icon: Users,
-      onClick: () => onOpenSuperApp(SuperAppTab.GROUP_BUY),
-    },
-    {
-      id: 'reserve',
-      label: '오피스 B2B 15분 예약',
-      icon: CalendarClock,
-      onClick: () => onOpenSuperApp(SuperAppTab.B2B),
-    },
-    {
-      id: 'errand',
-      label: '생활 심부름',
-      icon: Footprints,
-      onClick: () => onOpenSuperApp(SuperAppTab.ERRAND),
-    },
-  ];
-
   const detailMenu = useMemo(
     () =>
       detailMenuId ? menus.find((m) => m.id === detailMenuId) ?? null : null,
@@ -551,28 +522,42 @@ export function ConditionHome({
         </div>
       </section>
 
-      {/* B2B Corporate Meal & Office Highlight Card */}
-      <section className="rounded-3xl bg-[#1A1D1A] text-white p-5 sm:p-6 border border-[#3A4038] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 text-xs font-extrabold text-[#EAF1E2]">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#4E6E2A] text-white">
-              🏢 B2B 기업 식대
-            </span>
-            <span>오피스 단체 · 임직원 복지 식권</span>
-          </div>
-          <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
-            법인 식대 포인트로 15분 오프피크 예약 · 1인 주문도 가능
-          </h2>
-          <p className="text-sm text-[#C8D0C4]">
-            중개수수료 0% 매장 동일가 · 법인 월말 통합 정산 · alle페이(수수료 1.5%) 상생 결제 지원
-          </p>
-        </div>
+      {/* Simple Horizontal Banners: B2B Enterprise Group Order & Life Errands */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => onOpenSuperApp(SuperAppTab.B2B)}
-          className="min-h-[48px] px-5 py-2.5 rounded-2xl bg-[#82B440] hover:bg-[#72A135] text-[#111411] text-sm sm:text-base font-extrabold whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+          onClick={onOpenB2BMeal}
+          className="min-h-[76px] w-full px-5 py-4 rounded-2xl bg-[#1A1D1A] hover:bg-[#2A2F2A] text-white border border-[#3A4038] shadow-sm flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
         >
-          기업 식대 주문 →
+          <div className="min-w-0">
+            <div className="text-base sm:text-lg font-extrabold truncate">
+              🏢 B2B 기업 단체 선주문
+            </div>
+            <div className="text-xs sm:text-sm text-[#C8D0C4] mt-0.5 truncate">
+              원하는 시간 예약 · 카드/계좌 즉시 결제 · 거래명세표
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-[#82B440] text-[#111411] text-xs sm:text-sm font-extrabold shrink-0 whitespace-nowrap">
+            바로 주문 →
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenErrand}
+          className="min-h-[76px] w-full px-5 py-4 rounded-2xl bg-white hover:bg-[#EAF1E2] text-[#1A1D1A] border-2 border-[#D4E1C5] hover:border-[#4E6E2A] shadow-sm flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
+        >
+          <div className="min-w-0">
+            <div className="text-base sm:text-lg font-extrabold truncate">
+              🛵 생활 심부름
+            </div>
+            <div className="text-xs sm:text-sm text-[#555E52] mt-0.5 truncate">
+              동네 장보기 · 세탁물 · 픽업 대행 (매칭 100원)
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] border border-[#82B440]/60 text-[#3D5720] text-xs sm:text-sm font-extrabold shrink-0 whitespace-nowrap">
+            요청하기 →
+          </span>
         </button>
       </section>
 
@@ -816,29 +801,6 @@ export function ConditionHome({
             🍽️ 전체 카테고리 · 맛집 더 찾아보기 →
           </button>
         )}
-      </section>
-
-      {/* Quick Local Living Services */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-extrabold text-[#1A1D1A]">
-          우리 동네 생활 · 심부름 서비스
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {quickServices.map((svc) => {
-            const Icon = svc.icon;
-            return (
-              <button
-                key={svc.id}
-                type="button"
-                onClick={svc.onClick}
-                className="min-h-[62px] px-4 py-3 bg-white hover:bg-[#EAF1E2] border-2 border-[#E8ECE4] hover:border-[#82B440] rounded-2xl text-left flex items-center gap-2.5 text-sm sm:text-base font-extrabold text-[#1A1D1A] cursor-pointer transition-colors"
-              >
-                <Icon className="w-5 h-5 text-[#4E6E2A] shrink-0" />
-                <span className="leading-snug">{svc.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </section>
 
       <MenuDetailReviewModal

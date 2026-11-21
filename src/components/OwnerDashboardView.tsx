@@ -2234,7 +2234,7 @@ export function OwnerDashboardView({
                     • 11:42 “단체 12인분 가능?” → 오프피크 11:30 예약 링크 자동 전송
                   </p>
                   <p className="text-[#434B40] leading-snug">
-                    • 세그먼트: 단골 재주문(42%) · 오프피크 직장인(35%) · 이웃 묶음(23%)
+                    • 세그먼트: 단골 재주문(42%) · 오프피크 직장인(35%) · 자동 묶음배송(23%)
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <button

@@ -22,13 +22,7 @@ export enum ConsumerStep {
   STATUS = 'status',
   WISHLIST = 'wishlist',
   MY = 'my',
-  SUPERAPP = 'superapp',
-}
-
-export enum SuperAppTab {
-  GROUP_BUY = 'group_buy',
-  B2B = 'b2b',
-  MARKET_BUNDLE = 'market_bundle',
+  B2B_MEAL = 'b2b_meal',
   ERRAND = 'errand',
 }
 
@@ -183,7 +177,25 @@ export type PaymentMethod =
   | 'openbanking'
   | 'alle_pay'
   | 'local_currency'
-  | 'b2b_meal_point';
+  | 'b2b_meal_point'
+  | 'corporate_card'
+  | 'personal_card'
+  | 'bank_transfer';
+
+export type B2BDocumentType =
+  | 'transaction_statement'
+  | 'tax_invoice'
+  | 'expense_receipt';
+
+export interface B2BDocumentInfo {
+  companyName: string;
+  businessNumber: string;
+  representativeOrDept?: string;
+  contactEmail: string;
+  requestedDocs: B2BDocumentType[];
+  issuedAt: string;
+  statementNumber: string;
+}
 
 export interface CartLineItem {
   menuId: string;
@@ -249,6 +261,8 @@ export interface Order {
   sharedDeliveryApplied?: boolean;
   reservationSlot?: string | null;
   isB2B?: boolean;
+  b2bServiceFee?: number;
+  b2bDocumentInfo?: B2BDocumentInfo | null;
   paymentMethod?: PaymentMethod;
   paymentMethodLabel?: string;
   couponCode: string | null;
@@ -288,19 +302,6 @@ export interface ErrandRequest {
   receiptPhoto?: EvidencePhoto;
   status: ErrandStatus;
   createdAt: string;
-}
-
-export interface GroupBuyPool {
-  id: string;
-  storeId: string;
-  menuId: string;
-  title: string;
-  areaRadiusLabel: string;
-  currentParticipants: number;
-  targetParticipants: number;
-  remainingTimeLabel: string;
-  originalDeliveryFee: number;
-  sharedDeliveryFee: number;
 }
 
 export interface ParsedCondition {

@@ -135,7 +135,6 @@
   h1, h2, h3 {
     text-wrap: balance;
     letter-spacing: -0.025em;
-    color: #1A1D1A;
   }
 
   button:focus-visible,
