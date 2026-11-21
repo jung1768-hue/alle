@@ -162,9 +162,86 @@ export function SuperAppHubView({
   const [b2bNote, setB2bNote] = useState<string>('오피스 A 로비 앞 수령');
   const [b2bError, setB2bError] = useState<string | null>(null);
 
-  // Traditional Market / Alley Multi-Store Bundle state (prioritize 전통시장 점포)
+  // Neighbor Group-Buy Pools localized to activeLocation
+  const localizedGroupBuyPools = useMemo(() => {
+    const deliverableStatic = GROUP_BUY_POOLS.filter((pool) => {
+      const st = storeMap.get(pool.storeId);
+      if (!st) return false;
+      return !activeLocation || isStoreDeliverableToLocation(st, activeLocation);
+    });
+    if (deliverableStatic.length >= 2) {
+      return deliverableStatic;
+    }
+
+    const nearbyMenus = availableMenus.filter((m) => {
+      const st = storeMap.get(m.storeId);
+      return Boolean(
+        st && (!activeLocation || isStoreDeliverableToLocation(st, activeLocation))
+      );
+    });
+    const sourceMenus = nearbyMenus.length > 0 ? nearbyMenus : availableMenus;
+
+    const picked: Array<{ menu: MenuItem; store: Store }> = [];
+    const seenStores = new Set<string>();
+    const seenGroups = new Set<string>();
+
+    for (const m of sourceMenus) {
+      const st = storeMap.get(m.storeId);
+      if (!st || seenStores.has(st.id)) continue;
+      const grp = st.categoryGroup ?? st.category;
+      if (seenGroups.has(grp)) continue;
+      seenStores.add(st.id);
+      seenGroups.add(grp);
+      picked.push({ menu: m, store: st });
+      if (picked.length >= 3) break;
+    }
+
+    if (picked.length < 3) {
+      for (const m of sourceMenus) {
+        const st = storeMap.get(m.storeId);
+        if (!st || seenStores.has(st.id)) continue;
+        seenStores.add(st.id);
+        picked.push({ menu: m, store: st });
+        if (picked.length >= 3) break;
+      }
+    }
+
+    const areaLabel = activeLocation?.areaName || '내 주변';
+    const presets = [
+      { cur: 3, target: 5, time: '마감 25분 전', radius: '반경 300m' },
+      { cur: 4, target: 6, time: '마감 35분 전', radius: '반경 350m' },
+      { cur: 3, target: 4, time: '마감 15분 전', radius: '반경 250m' },
+    ];
+
+    return picked.map(({ menu, store }, idx) => {
+      const p = presets[idx % presets.length];
+      const originalFee = Math.max(2000, store.deliveryFee || 2500);
+      const sharedFee = Math.round((originalFee * 0.6) / 100) * 100;
+      return {
+        id: `gb-local-${store.id}-${menu.id}`,
+        storeId: store.id,
+        menuId: menu.id,
+        title: `${areaLabel} 이웃 묶음배달 (${store.name})`,
+        areaRadiusLabel: `${areaLabel} ${p.radius}`,
+        currentParticipants: p.cur,
+        targetParticipants: p.target,
+        remainingTimeLabel: p.time,
+        originalDeliveryFee: originalFee,
+        sharedDeliveryFee: sharedFee,
+      };
+    });
+  }, [availableMenus, storeMap, activeLocation]);
+
+  // Traditional Market / Alley Multi-Store Bundle state (localized + prioritize 전통시장 점포)
   const marketBundleCatalog = useMemo(() => {
-    const sorted = [...availableMenus].sort((a, b) => {
+    const nearbyMenus = availableMenus.filter((m) => {
+      const st = storeMap.get(m.storeId);
+      return Boolean(
+        st && (!activeLocation || isStoreDeliverableToLocation(st, activeLocation))
+      );
+    });
+    const baseMenus = nearbyMenus.length >= 2 ? nearbyMenus : availableMenus;
+    const sorted = [...baseMenus].sort((a, b) => {
       const sa = storeMap.get(a.storeId);
       const sb = storeMap.get(b.storeId);
       const aMarket =
@@ -195,7 +272,7 @@ export function SuperAppHubView({
       if (picked.length >= 6) break;
     }
     return picked;
-  }, [availableMenus, storeMap]);
+  }, [availableMenus, storeMap, activeLocation]);
 
   const [bundleQtyByMenu, setBundleQtyByMenu] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
@@ -600,17 +677,22 @@ export function SuperAppHubView({
 
         {activeTab === SuperAppTab.GROUP_BUY && (
           <div className="space-y-3.5">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="text-sm font-bold text-[#1A1D1A]">
-                진행 중인 이웃 묶음배달
-              </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-[#1A1D1A]">
+                  진행 중인 이웃 묶음배달
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#4E6E2A] text-[11px] font-semibold">
+                  📍 {activeLocation?.areaName ?? '내 주변'} 기준
+                </span>
+              </div>
               <span className="text-xs text-[#687064] tabular-nums">
-                매칭 가능 {GROUP_BUY_POOLS.length}건
+                매칭 가능 {localizedGroupBuyPools.length}건
               </span>
             </div>
 
             <div className="space-y-3">
-              {GROUP_BUY_POOLS.map((pool) => {
+              {localizedGroupBuyPools.map((pool) => {
                 const store = storeMap.get(pool.storeId);
                 const menu = menuMap.get(pool.menuId);
                 if (!store || !menu) return null;
@@ -638,7 +720,7 @@ export function SuperAppHubView({
                       </div>
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="text-[11px] text-[#687064]">
-                          {pool.areaRadiusLabel} · {pool.remainingTimeLabel} ·{' '}
+                          {store.name} · {pool.areaRadiusLabel} · {pool.remainingTimeLabel} ·{' '}
                           {pool.currentParticipants}/{pool.targetParticipants}명 참여
                         </div>
                         <h4 className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
