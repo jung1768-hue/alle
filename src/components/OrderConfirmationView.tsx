@@ -15,21 +15,28 @@ import {
   Sparkles,
   Ticket,
   Trash2,
-  Users,
+  Truck,
   Wallet,
 } from 'lucide-react';
 import { MOCK_COUPONS, RESERVATION_SLOTS_15M } from '../data/seedData';
 import {
   CartLineItem,
+  DeliveryMethod,
   MenuItem,
   OrderLineItem,
   PaymentMethod,
   Store,
+  StoreCoupon,
+  StorePromotion,
 } from '../types/alle';
 import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import {
+  calculateStoreDeliveryFee,
+  DELIVERY_METHOD_OPTIONS,
   estimateCompetitorSavings,
+  getAvailableCouponsForStore,
   getBestCoupon,
+  getDeliveryMethodMeta,
   getLocalCurrencyLabel,
   isCouponEligible,
 } from '../utils/pricing';
@@ -39,10 +46,13 @@ interface OrderConfirmationViewProps {
   menu: MenuItem;
   store: Store;
   storeMenus?: MenuItem[];
+  storePromotions?: StorePromotion[];
+  storeCoupons?: StoreCoupon[];
   initialItems?: CartLineItem[];
   initialServings: number;
   initialOptionIds: string[];
   initialCouponCode: string;
+  initialDeliveryMethod?: DeliveryMethod;
   initialSharedDelivery?: boolean;
   initialReservationSlot?: string;
   initialPaymentMethod?: PaymentMethod;
@@ -61,6 +71,7 @@ interface OrderConfirmationViewProps {
     items: OrderLineItem[];
     couponCode: string;
     couponDiscount: number;
+    deliveryMethod: DeliveryMethod;
     sharedDeliveryApplied: boolean;
     reservationSlot: string | null;
     customerAlias: string;
@@ -76,10 +87,13 @@ export function OrderConfirmationView({
   menu,
   store,
   storeMenus,
+  storePromotions = [],
+  storeCoupons = [],
   initialItems,
   initialServings,
   initialOptionIds,
   initialCouponCode,
+  initialDeliveryMethod,
   initialSharedDelivery = false,
   initialReservationSlot = 'now',
   initialPaymentMethod = 'kakaopay',
@@ -129,7 +143,13 @@ export function OrderConfirmationView({
   const [couponCode, setCouponCode] = useState<string>(() => {
     const firstSubtotal =
       getEffectiveMenuPrice(menu) * Math.max(1, initialServings);
-    return getBestCoupon(MOCK_COUPONS, {
+    const pool = getAvailableCouponsForStore(
+      MOCK_COUPONS,
+      storeCoupons,
+      store.id,
+      firstSubtotal
+    );
+    return getBestCoupon(pool, {
       menuSubtotal: firstSubtotal,
       stampCount,
       paymentMethod: initialPaymentMethod,
@@ -140,8 +160,9 @@ export function OrderConfirmationView({
     }).code;
   });
 
-  const [sharedDeliveryApplied, setSharedDeliveryApplied] = useState<boolean>(
-    initialSharedDelivery
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>(
+    initialDeliveryMethod ??
+      (initialSharedDelivery ? 'auto_bundle' : 'partner_direct')
   );
   const [reservationSlotId, setReservationSlotId] = useState<string>(
     initialReservationSlot || 'now'
@@ -297,16 +318,39 @@ export function OrderConfirmationView({
     });
   }, [lineItems, menuById]);
 
+  const availableCoupons = useMemo(
+    () =>
+      getAvailableCouponsForStore(
+        MOCK_COUPONS,
+        storeCoupons,
+        store.id,
+        menuSubtotal
+      ),
+    [storeCoupons, store.id, menuSubtotal]
+  );
+
+  const activeStorePromos = useMemo(
+    () =>
+      storePromotions.filter((p) => p.storeId === store.id && p.isActive),
+    [storePromotions, store.id]
+  );
+
   useEffect(() => {
     if (!couponManuallyChosen) {
-      const best = getBestCoupon(MOCK_COUPONS, {
+      const best = getBestCoupon(availableCoupons, {
         menuSubtotal,
         stampCount,
         paymentMethod,
       });
       setCouponCode(best.code);
     }
-  }, [menuSubtotal, stampCount, paymentMethod, couponManuallyChosen]);
+  }, [
+    availableCoupons,
+    menuSubtotal,
+    stampCount,
+    paymentMethod,
+    couponManuallyChosen,
+  ]);
 
   const isStoreClosed = !store.isOpen;
   const stockIssueMessage = useMemo(() => {
@@ -323,12 +367,15 @@ export function OrderConfirmationView({
     return null;
   }, [lineItems, menuById]);
 
-  const deliveryFee = sharedDeliveryApplied
-    ? Math.round(store.deliveryFee / 2)
-    : store.deliveryFee;
+  const deliveryFeeCalc = useMemo(
+    () => calculateStoreDeliveryFee(store, menuSubtotal, deliveryMethod),
+    [store, menuSubtotal, deliveryMethod]
+  );
+  const deliveryFee = deliveryFeeCalc.finalDeliveryFee;
+  const deliveryMeta = getDeliveryMethodMeta(deliveryMethod);
 
   const selectedCoupon =
-    MOCK_COUPONS.find((c) => c.code === couponCode) ?? MOCK_COUPONS[0];
+    availableCoupons.find((c) => c.code === couponCode) ?? availableCoupons[0];
 
   const isSelectedCouponEligible =
     selectedCoupon.code === 'NONE' ||
@@ -354,7 +401,7 @@ export function OrderConfirmationView({
     menuSubtotal,
     originalMenuSubtotal,
     deliveryFee,
-    originalDeliveryFee: store.deliveryFee,
+    originalDeliveryFee: deliveryFeeCalc.baseFee,
     couponDiscount: effectiveCouponDiscount,
     isSameStorePrice: allSameStorePrice,
   });
@@ -416,7 +463,7 @@ export function OrderConfirmationView({
 
   const handleAutoBestCoupon = () => {
     setCouponManuallyChosen(false);
-    const best = getBestCoupon(MOCK_COUPONS, {
+    const best = getBestCoupon(availableCoupons, {
       menuSubtotal,
       stampCount,
       paymentMethod,
@@ -442,7 +489,8 @@ export function OrderConfirmationView({
       items: resolvedOrderLines,
       couponCode: isSelectedCouponEligible ? selectedCoupon.code : 'NONE',
       couponDiscount: effectiveCouponDiscount,
-      sharedDeliveryApplied,
+      deliveryMethod,
+      sharedDeliveryApplied: deliveryMethod === 'auto_bundle',
       reservationSlot:
         reservationSlotId === 'now' ? null : chosenReservationObj.label,
       customerAlias: customerAlias.trim() || '고객 A',
@@ -464,14 +512,20 @@ export function OrderConfirmationView({
   const availableExtraMenus = allStoreMenus.filter(
     (m) => !m.isSoldOut && m.stock >= 1
   );
+  const estimatedArrivalMinutes = Math.max(
+    10,
+    leadMenu.estimatedMinutes +
+      (store.extraPrepMinutes ?? 0) +
+      deliveryFeeCalc.etaDeltaMinutes
+  );
 
   const autoAppliedSummary = [
     `${totalServings}개 메뉴`,
     chosenReservationObj.label,
-    sharedDeliveryApplied ? '이웃 묶음배달 50% 절약' : '빠른 직배달',
+    deliveryMeta.label,
     effectiveCouponDiscount > 0
       ? `${selectedCoupon.label} 자동 적용`
-      : '기본 혜택 적용',
+      : '착한가격 적용',
   ].join(' · ');
 
   return (
@@ -526,11 +580,16 @@ export function OrderConfirmationView({
               주문 메뉴 ({lineItems.length}종 · {totalServings}개)
             </h2>
           </div>
-          {allSameStorePrice && (
-            <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold shrink-0">
-              매장 동일가 ✓
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+            {allSameStorePrice && (
+              <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold">
+                💚 착한가격 · 매장 동일가
+              </span>
+            )}
+            <span className="px-2.5 py-1 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-xs font-bold">
+              1개도 배달
             </span>
-          )}
+          </div>
         </div>
 
         {/* Line items list */}
@@ -659,12 +718,38 @@ export function OrderConfirmationView({
           </div>
         )}
 
+        {activeStorePromos.length > 0 && (
+          <div className="px-3.5 py-2.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+            <span className="font-extrabold mr-1.5">
+              🎉 [{activeStorePromos[0].badgeText ?? '가게 이벤트'}]
+            </span>
+            <span className="font-bold">{activeStorePromos[0].title}</span>
+          </div>
+        )}
+
+        {deliveryFeeCalc.nextTierLabel && (
+          <div className="px-3.5 py-2 rounded-2xl bg-[#EAF1E2] border border-[#D4E1C5] flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-[#3D5720]">
+              💡 {deliveryFeeCalc.nextTierLabel}
+            </span>
+            {availableExtraMenus.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setShowAddMoreMenus(true)}
+                className="easy-compact font-extrabold text-[#4E6E2A] underline cursor-pointer"
+              >
+                메뉴 더 담기 →
+              </button>
+            )}
+          </div>
+        )}
+
         {leadMenu.aiReason && (
           <div className="px-4 py-3 bg-[#EAF1E2] border border-[#D4E1C5] rounded-2xl flex items-start gap-2.5">
             <Sparkles className="w-4 h-4 text-[#4E6E2A] shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed text-[#3D5720]">
               <strong className="font-semibold text-[#4E6E2A] mr-1.5">
-                올이 추천 근거
+                올레 추천 근거
               </strong>
               {leadMenu.aiReason}
             </p>
@@ -693,8 +778,64 @@ export function OrderConfirmationView({
           </div>
 
           <span className="text-xs font-semibold text-[#4E6E2A] tabular-nums">
-            약 {leadMenu.estimatedMinutes + (store.extraPrepMinutes ?? 0)}분 도착
+            약 {estimatedArrivalMinutes}분 도착 ({deliveryMeta.shortLabel})
           </span>
+        </div>
+
+        {/* Efficient Delivery Method Selector (Always Visible) */}
+        <div className="pt-4 border-t border-[#E8ECE4] space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
+              <Truck className="w-4 h-4 text-[#4E6E2A]" />
+              <span>배송 방식 선택</span>
+            </span>
+            <span className="text-xs text-[#687064]">
+              최소주문 없이 1개부터 효율 배송
+            </span>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label="배송 방식 선택"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+          >
+            {DELIVERY_METHOD_OPTIONS.map((option) => {
+              const active = deliveryMethod === option.id;
+              const optFee = calculateStoreDeliveryFee(
+                store,
+                menuSubtotal,
+                option.id
+              ).finalDeliveryFee;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setDeliveryMethod(option.id)}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer space-y-1 ${
+                    active
+                      ? 'bg-[#EAF1E2] border-2 border-[#4E6E2A] shadow-2xs'
+                      : 'bg-[#F7F8F5] border-[#E8ECE4] hover:border-[#82B440]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs sm:text-sm font-extrabold text-[#1A1D1A]">
+                      {option.label}
+                    </span>
+                    <span className="font-mono text-xs font-extrabold text-[#4E6E2A] tabular-nums shrink-0">
+                      {optFee === 0 ? '무료' : formatWon(optFee)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-bold text-[#3D5720]">
+                    {option.badge}
+                  </p>
+                  <p className="text-[11px] text-[#687064] leading-snug">
+                    {option.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Collapsible Fine-Tuning Drawer */}
@@ -785,31 +926,6 @@ export function OrderConfirmationView({
                 </div>
               )}
 
-              {/* Neighbor Shared Delivery */}
-              <label
-                className={`min-h-[46px] p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-colors ${
-                  sharedDeliveryApplied
-                    ? 'bg-[#EAF1E2] border-[#4E6E2A]'
-                    : 'bg-[#F7F8F5] border-[#E8ECE4]'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={sharedDeliveryApplied}
-                    onChange={(e) => setSharedDeliveryApplied(e.target.checked)}
-                    className="w-4 h-4 accent-[#4E6E2A] shrink-0"
-                  />
-                  <span className="text-xs font-semibold text-[#1A1D1A] flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                    <span>이웃 묶음배달 (배달비 50% 절약)</span>
-                  </span>
-                </div>
-                <span className="text-xs font-mono tabular-nums font-bold text-[#4E6E2A] shrink-0">
-                  {formatWon(Math.round(store.deliveryFee / 2))}
-                </span>
-              </label>
-
               {/* Coupon */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -836,18 +952,21 @@ export function OrderConfirmationView({
                   }}
                   className="w-full min-h-[42px] px-3.5 bg-white border border-[#E8ECE4] rounded-xl text-xs text-[#1A1D1A]"
                 >
-                  {MOCK_COUPONS.map((c) => (
+                  {availableCoupons.map((c) => (
                     <option key={c.id} value={c.code}>
                       {c.label}
                       {c.requiresStamps
                         ? ` (스탬프 ${c.requiresStamps}개 이상)`
+                        : ''}
+                      {c.minSubtotal
+                        ? ` (${formatWon(c.minSubtotal)} 이상)`
                         : ''}
                     </option>
                   ))}
                 </select>
                 {!isSelectedCouponEligible && selectedCoupon.code !== 'NONE' && (
                   <p className="text-xs text-amber-800 font-medium">
-                    현재 결제 수단 또는 스탬프 조건이 맞지 않아 적용되지 않습니다.
+                    현재 결제 수단·주문 금액 또는 스탬프 조건이 맞지 않아 적용되지 않습니다.
                   </p>
                 )}
               </div>
@@ -1060,8 +1179,16 @@ export function OrderConfirmationView({
             </div>
           )}
           <div className="flex justify-between text-[#555E52]">
-            <dt>배달비 {sharedDeliveryApplied ? '(이웃 묶음 50%)' : ''}</dt>
-            <dd className="font-mono tabular-nums">+{formatWon(deliveryFee)}</dd>
+            <dt>
+              배달비 ({deliveryMeta.label}
+              {deliveryFeeCalc.tierSavings > 0
+                ? ` · 점주 상생 -${formatWon(deliveryFeeCalc.tierSavings)}`
+                : ''}
+              )
+            </dt>
+            <dd className="font-mono tabular-nums">
+              {deliveryFee === 0 ? '무료 (0원)' : `+${formatWon(deliveryFee)}`}
+            </dd>
           </div>
           {effectiveCouponDiscount > 0 && (
             <div className="flex justify-between text-[#4E6E2A]">

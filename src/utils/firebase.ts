@@ -8,6 +8,8 @@ import {
 } from 'firebase/firestore';
 import {
   INITIAL_MENUS,
+  INITIAL_STORE_COUPONS,
+  INITIAL_STORE_PROMOTIONS,
   INITIAL_STORES,
   resolveBundledImage,
 } from '../data/seedData';
@@ -19,6 +21,8 @@ import {
   PriceReport,
   ReviewReply,
   Store,
+  StoreCoupon,
+  StorePromotion,
 } from '../types/alle';
 
 const firebaseConfig = {
@@ -49,6 +53,8 @@ export interface SharedOperationalState {
   errands: ErrandRequest[];
   reviewReplies: Record<string, ReviewReply>;
   priceReports: PriceReport[];
+  storePromotions: StorePromotion[];
+  storeCoupons: StoreCoupon[];
   updatedAt?: number;
 }
 
@@ -68,6 +74,8 @@ export function extractSharedState(
     errands: state.errands,
     reviewReplies: state.reviewReplies,
     priceReports: state.priceReports,
+    storePromotions: state.storePromotions,
+    storeCoupons: state.storeCoupons,
   };
 }
 
@@ -82,12 +90,15 @@ function normalizeRemoteSharedState(
     return null;
   }
 
-  const mergedStores: Store[] = raw.stores.map((s) => {
-    const seedStore = seedStoreById.get(s.id);
+  const mergedStores: Store[] = raw.stores.map((rawS) => {
+    const legacyStore = rawS as Store & { minOrderAmount?: number };
+    const { minOrderAmount: _removedMinOrder, ...s } = legacyStore;
+    const seedStore = seedStoreById.get(rawS.id);
     return {
       ...seedStore,
       ...s,
       region: s.region ?? seedStore?.region,
+      deliveryFeeTiers: s.deliveryFeeTiers ?? seedStore?.deliveryFeeTiers,
       image: resolveBundledImage(s.image) || seedStore?.image || s.image,
     };
   });
@@ -121,6 +132,12 @@ function normalizeRemoteSharedState(
     errands: Array.isArray(raw.errands) ? raw.errands : [],
     reviewReplies: raw.reviewReplies ?? {},
     priceReports: Array.isArray(raw.priceReports) ? raw.priceReports : [],
+    storePromotions: Array.isArray(raw.storePromotions)
+      ? raw.storePromotions
+      : structuredClone(INITIAL_STORE_PROMOTIONS),
+    storeCoupons: Array.isArray(raw.storeCoupons)
+      ? raw.storeCoupons
+      : structuredClone(INITIAL_STORE_COUPONS),
     updatedAt: raw.updatedAt,
   };
 }

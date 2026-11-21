@@ -95,9 +95,12 @@ export function MenuDetailReviewModal({
                 )}
                 {menu.storePrice === menu.pricePerPerson && (
                   <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
-                    매장 동일가 ✓
+                    💚 착한가격 · 매장 동일가
                   </span>
                 )}
+                <span className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-[11px] font-bold">
+                  최소주문 없음 · 1개도 배달
+                </span>
                 <span className="inline-flex items-center gap-1 text-[#687064]">
                   <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />약{' '}
                   {effectiveMinutes}분

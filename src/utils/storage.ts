@@ -5,10 +5,18 @@ import {
   INITIAL_ORDERS,
   INITIAL_PREFERENCES,
   INITIAL_SAVED_LOCATIONS,
+  INITIAL_STORE_COUPONS,
+  INITIAL_STORE_PROMOTIONS,
   INITIAL_STORES,
   resolveBundledImage,
 } from '../data/seedData';
-import { AllePersistedState, MenuItem, Store } from '../types/alle';
+import {
+  AllePersistedState,
+  MenuItem,
+  Store,
+  StoreCoupon,
+  StorePromotion,
+} from '../types/alle';
 
 const STORAGE_KEY = 'alle_mvp_nationwide_v8';
 
@@ -34,6 +42,8 @@ export function getDefaultState(): AllePersistedState {
     priceReports: [],
     savedLocations: structuredClone(INITIAL_SAVED_LOCATIONS),
     selectedLocationId: INITIAL_SAVED_LOCATIONS[0].id,
+    storePromotions: structuredClone(INITIAL_STORE_PROMOTIONS),
+    storeCoupons: structuredClone(INITIAL_STORE_COUPONS),
     easyMode: true,
   };
 }
@@ -89,20 +99,23 @@ export function loadDemoState(): {
     const storeSeedById = new Map(INITIAL_STORES.map((s) => [s.id, s]));
     const menuSeedById = new Map(INITIAL_MENUS.map((m) => [m.id, m]));
 
-    const migratedStores: Store[] = parsed.stores.map((store) => {
-      const seedStore = storeSeedById.get(store.id);
+    const migratedStores: Store[] = parsed.stores.map((rawStore) => {
+      const legacyStore = rawStore as Store & { minOrderAmount?: number };
+      const { minOrderAmount: _removedMinOrder, ...storeRest } = legacyStore;
+      const seedStore = storeSeedById.get(rawStore.id);
       return {
         ...seedStore,
-        ...store,
-        categoryGroup: store.categoryGroup ?? seedStore?.categoryGroup,
-        region: store.region ?? seedStore?.region,
-        minOrderAmount: store.minOrderAmount ?? seedStore?.minOrderAmount,
-        rating: store.rating ?? seedStore?.rating,
-        reviewCount: store.reviewCount ?? seedStore?.reviewCount,
+        ...storeRest,
+        categoryGroup: storeRest.categoryGroup ?? seedStore?.categoryGroup,
+        region: storeRest.region ?? seedStore?.region,
+        deliveryFeeTiers:
+          storeRest.deliveryFeeTiers ?? seedStore?.deliveryFeeTiers,
+        rating: storeRest.rating ?? seedStore?.rating,
+        reviewCount: storeRest.reviewCount ?? seedStore?.reviewCount,
         image:
-          resolveBundledImage(store.image) ||
+          resolveBundledImage(storeRest.image) ||
           seedStore?.image ||
-          store.image,
+          storeRest.image,
       };
     });
 
@@ -162,7 +175,13 @@ export function loadDemoState(): {
           ).some((loc) => loc.id === parsed.selectedLocationId)
             ? parsed.selectedLocationId
             : INITIAL_SAVED_LOCATIONS[0].id,
-        easyMode: typeof parsed.easyMode === 'boolean' ? parsed.easyMode : true,
+        storePromotions: Array.isArray(parsed.storePromotions)
+          ? (parsed.storePromotions as StorePromotion[])
+          : structuredClone(INITIAL_STORE_PROMOTIONS),
+        storeCoupons: Array.isArray(parsed.storeCoupons)
+          ? (parsed.storeCoupons as StoreCoupon[])
+          : structuredClone(INITIAL_STORE_COUPONS),
+        easyMode: true,
       },
       storageMode: 'localStorage',
     };

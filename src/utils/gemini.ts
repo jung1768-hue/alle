@@ -519,10 +519,10 @@ export async function understandChatTurnWithAI(
   try {
     const historyText = ctx.recentMessages
       .slice(-6)
-      .map((m) => `${m.sender === 'user' ? '사용자' : '올이'}: ${m.text}`)
+      .map((m) => `${m.sender === 'user' ? '사용자' : '올레'}: ${m.text}`)
       .join('\n');
 
-    const prompt = `당신은 AI 생활주문 플랫폼 'alle(올이)'의 한국어 대화형 주문 어시스턴트입니다.
+    const prompt = `당신은 AI 생활주문 플랫폼 'alle(올레)'의 한국어 대화형 주문 어시스턴트입니다.
 사용자의 마지막 발화와 직전 대화 맥락, 현재 보고 있는 메뉴/결제 상태를 정확히 이해해 다음에 수행할 액션과 자연스러운 응답을 JSON으로만 반환하세요.
 
 [현재 상태]

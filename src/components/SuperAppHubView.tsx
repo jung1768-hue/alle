@@ -162,13 +162,23 @@ export function SuperAppHubView({
   const [b2bNote, setB2bNote] = useState<string>('오피스 A 로비 앞 수령');
   const [b2bError, setB2bError] = useState<string | null>(null);
 
-  // Traditional Market / Alley Multi-Store Bundle state (prioritize 전통시장 / 0원 최소주문 점포)
+  // Traditional Market / Alley Multi-Store Bundle state (prioritize 전통시장 점포)
   const marketBundleCatalog = useMemo(() => {
     const sorted = [...availableMenus].sort((a, b) => {
       const sa = storeMap.get(a.storeId);
       const sb = storeMap.get(b.storeId);
-      const aMarket = sa?.name.includes('시장') || sa?.minOrderAmount === 0 ? 1 : 0;
-      const bMarket = sb?.name.includes('시장') || sb?.minOrderAmount === 0 ? 1 : 0;
+      const aMarket =
+        sa?.name.includes('시장') ||
+        sa?.categoryGroup?.includes('전통시장') ||
+        sa?.category.includes('시장')
+          ? 1
+          : 0;
+      const bMarket =
+        sb?.name.includes('시장') ||
+        sb?.categoryGroup?.includes('전통시장') ||
+        sb?.category.includes('시장')
+          ? 1
+          : 0;
       return bMarket - aMarket;
     });
     const seenStores = new Set<string>();
@@ -452,11 +462,11 @@ export function SuperAppHubView({
                   전국 전통시장 · 골목 가게 한 바구니 묶음
                 </h3>
                 <p className="text-xs text-[#687064] mt-0.5">
-                  광장시장·부평깡통시장·서문시장 등 동네 점포 메뉴를 최소주문금액 없이 한 번에 담고 배달비 1회(1,500원)로 받아보세요.
+                  광장시장·부평깡통시장·서문시장 등 동네 점포 메뉴를 최소주문 제한 없이 1개씩 담고 배달비 1회(1,500원)로 받아보세요.
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
-                최소주문 0원
+                1개도 배달
               </span>
             </div>
 

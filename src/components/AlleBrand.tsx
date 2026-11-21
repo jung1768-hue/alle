@@ -15,6 +15,9 @@ export function AlleLogo({ className = '' }: AlleLogoProps) {
       <span className="font-display text-[24px] font-extrabold tracking-[-0.045em] text-[#1A1D1A] leading-none">
         alle
       </span>
+      <span className="text-xs font-extrabold text-[#4E6E2A] tracking-tight leading-none mt-1">
+        올레
+      </span>
     </span>
   );
 }

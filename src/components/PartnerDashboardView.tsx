@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  DeliveryMethod,
   DispatchMode,
   ErrandRequest,
   ErrandStatus,
@@ -20,6 +21,7 @@ import {
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
+import { getDeliveryMethodMeta } from '../utils/pricing';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
 interface PartnerDashboardViewProps {
@@ -49,7 +51,11 @@ export function PartnerDashboardView({
   onSwitchToConsumer,
   onSwitchToOwner,
 }: PartnerDashboardViewProps) {
-  const [trackFilter, setTrackFilter] = useState<'all' | DispatchMode>('all');
+  const [trackFilter, setTrackFilter] = useState<'all' | DeliveryMethod>('all');
+
+  const getEffectiveOrderMethod = (order: Order): DeliveryMethod =>
+    order.deliveryMethod ??
+    (order.sharedDeliveryApplied ? 'auto_bundle' : 'partner_direct');
 
   const deliveryQueue = useMemo(
     () =>
@@ -62,10 +68,19 @@ export function PartnerDashboardView({
           return false;
         }
         if (trackFilter === 'all') return true;
-        if (!o.dispatchMode) return true;
-        return o.dispatchMode === trackFilter;
+        return getEffectiveOrderMethod(o) === trackFilter;
       }),
     [orders, trackFilter]
+  );
+
+  const cookingBundleOrders = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          o.status === OrderStatus.COOKING &&
+          getEffectiveOrderMethod(o) === 'auto_bundle'
+      ),
+    [orders]
   );
 
   const completedDeliveries = useMemo(
@@ -156,12 +171,13 @@ export function PartnerDashboardView({
         <h2 className="text-lg font-bold text-[#1A1D1A]">
           배송 콜 목록
         </h2>
-        <div className="inline-flex items-center p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
+        <div className="inline-flex flex-wrap items-center p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl gap-1">
           {(
             [
               { id: 'all', label: '전체' },
-              { id: DispatchMode.NEIGHBOR_WALK, label: 'Track 1 이웃 도보' },
-              { id: DispatchMode.AGENCY_RIDER, label: 'Track 2 전문 라이더' },
+              { id: 'auto_bundle', label: '📦 자동 묶음 콜' },
+              { id: 'single_express', label: '⚡ 한집 빠른배송' },
+              { id: 'partner_direct', label: '🚶 동네 파트너(도보)' },
             ] as const
           ).map((t) => (
             <button
@@ -179,6 +195,35 @@ export function PartnerDashboardView({
           ))}
         </div>
       </div>
+
+      {/* Auto-Bundle Dispatch Highlight Banner */}
+      {cookingBundleOrders.length >= 2 && (
+        <div className="p-4 rounded-2xl bg-[#EAF1E2] border-2 border-[#82B440] flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5 text-xs">
+            <p className="font-extrabold text-[#3D5720] text-sm">
+              📦 자동 묶음배차 그룹 대기 ({cookingBundleOrders.length}건 동선 매칭)
+            </p>
+            <p className="text-[#4C6235]">
+              {cookingBundleOrders.map((o) => `${o.orderCode}(${o.storeName})`).join(' + ')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              for (const ord of cookingBundleOrders) {
+                onAdvanceOrderStatus(
+                  ord.id,
+                  OrderStatus.PICKUP,
+                  DispatchMode.AGENCY_RIDER
+                );
+              }
+            }}
+            className="min-h-[42px] px-4 py-2 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-extrabold cursor-pointer shrink-0"
+          >
+            묶음 일괄 픽업 수락 ({cookingBundleOrders.length}건)
+          </button>
+        </div>
+      )}
 
       {/* Delivery Orders */}
       {deliveryQueue.length === 0 ? (
@@ -200,6 +245,11 @@ export function PartnerDashboardView({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                      <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                        {getDeliveryMethodMeta(getEffectiveOrderMethod(order)).label}
+                      </span>
+                    </div>
                     <div className="text-xs font-medium text-[#687064]">
                       <span className="font-mono font-bold text-[#1A1D1A]">
                         {order.orderCode}

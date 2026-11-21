@@ -10,6 +10,7 @@ import {
   Flag,
   Loader2,
   Lock,
+  Megaphone,
   MessageSquare,
   Mic,
   MicOff,
@@ -20,7 +21,10 @@ import {
   ShieldCheck,
   Sparkles,
   Store as StoreIcon,
+  Ticket,
+  Trash2,
   TrendingUp,
+  Truck,
   X,
 } from 'lucide-react';
 import {
@@ -28,6 +32,7 @@ import {
   PAPER_MENU_OCR_SAMPLE,
 } from '../data/seedData';
 import {
+  DeliveryFeeTier,
   DispatchMode,
   EvidencePhoto,
   MenuItem,
@@ -38,9 +43,12 @@ import {
   Review,
   ReviewReply,
   Store,
+  StoreCoupon,
+  StorePromotion,
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
+import { getDeliveryMethodMeta } from '../utils/pricing';
 import {
   ExtractedMenuCandidate,
   extractMenusFromImageWithAI,
@@ -68,6 +76,7 @@ interface OwnerDashboardViewProps {
   onSetStoreExtraPrep: (storeId: string, minutes: number) => void;
   onToggleMenuSoldOut: (menuId: string) => void;
   onToggleMenuClosingSale: (menuId: string, discountPercent?: number) => void;
+  onSetMenuDiscountPercent?: (menuId: string, percent: number) => void;
   onAdjustMenuStock: (menuId: string, delta: number) => void;
   onAddMenuFromLine: (
     storeId: string,
@@ -77,6 +86,21 @@ interface OwnerDashboardViewProps {
     message: string;
   };
   onBulkAddMenusFromSample: (storeId: string, lines: string[]) => number;
+  storePromotions?: StorePromotion[];
+  storeCoupons?: StoreCoupon[];
+  onUpdateStoreDeliveryPolicy?: (
+    storeId: string,
+    deliveryFee: number,
+    deliveryFeeTiers: DeliveryFeeTier[]
+  ) => void;
+  onAddStorePromotion?: (
+    promo: Omit<StorePromotion, 'id' | 'createdAt'>
+  ) => void;
+  onToggleStorePromotion?: (promoId: string) => void;
+  onDeleteStorePromotion?: (promoId: string) => void;
+  onAddStoreCoupon?: (coupon: Omit<StoreCoupon, 'id' | 'createdAt'>) => void;
+  onToggleStoreCoupon?: (couponId: string) => void;
+  onDeleteStoreCoupon?: (couponId: string) => void;
   onSaveReviewReply: (reviewId: string, replyText: string) => void;
   onToggleReviewFlag: (reviewId: string, reason: string) => void;
   onAttachOwnerPhotos?: (orderId: string, photos: EvidencePhoto[]) => void;
@@ -110,9 +134,19 @@ export function OwnerDashboardView({
   onSetStoreExtraPrep,
   onToggleMenuSoldOut,
   onToggleMenuClosingSale,
+  onSetMenuDiscountPercent,
   onAdjustMenuStock,
   onAddMenuFromLine,
   onBulkAddMenusFromSample,
+  storePromotions = [],
+  storeCoupons = [],
+  onUpdateStoreDeliveryPolicy,
+  onAddStorePromotion,
+  onToggleStorePromotion,
+  onDeleteStorePromotion,
+  onAddStoreCoupon,
+  onToggleStoreCoupon,
+  onDeleteStoreCoupon,
   onSaveReviewReply,
   onToggleReviewFlag,
   onAttachOwnerPhotos,
@@ -122,8 +156,50 @@ export function OwnerDashboardView({
   onOpenAiSettings,
 }: OwnerDashboardViewProps) {
   const [ownerSection, setOwnerSection] = useState<
-    'orders' | 'dashboard' | 'ops' | 'crm'
+    'orders' | 'promo' | 'ops' | 'dashboard' | 'crm'
   >('orders');
+
+  const defaultPromoStore =
+    stores.find((s) => s.id === 'dg-s171') ??
+    stores.find((s) => s.id === 's30') ??
+    stores[0];
+  const [promoStoreId, setPromoStoreId] = useState<string>(
+    defaultPromoStore?.id ?? 's1'
+  );
+  const selectedPromoStore = useMemo(
+    () => stores.find((s) => s.id === promoStoreId) ?? stores[0],
+    [stores, promoStoreId]
+  );
+
+  const [draftBaseFee, setDraftBaseFee] = useState<number>(
+    selectedPromoStore?.deliveryFee ?? 2000
+  );
+  const [draftTiers, setDraftTiers] = useState<DeliveryFeeTier[]>(
+    selectedPromoStore?.deliveryFeeTiers ?? []
+  );
+  const [deliverySavedNotice, setDeliverySavedNotice] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!selectedPromoStore) return;
+    setDraftBaseFee(selectedPromoStore.deliveryFee ?? 2000);
+    setDraftTiers(
+      selectedPromoStore.deliveryFeeTiers
+        ? selectedPromoStore.deliveryFeeTiers.map((t) => ({ ...t }))
+        : []
+    );
+  }, [selectedPromoStore?.id]);
+
+  const [promoBadge, setPromoBadge] = useState<string>('점주 이벤트');
+  const [promoTitle, setPromoTitle] = useState<string>('');
+  const [promoDesc, setPromoDesc] = useState<string>('');
+  const [showAllStorePromos, setShowAllStorePromos] = useState<boolean>(false);
+
+  const [couponLabel, setCouponLabel] = useState<string>('');
+  const [couponType, setCouponType] = useState<'fixed' | 'percent'>('fixed');
+  const [couponValue, setCouponValue] = useState<string>('2000');
+  const [couponMinSubtotal, setCouponMinSubtotal] = useState<string>('');
   const [csLightboxPhoto, setCsLightboxPhoto] = useState<EvidencePhoto | null>(
     null
   );
@@ -836,14 +912,14 @@ export function OwnerDashboardView({
       <div
         role="tablist"
         aria-label="점주 관리 탭"
-        className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1.5 bg-white border border-[#E8ECE4] rounded-2xl shadow-sm"
+        className="grid grid-cols-2 sm:grid-cols-5 gap-1 p-1.5 bg-white border border-[#E8ECE4] rounded-2xl shadow-sm"
       >
         <button
           type="button"
           role="tab"
           aria-selected={ownerSection === 'orders'}
           onClick={() => setOwnerSection('orders')}
-          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
+          className={`min-h-[42px] px-2.5 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
             ownerSection === 'orders'
               ? 'bg-[#EAF1E2] text-[#3D5720]'
               : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
@@ -854,9 +930,36 @@ export function OwnerDashboardView({
         <button
           type="button"
           role="tab"
+          aria-selected={ownerSection === 'promo'}
+          onClick={() => setOwnerSection('promo')}
+          className={`min-h-[42px] px-2.5 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
+            ownerSection === 'promo'
+              ? 'bg-[#EAF1E2] text-[#3D5720]'
+              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
+          }`}
+        >
+          <Megaphone className="w-4 h-4 shrink-0" />
+          <span>홍보·쿠폰·배달비</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={ownerSection === 'ops'}
+          onClick={() => setOwnerSection('ops')}
+          className={`min-h-[42px] px-2.5 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
+            ownerSection === 'ops'
+              ? 'bg-[#EAF1E2] text-[#3D5720]'
+              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
+          }`}
+        >
+          매장 · 메뉴
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={ownerSection === 'dashboard'}
           onClick={() => setOwnerSection('dashboard')}
-          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+          className={`min-h-[42px] px-2.5 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
             ownerSection === 'dashboard'
               ? 'bg-[#EAF1E2] text-[#3D5720]'
               : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
@@ -868,22 +971,9 @@ export function OwnerDashboardView({
         <button
           type="button"
           role="tab"
-          aria-selected={ownerSection === 'ops'}
-          onClick={() => setOwnerSection('ops')}
-          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer ${
-            ownerSection === 'ops'
-              ? 'bg-[#EAF1E2] text-[#3D5720]'
-              : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
-          }`}
-        >
-          매장 · 메뉴
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={ownerSection === 'crm'}
           onClick={() => setOwnerSection('crm')}
-          className={`min-h-[42px] px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
+          className={`min-h-[42px] px-2.5 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap cursor-pointer inline-flex items-center justify-center gap-1.5 ${
             ownerSection === 'crm'
               ? 'bg-[#EAF1E2] text-[#3D5720]'
               : 'text-[#687064] hover:text-[#1A1D1A] hover:bg-[#F7F8F5]'
@@ -1056,8 +1146,14 @@ export function OwnerDashboardView({
                   const isBeforeCooking =
                     order.status === OrderStatus.PENDING ||
                     order.status === OrderStatus.ACCEPTED;
+                  const effectiveMethod =
+                    order.deliveryMethod ??
+                    (order.sharedDeliveryApplied
+                      ? 'auto_bundle'
+                      : 'partner_direct');
+                  const methodMeta = getDeliveryMethodMeta(effectiveMethod);
                   const chosenDispatch =
-                    dispatchChoiceByOrder[order.id] ?? DispatchMode.NEIGHBOR_WALK;
+                    dispatchChoiceByOrder[order.id] ?? methodMeta.dispatchMode;
 
                   return (
                     <article
@@ -1069,6 +1165,9 @@ export function OwnerDashboardView({
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#687064]">
                             <span className="font-mono font-semibold text-[#1A1D1A]">
                               {order.orderCode}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                              {methodMeta.label}
                             </span>
                             <span aria-hidden="true">·</span>
                             <span>
@@ -1376,7 +1475,503 @@ export function OwnerDashboardView({
         </div>
       )}
 
-      {/* 2. Analytics & Statistics Tab */}
+      {/* 2. Self-Service Store Promotions, Coupons & Tiered Delivery Fee (FREE for All Owners) */}
+      {ownerSection === 'promo' && selectedPromoStore && (
+        <div className="space-y-6">
+          {/* Store Selector */}
+          <section className="os-card rounded-3xl p-5 sm:p-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="text-xs font-bold text-[#4E6E2A]">
+                💚 수수료 0% 상생 지원 · 전체 무료 제공
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
+                가게 홍보 이벤트 · 쿠폰 · 상생 배달비 설정
+              </h2>
+            </div>
+            <select
+              aria-label="설정할 매장 선택"
+              value={selectedPromoStore.id}
+              onChange={(e) => setPromoStoreId(e.target.value)}
+              className="min-h-[42px] px-3.5 bg-[#F7F8F5] border border-[#D4E1C5] rounded-xl text-sm font-bold text-[#1A1D1A] max-w-full sm:max-w-xs"
+            >
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.areaLabel.split(' · ')[0]})
+                </option>
+              ))}
+            </select>
+          </section>
+
+          {/* Card 1: Mutual-Benefit Tiered Delivery Fee */}
+          <section className="os-card rounded-3xl p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-[#4E6E2A]" />
+                  <span>상생 배달비 설정 (최소주문 없음 · 1개도 배달)</span>
+                </h3>
+                <p className="text-xs text-[#687064]">
+                  최소주문 없이 1개 주문도 배달합니다. 기본 배달비는 고객이 부담하고, 주문 금액이 커질수록 점주님이 일부 지원해 상생할 수 있어요.
+                </p>
+              </div>
+            </div>
+
+            {/* Base Delivery Fee */}
+            <div className="p-4 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#1A1D1A]">
+                  기본 배달비 (1개 주문 시 구매자 부담)
+                </div>
+                <div className="text-[11px] text-[#687064]">
+                  착한가격(매장 동일가) 원칙으로 숨겨진 수수료 없이 배달비만 투명하게 안내됩니다.
+                </div>
+              </div>
+              <div className="inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraftBaseFee((f) => Math.max(0, f - 500))}
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E8ECE4] font-bold cursor-pointer"
+                >
+                  -
+                </button>
+                <span className="min-w-[76px] text-center font-mono font-extrabold text-sm text-[#4E6E2A] tabular-nums">
+                  {formatWon(draftBaseFee)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDraftBaseFee((f) => Math.min(6000, f + 500))}
+                  className="w-9 h-9 rounded-xl bg-white border border-[#E8ECE4] font-bold cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* 1-Click Presets */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-bold text-[#687064]">빠른 프리셋:</span>
+              <button
+                type="button"
+                onClick={() => setDraftTiers([])}
+                className="px-3 py-1.5 rounded-xl bg-white border border-[#E8ECE4] hover:border-[#82B440] font-semibold cursor-pointer"
+              >
+                기본형 (구간 없음)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraftTiers([
+                    {
+                      minSubtotal: 15000,
+                      deliveryFee: Math.max(0, draftBaseFee - 1000),
+                    },
+                    { minSubtotal: 25000, deliveryFee: 0 },
+                  ])
+                }
+                className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] font-bold cursor-pointer"
+              >
+                상생 추천 (1.5만↑ -1천 · 2.5만↑ 무료)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraftTiers([
+                    {
+                      minSubtotal: 10000,
+                      deliveryFee: Math.max(0, draftBaseFee - 500),
+                    },
+                    { minSubtotal: 20000, deliveryFee: 0 },
+                  ])
+                }
+                className="px-3 py-1.5 rounded-xl bg-white border border-[#E8ECE4] hover:border-[#82B440] font-semibold cursor-pointer"
+              >
+                소액 상생 (1만↑ -500 · 2만↑ 무료)
+              </button>
+            </div>
+
+            {/* Editable Tiers */}
+            <div className="space-y-2">
+              {draftTiers.map((tier, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-[#FAFCF8] border border-[#E8ECE4] text-xs"
+                >
+                  <input
+                    type="number"
+                    min={1000}
+                    step={1000}
+                    value={tier.minSubtotal}
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                      setDraftTiers((prev) =>
+                        prev.map((t, i) =>
+                          i === idx ? { ...t, minSubtotal: val } : t
+                        )
+                      );
+                    }}
+                    className="w-28 min-h-[36px] px-2.5 bg-white border border-[#E8ECE4] rounded-lg font-mono font-bold"
+                  />
+                  <span className="font-semibold text-[#555E52]">
+                    원 이상 주문 시 → 배달비
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={tier.deliveryFee}
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                      setDraftTiers((prev) =>
+                        prev.map((t, i) =>
+                          i === idx ? { ...t, deliveryFee: val } : t
+                        )
+                      );
+                    }}
+                    className="w-24 min-h-[36px] px-2.5 bg-white border border-[#E8ECE4] rounded-lg font-mono font-bold"
+                  />
+                  <span className="font-semibold text-[#4E6E2A]">
+                    원 {tier.deliveryFee === 0 && '(점주 지원 무료)'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraftTiers((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    className="ml-auto px-2.5 py-1 rounded-lg bg-red-50 text-red-700 font-bold cursor-pointer"
+                  >
+                    삭제
+                  </button>
+                </div>
+              ))}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraftTiers((prev) => [
+                      ...prev,
+                      {
+                        minSubtotal:
+                          prev.length > 0
+                            ? prev[prev.length - 1].minSubtotal + 10000
+                            : 15000,
+                        deliveryFee: 0,
+                      },
+                    ])
+                  }
+                  className="px-3 py-1.5 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-xs font-bold text-[#3D5720] cursor-pointer"
+                >
+                  + 지원 구간 추가
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateStoreDeliveryPolicy?.(
+                      selectedPromoStore.id,
+                      draftBaseFee,
+                      draftTiers
+                    );
+                    setDeliverySavedNotice('상생 배달비 정책이 저장되었습니다.');
+                    window.setTimeout(() => setDeliverySavedNotice(null), 2500);
+                  }}
+                  className="min-h-[40px] px-5 py-2 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold cursor-pointer"
+                >
+                  배달비 정책 저장
+                </button>
+              </div>
+              {deliverySavedNotice && (
+                <p className="text-xs font-bold text-[#4E6E2A]">
+                  ✓ {deliverySavedNotice}
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Card 2: Store Event / Promotion Banner */}
+          <section className="os-card rounded-3xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-[#4E6E2A]" />
+                  <span>우리 가게 자체 이벤트 · 가게 홍보 등록</span>
+                </h3>
+                <p className="text-xs text-[#687064] mt-0.5">
+                  등록한 이벤트는 고객 홈 화면과 가게 메뉴창 상단에 바로 노출됩니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllStorePromos((p) => !p)}
+                className="text-xs font-bold text-[#4E6E2A] underline cursor-pointer"
+              >
+                {showAllStorePromos ? '선택 매장만 보기' : '전체 매장 이벤트 보기'}
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!promoTitle.trim()) return;
+                onAddStorePromotion?.({
+                  storeId: selectedPromoStore.id,
+                  badgeText: promoBadge,
+                  title: promoTitle.trim(),
+                  description: promoDesc.trim(),
+                  isActive: true,
+                });
+                setPromoTitle('');
+                setPromoDesc('');
+              }}
+              className="p-4 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-3"
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {['점주 이벤트', '리뷰 혜택', '신메뉴 특가', '오늘의 혜택'].map(
+                  (b) => (
+                    <button
+                      key={b}
+                      type="button"
+                      onClick={() => setPromoBadge(b)}
+                      className={`px-3 py-1 rounded-full border text-xs font-bold cursor-pointer ${
+                        promoBadge === b
+                          ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                          : 'bg-white border-[#E8ECE4] text-[#434B40]'
+                      }`}
+                    >
+                      {b}
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <input
+                  type="text"
+                  value={promoTitle}
+                  onChange={(e) => setPromoTitle(e.target.value)}
+                  placeholder="이벤트 제목 (예: 리뷰 약속 시 음료수 1캔 무료)"
+                  className="min-h-[42px] px-3.5 bg-white border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
+                />
+                <input
+                  type="text"
+                  value={promoDesc}
+                  onChange={(e) => setPromoDesc(e.target.value)}
+                  placeholder="상세 안내 (예: 1개 주문해도 정성껏 담아드려요)"
+                  className="min-h-[42px] px-3.5 bg-white border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
+                />
+              </div>
+              <button
+                type="submit"
+                className="min-h-[42px] px-5 py-2 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold cursor-pointer"
+              >
+                + {selectedPromoStore.name} 이벤트 등록
+              </button>
+            </form>
+
+            <div className="space-y-2">
+              {storePromotions
+                .filter(
+                  (p) => showAllStorePromos || p.storeId === selectedPromoStore.id
+                )
+                .map((promo) => {
+                  const stName =
+                    stores.find((s) => s.id === promo.storeId)?.name ?? '';
+                  return (
+                    <div
+                      key={promo.id}
+                      className="p-3.5 rounded-2xl bg-white border border-[#E8ECE4] flex flex-wrap items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">
+                            {promo.badgeText ?? '점주 이벤트'}
+                          </span>
+                          <span className="font-bold text-[#4E6E2A]">
+                            {stName}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-[#1A1D1A]">
+                          {promo.title}
+                        </p>
+                        {promo.description && (
+                          <p className="text-[#687064]">{promo.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onToggleStorePromotion?.(promo.id)}
+                          className={`min-h-[34px] px-3 py-1 rounded-xl font-bold border cursor-pointer ${
+                            promo.isActive
+                              ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
+                              : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064]'
+                          }`}
+                        >
+                          {promo.isActive ? '노출 ON' : '일시정지'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteStorePromotion?.(promo.id)}
+                          aria-label="이벤트 삭제"
+                          className="p-2 rounded-xl hover:bg-red-50 text-[#687064] hover:text-red-600 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </section>
+
+          {/* Card 3: Store Coupons */}
+          <section className="os-card rounded-3xl p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-[#4E6E2A]" />
+                <span>가게 자체 쿠폰 발행 · 할인 설정</span>
+              </h3>
+              <p className="text-xs text-[#687064] mt-0.5">
+                점주님이 발행한 쿠폰은 고객 결제 시 자동 적용 후보로 노출됩니다. 금액 조건을 비우면 1개 주문에도 즉시 할인됩니다.
+              </p>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const val = Math.max(1, parseInt(couponValue, 10) || 0);
+                if (!couponLabel.trim() || val <= 0) return;
+                const minSub = parseInt(couponMinSubtotal, 10);
+                const code = `STORE_${Math.random()
+                  .toString(36)
+                  .slice(2, 6)
+                  .toUpperCase()}`;
+                onAddStoreCoupon?.({
+                  storeId: selectedPromoStore.id,
+                  code,
+                  label: couponLabel.trim(),
+                  discountType: couponType,
+                  discountValue:
+                    couponType === 'percent' ? Math.min(50, val) : val,
+                  maxDiscountAmount: couponType === 'percent' ? 5000 : undefined,
+                  minSubtotal:
+                    Number.isFinite(minSub) && minSub > 0 ? minSub : undefined,
+                  isActive: true,
+                });
+                setCouponLabel('');
+                setCouponMinSubtotal('');
+              }}
+              className="p-4 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-3"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <input
+                  type="text"
+                  value={couponLabel}
+                  onChange={(e) => setCouponLabel(e.target.value)}
+                  placeholder="쿠폰명 (예: 단골 감사 2,000원 즉시 할인)"
+                  className="min-h-[42px] px-3.5 bg-white border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={couponType}
+                    onChange={(e) =>
+                      setCouponType(e.target.value as 'fixed' | 'percent')
+                    }
+                    className="min-h-[42px] px-3 bg-white border border-[#E8ECE4] rounded-xl text-xs font-bold"
+                  >
+                    <option value="fixed">정액 (원)</option>
+                    <option value="percent">정률 (%)</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={couponValue}
+                    onChange={(e) => setCouponValue(e.target.value)}
+                    placeholder={couponType === 'fixed' ? '2000' : '10'}
+                    className="w-24 min-h-[42px] px-3 bg-white border border-[#E8ECE4] rounded-xl text-sm font-mono font-bold"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={couponMinSubtotal}
+                    onChange={(e) => setCouponMinSubtotal(e.target.value)}
+                    placeholder="조건금액(선택)"
+                    className="flex-1 min-w-0 min-h-[42px] px-3 bg-white border border-[#E8ECE4] rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="min-h-[42px] px-5 py-2 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold cursor-pointer"
+              >
+                + 가게 쿠폰 발행하기
+              </button>
+            </form>
+
+            <div className="space-y-2">
+              {storeCoupons
+                .filter(
+                  (c) => showAllStorePromos || c.storeId === selectedPromoStore.id
+                )
+                .map((cp) => {
+                  const stName =
+                    stores.find((s) => s.id === cp.storeId)?.name ?? '';
+                  return (
+                    <div
+                      key={cp.id}
+                      className="p-3.5 rounded-2xl bg-white border border-[#E8ECE4] flex flex-wrap items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] font-bold">
+                            {cp.discountType === 'percent'
+                              ? `${cp.discountValue}% 할인`
+                              : `${formatWon(cp.discountValue)} 할인`}
+                          </span>
+                          <span className="font-bold text-[#4E6E2A]">
+                            {stName}
+                          </span>
+                          {cp.minSubtotal ? (
+                            <span className="text-[#687064]">
+                              · {formatWon(cp.minSubtotal)}↑
+                            </span>
+                          ) : (
+                            <span className="text-[#687064]">· 조건 없음</span>
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-[#1A1D1A]">
+                          {cp.label}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onToggleStoreCoupon?.(cp.id)}
+                          className={`min-h-[34px] px-3 py-1 rounded-xl font-bold border cursor-pointer ${
+                            cp.isActive
+                              ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
+                              : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064]'
+                          }`}
+                        >
+                          {cp.isActive ? '사용 가능' : '중지'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteStoreCoupon?.(cp.id)}
+                          aria-label="쿠폰 삭제"
+                          className="p-2 rounded-xl hover:bg-red-50 text-[#687064] hover:text-red-600 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* 3. Analytics & Statistics Tab */}
       {ownerSection === 'dashboard' && (
         <div className="space-y-6">
           {/* Unified 4-Metric Hairline Strip */}
@@ -2200,7 +2795,11 @@ export function OwnerDashboardView({
                         </h3>
                       </div>
                       <p className="text-xs text-[#687064] mt-0.5 tabular-nums">
-                        {store.category} · 배달비 {formatWon(store.deliveryFee)}{' '}
+                        {store.category} · 기본 배달비 {formatWon(store.deliveryFee)}{' '}
+                        {store.deliveryFeeTiers &&
+                        store.deliveryFeeTiers.length > 0
+                          ? `· 상생 구간 ${store.deliveryFeeTiers.length}개`
+                          : ''}{' '}
                         · 조리대기 {activeKitchenCount}건
                       </p>
                     </div>
@@ -2278,20 +2877,37 @@ export function OwnerDashboardView({
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => onToggleMenuClosingSale(menu.id, 30)}
-                              className={`min-h-[32px] px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
-                                (menu.closingDiscountPercent ?? 0) > 0
-                                  ? 'bg-amber-600 border-amber-600 text-white'
-                                  : 'bg-[#FFFBEF] border-[#E8D595] text-amber-900 hover:bg-amber-100'
-                              }`}
-                            >
-                              {(menu.closingDiscountPercent ?? 0) > 0
-                                ? `마감 -${menu.closingDiscountPercent}% ON`
-                                : '마감 30%'}
-                            </button>
+                          <div className="flex flex-wrap items-center gap-1 shrink-0">
+                            <div className="inline-flex rounded-lg border border-[#E8D595] bg-[#FFFBEF] p-0.5">
+                              {[0, 10, 20, 30].map((pct) => {
+                                const currentPct = menu.closingDiscountPercent ?? 0;
+                                const active = currentPct === pct;
+                                return (
+                                  <button
+                                    key={pct}
+                                    type="button"
+                                    onClick={() => {
+                                      if (onSetMenuDiscountPercent) {
+                                        onSetMenuDiscountPercent(menu.id, pct);
+                                      } else if (pct === 0 && currentPct > 0) {
+                                        onToggleMenuClosingSale(menu.id, currentPct);
+                                      } else if (pct > 0) {
+                                        onToggleMenuClosingSale(menu.id, pct);
+                                      }
+                                    }}
+                                    className={`px-2 py-1 text-[11px] font-bold rounded-md cursor-pointer ${
+                                      active
+                                        ? pct === 0
+                                          ? 'bg-white text-[#1A1D1A] shadow-2xs'
+                                          : 'bg-amber-600 text-white'
+                                        : 'text-amber-900 hover:bg-amber-100'
+                                    }`}
+                                  >
+                                    {pct === 0 ? '정가' : `-${pct}%`}
+                                  </button>
+                                );
+                              })}
+                            </div>
                             <button
                               type="button"
                               onClick={() => onAdjustMenuStock(menu.id, -1)}

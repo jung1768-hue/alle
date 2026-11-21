@@ -83,7 +83,7 @@ export const PLATFORM_CATEGORIES: PlatformCategoryDef[] = [
     label: '전통시장',
     shortLabel: '전통시장',
     emoji: '🧺',
-    description: '최소주문 0원 · 시장 골목 점포',
+    description: '1개도 배달 · 시장 골목 점포',
   },
   {
     id: 'convenience',
@@ -216,7 +216,8 @@ function matchesStoreGroupForCategory(
       return (
         grp.includes('전통시장') ||
         store.name.includes('시장') ||
-        store.minOrderAmount === 0
+        store.category.includes('시장') ||
+        store.areaLabel.includes('시장')
       );
     case 'convenience':
       return (

@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Eye,
   KeyRound,
   MapPin,
   Presentation,
@@ -39,7 +38,6 @@ interface MyHubViewProps {
   orderCount: number;
   orders?: Order[];
   menus?: MenuItem[];
-  easyMode?: boolean;
   showPresenterMode?: boolean;
   regularMenuId?: string;
   regularMenuName?: string;
@@ -49,7 +47,6 @@ interface MyHubViewProps {
   onTopupWalletConfirmed: (amount: number) => void;
   onEarnStamp: () => void;
   onChangeRole: (nextRole: DemoRole) => void;
-  onToggleEasyMode?: () => void;
   onTogglePresenterMode?: () => void;
   onOpenAiSettings?: () => void;
   onShareDemoSummary: () => void;
@@ -68,7 +65,6 @@ export function MyHubView({
   orderCount,
   orders = [],
   menus = [],
-  easyMode = false,
   showPresenterMode = false,
   regularMenuId = 'm1',
   regularMenuName = '얼큰 소고기국밥',
@@ -78,7 +74,6 @@ export function MyHubView({
   onTopupWalletConfirmed,
   onEarnStamp,
   onChangeRole,
-  onToggleEasyMode,
   onTogglePresenterMode,
   onOpenAiSettings,
   onShareDemoSummary,
@@ -136,18 +131,18 @@ export function MyHubView({
               +{formatWon(savingsSummary.totalSaved)} 절약
             </div>
             <p className="text-xs text-[#3D5720]">
-              유효 주문 {savingsSummary.validOrderCount}건 · 타 배달앱 이중가격·수수료 부담 없이 매장가 그대로 이용 중
+              유효 주문 {savingsSummary.validOrderCount}건 · 착한가격(매장 동일가) · 수수료 0% 혜택 적용 중
             </p>
           </div>
           <span className="px-3 py-1 rounded-full bg-white border border-[#D4E1C5] text-xs font-bold text-[#4E6E2A] shrink-0">
-            수수료 0% 혜택
+            착한가격 · 수수료 0%
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-1">
           <div className="p-3 bg-white/90 border border-[#D4E1C5] rounded-2xl">
             <div className="text-[11px] font-semibold text-[#687064]">
-              매장 동일가로 아낀 차액
+              착한가격으로 아낀 차액
             </div>
             <div className="text-base font-bold font-mono tabular-nums text-[#1A1D1A] mt-0.5">
               +{formatWon(savingsSummary.dualPriceAvoidedTotal)}
@@ -163,38 +158,6 @@ export function MyHubView({
           </div>
         </div>
       </section>
-
-      {/* Easy Mode Toggle Card */}
-      {onToggleEasyMode && (
-        <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 flex items-center justify-between gap-3 shadow-[0_2px_10px_rgba(26,29,26,0.03)]">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-[#EAF1E2] text-[#4E6E2A] flex items-center justify-center shrink-0">
-              <Eye className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-[#1A1D1A]">
-                큰 글씨 · 쉬운 모드
-              </h2>
-              <p className="text-xs text-[#687064] mt-0.5">
-                버튼과 글씨를 키우고, 홈에서 말로 바로 시키는 단순한 화면으로 전환합니다.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={easyMode}
-            onClick={onToggleEasyMode}
-            className={`min-h-[38px] px-4 py-1.5 rounded-xl text-xs font-bold border transition-colors shrink-0 cursor-pointer ${
-              easyMode
-                ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40]'
-            }`}
-          >
-            {easyMode ? '켜짐 ON' : '꺼짐'}
-          </button>
-        </section>
-      )}
 
       {/* Encrypted Alias Profile & allePay Wallet */}
       <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]">

@@ -1,10 +1,187 @@
 import {
+  DeliveryFeeTier,
+  DeliveryMethod,
+  DispatchMode,
   MenuItem,
   MockCoupon,
   Order,
   OrderStatus,
   PaymentMethod,
+  Store,
+  StoreCoupon,
 } from '../types/alle';
+
+function formatWonInline(amount: number): string {
+  return `${Math.round(amount).toLocaleString('ko-KR')}원`;
+}
+
+export interface DeliveryMethodMeta {
+  id: DeliveryMethod;
+  label: string;
+  shortLabel: string;
+  badge: string;
+  description: string;
+  dispatchMode: DispatchMode;
+  etaDeltaMinutes: number;
+}
+
+export const DELIVERY_METHOD_OPTIONS: DeliveryMethodMeta[] = [
+  {
+    id: 'partner_direct',
+    label: '동네 파트너 배송',
+    shortLabel: '동네 파트너',
+    badge: '1개도 효율배송',
+    description: '근거리 이웃 파트너가 소량 주문도 빠르게 배송',
+    dispatchMode: DispatchMode.NEIGHBOR_WALK,
+    etaDeltaMinutes: 0,
+  },
+  {
+    id: 'auto_bundle',
+    label: '자동 묶음배송',
+    shortLabel: '자동 묶음',
+    badge: '배달비 40% 절약',
+    description: '플랫폼이 같은 방향 주문을 자동으로 모아 알뜰 배송',
+    dispatchMode: DispatchMode.AGENCY_RIDER,
+    etaDeltaMinutes: 10,
+  },
+  {
+    id: 'single_express',
+    label: '한집 빠른배송',
+    shortLabel: '한집 빠른',
+    badge: '경유 없이 직행',
+    description: '내 주문만 바로 직행 (+1,000원)',
+    dispatchMode: DispatchMode.AGENCY_RIDER,
+    etaDeltaMinutes: -3,
+  },
+];
+
+export function getDeliveryMethodMeta(
+  method?: DeliveryMethod
+): DeliveryMethodMeta {
+  return (
+    DELIVERY_METHOD_OPTIONS.find((m) => m.id === (method ?? 'partner_direct')) ??
+    DELIVERY_METHOD_OPTIONS[0]
+  );
+}
+
+export interface StoreDeliveryFeeCalculation {
+  baseFee: number;
+  tierFee: number;
+  finalDeliveryFee: number;
+  tierSavings: number;
+  bundleSavings: number;
+  expressSurcharge: number;
+  appliedTier: DeliveryFeeTier | null;
+  nextTier: DeliveryFeeTier | null;
+  amountToNextTier: number;
+  nextTierLabel: string | null;
+  etaDeltaMinutes: number;
+}
+
+/**
+ * Calculates mutual-benefit tiered delivery fee based on order subtotal and chosen delivery method.
+ */
+export function calculateStoreDeliveryFee(
+  store: Pick<Store, 'deliveryFee' | 'deliveryFeeTiers'>,
+  menuSubtotal: number,
+  deliveryMethod: DeliveryMethod = 'partner_direct'
+): StoreDeliveryFeeCalculation {
+  const baseFee = Math.max(0, store.deliveryFee ?? 0);
+  const tiers = [...(store.deliveryFeeTiers ?? [])]
+    .filter((t) => t.minSubtotal > 0 && t.deliveryFee >= 0)
+    .sort((a, b) => a.minSubtotal - b.minSubtotal);
+
+  let appliedTier: DeliveryFeeTier | null = null;
+  for (const tier of tiers) {
+    if (menuSubtotal >= tier.minSubtotal) {
+      appliedTier = tier;
+    }
+  }
+
+  const tierFee = appliedTier ? appliedTier.deliveryFee : baseFee;
+  const nextTier = tiers.find((t) => t.minSubtotal > menuSubtotal) ?? null;
+  const amountToNextTier = nextTier
+    ? Math.max(0, nextTier.minSubtotal - menuSubtotal)
+    : 0;
+
+  let nextTierLabel: string | null = null;
+  if (nextTier && amountToNextTier > 0) {
+    if (nextTier.deliveryFee === 0) {
+      nextTierLabel = `${formatWonInline(amountToNextTier)} 더 담으면 배달비 무료!`;
+    } else if (nextTier.deliveryFee < tierFee) {
+      nextTierLabel = `${formatWonInline(amountToNextTier)} 더 담으면 배달비 ${formatWonInline(
+        tierFee - nextTier.deliveryFee
+      )} 할인!`;
+    }
+  }
+
+  let finalDeliveryFee = tierFee;
+  if (deliveryMethod === 'auto_bundle') {
+    finalDeliveryFee =
+      tierFee === 0 ? 0 : Math.round((tierFee * 0.6) / 100) * 100;
+  } else if (deliveryMethod === 'single_express') {
+    finalDeliveryFee = tierFee + 1000;
+  }
+
+  const etaDeltaMinutes = getDeliveryMethodMeta(deliveryMethod).etaDeltaMinutes;
+
+  return {
+    baseFee,
+    tierFee,
+    finalDeliveryFee,
+    tierSavings: Math.max(0, baseFee - tierFee),
+    bundleSavings: Math.max(0, tierFee - finalDeliveryFee),
+    expressSurcharge: deliveryMethod === 'single_express' ? 1000 : 0,
+    appliedTier,
+    nextTier,
+    amountToNextTier,
+    nextTierLabel,
+    etaDeltaMinutes,
+  };
+}
+
+/**
+ * Merges active owner-issued store coupons with platform coupons so both compete in auto-selection.
+ */
+export function getAvailableCouponsForStore(
+  baseCoupons: MockCoupon[],
+  storeCoupons: StoreCoupon[],
+  storeId: string,
+  menuSubtotal: number
+): MockCoupon[] {
+  const noneCoupon = baseCoupons.find((c) => c.code === 'NONE') ?? {
+    id: 'none',
+    code: 'NONE',
+    label: '쿠폰 적용 안 함',
+    discountAmount: 0,
+    autoSelectEligible: false,
+  };
+  const platformCoupons = baseCoupons.filter((c) => c.code !== 'NONE');
+
+  const activeOwnerCoupons: MockCoupon[] = storeCoupons
+    .filter((c) => c.storeId === storeId && c.isActive)
+    .map((c) => {
+      const computedDiscount =
+        c.discountType === 'percent'
+          ? Math.min(
+              c.maxDiscountAmount ?? 50000,
+              Math.round((Math.max(0, menuSubtotal) * c.discountValue) / 100)
+            )
+          : c.discountValue;
+      return {
+        id: c.id,
+        code: c.code,
+        label: `[가게 쿠폰] ${c.label}`,
+        discountAmount: Math.max(0, computedDiscount),
+        minSubtotal: c.minSubtotal,
+        autoSelectEligible: true,
+        storeId: c.storeId,
+        isStoreCoupon: true,
+      };
+    });
+
+  return [noneCoupon, ...activeOwnerCoupons, ...platformCoupons];
+}
 
 export interface LocalCurrencyLabel {
   shortLabel: string;
@@ -79,7 +256,7 @@ export function isCouponEligible(
   if (coupon.requiresStamps && params.stampCount < coupon.requiresStamps) {
     return false;
   }
-  if (coupon.minOrderAmount && params.menuSubtotal < coupon.minOrderAmount) {
+  if (coupon.minSubtotal && params.menuSubtotal < coupon.minSubtotal) {
     return false;
   }
   if (

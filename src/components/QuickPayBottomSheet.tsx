@@ -14,16 +14,22 @@ import {
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
 import {
+  DeliveryMethod,
   MenuItem,
   OrderLineItem,
   PaymentMethod,
   SavedLocation,
   Store,
+  StoreCoupon,
 } from '../types/alle';
 import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import {
+  calculateStoreDeliveryFee,
+  DELIVERY_METHOD_OPTIONS,
   estimateCompetitorSavings,
+  getAvailableCouponsForStore,
   getBestCoupon,
+  getDeliveryMethodMeta,
   getLocalCurrencyLabel,
 } from '../utils/pricing';
 import { FoodImage } from './FoodImage';
@@ -37,17 +43,19 @@ export interface QuickPayResolvedItem {
 interface QuickPayBottomSheetProps {
   isOpen: boolean;
   store: Store | null;
+  storeCoupons?: StoreCoupon[];
   items: QuickPayResolvedItem[];
   defaultPaymentMethod?: PaymentMethod;
+  defaultDeliveryMethod?: DeliveryMethod;
   defaultCouponCode?: string;
   walletBalance: number;
   stampCount: number;
   activeLocation: SavedLocation;
   customerNote: string;
-  easyMode?: boolean;
   onTopupWallet: (amount: number) => void;
   onOpenFullCheckout: (payload: {
     paymentMethod: PaymentMethod;
+    deliveryMethod: DeliveryMethod;
     couponCode: string;
   }) => void;
   onConfirmQuickPay: (payload: {
@@ -55,6 +63,7 @@ interface QuickPayBottomSheetProps {
     items: OrderLineItem[];
     couponCode: string;
     couponDiscount: number;
+    deliveryMethod: DeliveryMethod;
     paymentMethod: PaymentMethod;
     paymentMethodLabel: string;
     customerNote: string;
@@ -66,14 +75,15 @@ interface QuickPayBottomSheetProps {
 export function QuickPayBottomSheet({
   isOpen,
   store,
+  storeCoupons = [],
   items,
   defaultPaymentMethod = 'kakaopay',
+  defaultDeliveryMethod = 'partner_direct',
   defaultCouponCode,
   walletBalance,
   stampCount,
   activeLocation,
   customerNote,
-  easyMode = false,
   onTopupWallet,
   onOpenFullCheckout,
   onConfirmQuickPay,
@@ -115,16 +125,19 @@ export function QuickPayBottomSheet({
 
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>(defaultPaymentMethod);
+  const [deliveryMethod, setDeliveryMethod] =
+    useState<DeliveryMethod>(defaultDeliveryMethod);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setPaymentMethod(defaultPaymentMethod);
+      setDeliveryMethod(defaultDeliveryMethod);
       setErrorMsg(null);
       setIsSubmitting(false);
     }
-  }, [isOpen, defaultPaymentMethod]);
+  }, [isOpen, defaultPaymentMethod, defaultDeliveryMethod]);
 
   const computed = useMemo(() => {
     if (!store || items.length === 0) return null;
@@ -165,7 +178,14 @@ export function QuickPayBottomSheet({
       };
     });
 
-    const bestCoupon = getBestCoupon(MOCK_COUPONS, {
+    const availableCoupons = getAvailableCouponsForStore(
+      MOCK_COUPONS,
+      storeCoupons,
+      store.id,
+      menuSubtotal
+    );
+
+    const bestCoupon = getBestCoupon(availableCoupons, {
       menuSubtotal,
       stampCount,
       paymentMethod,
@@ -173,7 +193,12 @@ export function QuickPayBottomSheet({
     });
 
     const couponDiscount = Math.min(bestCoupon.discountAmount, menuSubtotal);
-    const deliveryFee = store.deliveryFee;
+    const deliveryFeeCalc = calculateStoreDeliveryFee(
+      store,
+      menuSubtotal,
+      deliveryMethod
+    );
+    const deliveryFee = deliveryFeeCalc.finalDeliveryFee;
     const totalAmount =
       menuSubtotal + optionsSubtotal + deliveryFee - couponDiscount;
 
@@ -181,7 +206,7 @@ export function QuickPayBottomSheet({
       menuSubtotal,
       originalMenuSubtotal,
       deliveryFee,
-      originalDeliveryFee: store.deliveryFee,
+      originalDeliveryFee: deliveryFeeCalc.baseFee,
       couponDiscount,
       isSameStorePrice: allSameStorePrice,
     });
@@ -201,13 +226,22 @@ export function QuickPayBottomSheet({
       originalMenuSubtotal,
       optionsSubtotal,
       deliveryFee,
+      deliveryFeeCalc,
       bestCoupon,
       couponDiscount,
       totalAmount,
       savings,
       unavailable,
     };
-  }, [store, items, stampCount, paymentMethod, defaultCouponCode]);
+  }, [
+    store,
+    storeCoupons,
+    items,
+    stampCount,
+    paymentMethod,
+    deliveryMethod,
+    defaultCouponCode,
+  ]);
 
   if (!isOpen || !store || !computed) return null;
 
@@ -231,6 +265,7 @@ export function QuickPayBottomSheet({
       items: computed.resolvedLines,
       couponCode: computed.bestCoupon.code,
       couponDiscount: computed.couponDiscount,
+      deliveryMethod,
       paymentMethod,
       paymentMethodLabel: selectedPayOption.label,
       customerNote,
@@ -315,9 +350,60 @@ export function QuickPayBottomSheet({
                 <span className="truncate">{activeLocation.detailAddress}</span>
               </span>
               <span className="font-mono font-bold text-[#4E6E2A] shrink-0">
-                약 {leadItem.menu.estimatedMinutes + (store.extraPrepMinutes ?? 0)}분
+                약{' '}
+                {Math.max(
+                  10,
+                  leadItem.menu.estimatedMinutes +
+                    (store.extraPrepMinutes ?? 0) +
+                    computed.deliveryFeeCalc.etaDeltaMinutes
+                )}
+                분
               </span>
             </div>
+          </div>
+
+          {/* Compact Delivery Method Selector */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-[#1A1D1A]">배송 방식</span>
+              <span className="text-[#4E6E2A] font-semibold">
+                💚 착한가격 · 최소주문 없음
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {DELIVERY_METHOD_OPTIONS.map((opt) => {
+                const active = deliveryMethod === opt.id;
+                const optFee = calculateStoreDeliveryFee(
+                  store,
+                  computed.menuSubtotal,
+                  opt.id
+                ).finalDeliveryFee;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setDeliveryMethod(opt.id)}
+                    className={`easy-compact p-2 rounded-xl border text-center cursor-pointer transition-colors ${
+                      active
+                        ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                        : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40]'
+                    }`}
+                  >
+                    <div className="text-xs font-extrabold truncate">
+                      {opt.shortLabel}
+                    </div>
+                    <div className="text-[11px] font-mono font-bold text-[#4E6E2A]">
+                      {optFee === 0 ? '무료' : formatWon(optFee)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {computed.deliveryFeeCalc.nextTierLabel && (
+              <p className="text-[11px] font-bold text-[#4E6E2A]">
+                💡 {computed.deliveryFeeCalc.nextTierLabel}
+              </p>
+            )}
           </div>
 
           {/* Savings & Auto-Applied Best Coupon */}
@@ -354,11 +440,10 @@ export function QuickPayBottomSheet({
                 <CreditCard className="w-3.5 h-3.5 text-[#4E6E2A]" />
                 <span>결제 수단</span>
               </span>
-              <span className="text-[#687064]">매장가 그대로 · 중개수수료 0원</span>
+              <span className="text-[#687064]">💚 착한가격 · 중개수수료 0원</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {(easyMode ? paymentOptions.slice(0, 5) : paymentOptions).map(
-                (opt) => {
+              {paymentOptions.slice(0, 5).map((opt) => {
                   const active = paymentMethod === opt.id;
                   return (
                     <button
@@ -381,8 +466,7 @@ export function QuickPayBottomSheet({
                       <span>{opt.shortLabel}</span>
                     </button>
                   );
-                }
-              )}
+                })}
             </div>
 
             {insufficientWallet && (
@@ -423,7 +507,11 @@ export function QuickPayBottomSheet({
           {/* Price Breakdown Line */}
           <div className="pt-2 border-t border-dashed border-[#D4DCD0] flex items-baseline justify-between gap-3">
             <span className="text-xs font-semibold text-[#687064]">
-              최종 결제 금액 (배달비 {formatWon(computed.deliveryFee)} 포함)
+              최종 결제 금액 ({getDeliveryMethodMeta(deliveryMethod).shortLabel}{' '}
+              {computed.deliveryFee === 0
+                ? '무료'
+                : formatWon(computed.deliveryFee)}
+              )
             </span>
             <span className="os-kpi text-2xl font-bold text-[#4E6E2A]">
               {formatWon(computed.totalAmount)}
@@ -453,6 +541,7 @@ export function QuickPayBottomSheet({
               onClick={() =>
                 onOpenFullCheckout({
                   paymentMethod,
+                  deliveryMethod,
                   couponCode: computed.bestCoupon.code,
                 })
               }

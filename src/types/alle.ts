@@ -44,6 +44,36 @@ export enum ErrandStatus {
   COMPLETED = 'completed',
 }
 
+export type DeliveryMethod = 'auto_bundle' | 'single_express' | 'partner_direct';
+
+export interface DeliveryFeeTier {
+  minSubtotal: number;
+  deliveryFee: number;
+}
+
+export interface StorePromotion {
+  id: string;
+  storeId: string;
+  title: string;
+  description: string;
+  badgeText?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface StoreCoupon {
+  id: string;
+  storeId: string;
+  code: string;
+  label: string;
+  discountType: 'fixed' | 'percent';
+  discountValue: number;
+  maxDiscountAmount?: number;
+  minSubtotal?: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Store {
   id: string;
   name: string;
@@ -52,7 +82,7 @@ export interface Store {
   region?: string;
   isOpen: boolean;
   deliveryFee: number;
-  minOrderAmount?: number;
+  deliveryFeeTiers?: DeliveryFeeTier[];
   rating?: number;
   reviewCount?: number;
   basePrepMinutes: number;
@@ -215,6 +245,7 @@ export interface Order {
   menuSubtotal: number;
   optionsSubtotal: number;
   deliveryFee: number;
+  deliveryMethod?: DeliveryMethod;
   sharedDeliveryApplied?: boolean;
   reservationSlot?: string | null;
   isB2B?: boolean;
@@ -297,9 +328,11 @@ export interface MockCoupon {
   label: string;
   discountAmount: number;
   requiresStamps?: number;
-  minOrderAmount?: number;
+  minSubtotal?: number;
   paymentMethodOnly?: PaymentMethod;
   autoSelectEligible?: boolean;
+  storeId?: string;
+  isStoreCoupon?: boolean;
 }
 
 export interface RecommendationMatch {
@@ -371,5 +404,7 @@ export interface AllePersistedState {
   priceReports: PriceReport[];
   savedLocations: SavedLocation[];
   selectedLocationId: string;
-  easyMode: boolean;
+  storePromotions: StorePromotion[];
+  storeCoupons: StoreCoupon[];
+  easyMode?: boolean;
 }

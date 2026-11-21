@@ -3,7 +3,6 @@ import {
   Bell,
   ChevronDown,
   ClipboardList,
-  Eye,
   Heart,
   HelpCircle,
   Home,
@@ -45,6 +44,8 @@ import {
   CartLineItem,
   CartState,
   ConsumerStep,
+  DeliveryFeeTier,
+  DeliveryMethod,
   DeliveryNotification,
   DeliveryProgressStage,
   DemoRole,
@@ -61,6 +62,8 @@ import {
   PaymentMethod,
   PriceReport,
   SavedLocation,
+  StoreCoupon,
+  StorePromotion,
   SuperAppTab,
   UserPreferences,
 } from './types/alle';
@@ -71,7 +74,9 @@ import {
   parseConditionInput,
 } from './utils/parser';
 import {
+  calculateStoreDeliveryFee,
   estimateCompetitorSavings,
+  getDeliveryMethodMeta,
   getLocalCurrencyLabel,
 } from './utils/pricing';
 import { PlatformCategoryId } from './utils/categories';
@@ -203,6 +208,7 @@ export default function App() {
     storeId: string;
     items: CartLineItem[];
     couponCode: string;
+    deliveryMethod?: DeliveryMethod;
     sharedDeliveryApplied?: boolean;
     reservationSlot?: string;
     paymentMethod?: PaymentMethod;
@@ -233,6 +239,7 @@ export default function App() {
     storeId: string;
     items: CartLineItem[];
     paymentMethod?: PaymentMethod;
+    deliveryMethod?: DeliveryMethod;
     couponCode?: string;
     customerNote?: string;
   } | null>(null);
@@ -378,6 +385,8 @@ export default function App() {
           errands: remote.errands,
           reviewReplies: remote.reviewReplies,
           priceReports: remote.priceReports,
+          storePromotions: remote.storePromotions,
+          storeCoupons: remote.storeCoupons,
         }));
       }
     );
@@ -589,18 +598,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleToggleEasyMode = () => {
-    setAppState((prev) => {
-      const nextEasy = !prev.easyMode;
-      showToast(
-        nextEasy
-          ? '큰 글씨 · 쉬운 모드가 켜졌습니다.'
-          : '기본 화면으로 전환되었습니다.'
-      );
-      return { ...prev, easyMode: nextEasy };
-    });
-  };
-
   const mergeCartItems = (
     existing: CartLineItem[],
     incoming: CartLineItem,
@@ -794,6 +791,7 @@ export default function App() {
     servings: number;
     selectedOptionIds?: string[];
     paymentMethod?: PaymentMethod;
+    deliveryMethod?: DeliveryMethod;
     customerNote?: string;
     couponCode?: string;
   }) => {
@@ -821,6 +819,7 @@ export default function App() {
         },
       ],
       paymentMethod: payload.paymentMethod ?? 'kakaopay',
+      deliveryMethod: payload.deliveryMethod ?? 'partner_direct',
       couponCode: payload.couponCode,
       customerNote: payload.customerNote ?? appState.preferences.memoNote,
     });
@@ -867,6 +866,9 @@ export default function App() {
       storeId: targetStore.id,
       items: validLines,
       paymentMethod: order.paymentMethod ?? 'kakaopay',
+      deliveryMethod:
+        order.deliveryMethod ??
+        (order.sharedDeliveryApplied ? 'auto_bundle' : 'partner_direct'),
       couponCode: order.couponCode ?? undefined,
       customerNote: order.customerNote || appState.preferences.memoNote,
     });
@@ -876,6 +878,7 @@ export default function App() {
     menuId: string,
     servings: number,
     options?: {
+      deliveryMethod?: DeliveryMethod;
       sharedDeliveryApplied?: boolean;
       reservationSlot?: string;
       couponCode?: string;
@@ -899,6 +902,9 @@ export default function App() {
       return;
     }
     setPrevStepBeforeConfirm(step);
+    const resolvedMethod: DeliveryMethod =
+      options?.deliveryMethod ??
+      (options?.sharedDeliveryApplied ? 'auto_bundle' : 'partner_direct');
     setConfirmDraft({
       draftId: `draft-${Date.now()}`,
       storeId: targetStore.id,
@@ -910,7 +916,8 @@ export default function App() {
         },
       ],
       couponCode: options?.couponCode ?? 'NONE',
-      sharedDeliveryApplied: options?.sharedDeliveryApplied ?? false,
+      deliveryMethod: resolvedMethod,
+      sharedDeliveryApplied: resolvedMethod === 'auto_bundle',
       reservationSlot: options?.reservationSlot ?? 'now',
       paymentMethod: options?.paymentMethod,
     });
@@ -976,8 +983,11 @@ export default function App() {
   };
 
   const handleJoinGroupBuy = (menuId: string) => {
-    handleQuickReorderToConfirm(menuId, 1, { sharedDeliveryApplied: true });
-    showToast('이웃 공동구매 배달비 할인이 적용되었습니다.');
+    handleQuickReorderToConfirm(menuId, 1, {
+      deliveryMethod: 'auto_bundle',
+      sharedDeliveryApplied: true,
+    });
+    showToast('이웃 공동구매 · 자동 묶음배송 배달비 절약이 적용되었습니다.');
   };
 
   const handleQuickRelaxCondition = (patch: Partial<ParsedCondition>) => {
@@ -1043,6 +1053,7 @@ export default function App() {
     storeId: string;
     items: CartLineItem[];
     couponCode?: string;
+    deliveryMethod?: DeliveryMethod;
   }) => {
     const targetStore = appState.stores.find((s) => s.id === payload.storeId);
     if (!targetStore || !targetStore.isOpen) {
@@ -1060,6 +1071,7 @@ export default function App() {
       showToast('주문 가능한 메뉴가 없습니다.');
       return;
     }
+    const deliveryMethod = payload.deliveryMethod ?? 'partner_direct';
     setPrevStepBeforeConfirm(step);
     setConfirmDraft({
       draftId: `draft-multi-${Date.now()}`,
@@ -1073,7 +1085,8 @@ export default function App() {
         };
       }),
       couponCode: payload.couponCode ?? 'NONE',
-      sharedDeliveryApplied: false,
+      deliveryMethod,
+      sharedDeliveryApplied: deliveryMethod === 'auto_bundle',
       reservationSlot: 'now',
     });
     setRole(DemoRole.CONSUMER);
@@ -1147,12 +1160,17 @@ export default function App() {
     estimatedMinutes: number
   ) => {
     clearOrderDeliveryTimers(order.id);
+    const methodMeta = getDeliveryMethodMeta(
+      order.deliveryMethod ??
+        (order.sharedDeliveryApplied ? 'auto_bundle' : 'partner_direct')
+    );
     const dispatchMode =
-      order.sharedDeliveryApplied || order.deliveryFee <= 1800
-        ? DispatchMode.NEIGHBOR_WALK
-        : DispatchMode.AGENCY_RIDER;
+      order.dispatchMode ?? methodMeta.dispatchMode ?? DispatchMode.NEIGHBOR_WALK;
     const riderLabel = order.riderName ?? pickRandomRiderName(dispatchMode);
-    const departEta = Math.max(8, estimatedMinutes - 6);
+    const departEta = Math.max(
+      6,
+      estimatedMinutes + methodMeta.etaDeltaMinutes - 6
+    );
 
     const tDepart = window.setTimeout(() => {
       setAppState((prev) => ({
@@ -1252,6 +1270,7 @@ export default function App() {
     items?: OrderLineItem[];
     couponCode: string;
     couponDiscount: number;
+    deliveryMethod?: DeliveryMethod;
     sharedDeliveryApplied: boolean;
     reservationSlot: string | null;
     customerAlias: string;
@@ -1334,9 +1353,14 @@ export default function App() {
       0
     );
     const totalServings = orderLines.reduce((sum, l) => sum + l.quantity, 0);
-    const effectiveDeliveryFee = payload.sharedDeliveryApplied
-      ? Math.round(targetStore.deliveryFee / 2)
-      : targetStore.deliveryFee;
+    const deliveryMethod: DeliveryMethod =
+      payload.deliveryMethod ??
+      (payload.sharedDeliveryApplied ? 'auto_bundle' : 'partner_direct');
+    const effectiveDeliveryFee = calculateStoreDeliveryFee(
+      targetStore,
+      menuSubtotal,
+      deliveryMethod
+    ).finalDeliveryFee;
     const cappedCoupon = Math.max(
       0,
       Math.min(payload.couponDiscount, menuSubtotal)
@@ -1379,7 +1403,8 @@ export default function App() {
       menuSubtotal,
       optionsSubtotal,
       deliveryFee: effectiveDeliveryFee,
-      sharedDeliveryApplied: payload.sharedDeliveryApplied,
+      deliveryMethod,
+      sharedDeliveryApplied: deliveryMethod === 'auto_bundle',
       reservationSlot: payload.reservationSlot,
       isB2B: chosenPayMethod === 'b2b_meal_point',
       paymentMethod: chosenPayMethod,
@@ -1892,6 +1917,108 @@ export default function App() {
     }));
   };
 
+  const handleSetMenuDiscountPercent = (menuId: string, percent: number) => {
+    const safePct = Math.max(0, Math.min(50, Math.round(percent)));
+    setAppState((prev) => ({
+      ...prev,
+      menus: prev.menus.map((m) =>
+        m.id === menuId ? { ...m, closingDiscountPercent: safePct } : m
+      ),
+    }));
+    showToast(
+      safePct > 0
+        ? `메뉴 할인율(${safePct}%)이 적용되었습니다.`
+        : '메뉴 할인이 해제되어 정가로 복원되었습니다.'
+    );
+  };
+
+  const handleUpdateStoreDeliveryPolicy = (
+    storeId: string,
+    deliveryFee: number,
+    deliveryFeeTiers: DeliveryFeeTier[]
+  ) => {
+    const cleanedTiers = [...deliveryFeeTiers]
+      .filter((t) => t.minSubtotal > 0 && t.deliveryFee >= 0)
+      .sort((a, b) => a.minSubtotal - b.minSubtotal);
+    setAppState((prev) => ({
+      ...prev,
+      stores: prev.stores.map((s) =>
+        s.id === storeId
+          ? {
+              ...s,
+              deliveryFee: Math.max(0, deliveryFee),
+              deliveryFeeTiers: cleanedTiers,
+            }
+          : s
+      ),
+    }));
+    showToast('매장 상생 배달비 정책이 저장되었습니다.');
+  };
+
+  const handleAddStorePromotion = (
+    promo: Omit<StorePromotion, 'id' | 'createdAt'>
+  ) => {
+    const newPromo: StorePromotion = {
+      ...promo,
+      id: `promo-${Date.now()}`,
+      createdAt: formatNowTime(),
+    };
+    setAppState((prev) => ({
+      ...prev,
+      storePromotions: [newPromo, ...prev.storePromotions],
+    }));
+    showToast('가게 홍보 이벤트가 등록되어 고객 화면에 노출됩니다.');
+  };
+
+  const handleToggleStorePromotion = (promoId: string) => {
+    setAppState((prev) => ({
+      ...prev,
+      storePromotions: prev.storePromotions.map((p) =>
+        p.id === promoId ? { ...p, isActive: !p.isActive } : p
+      ),
+    }));
+  };
+
+  const handleDeleteStorePromotion = (promoId: string) => {
+    setAppState((prev) => ({
+      ...prev,
+      storePromotions: prev.storePromotions.filter((p) => p.id !== promoId),
+    }));
+    showToast('가게 이벤트가 삭제되었습니다.');
+  };
+
+  const handleAddStoreCoupon = (
+    coupon: Omit<StoreCoupon, 'id' | 'createdAt'>
+  ) => {
+    const newCoupon: StoreCoupon = {
+      ...coupon,
+      id: `sc-${Date.now()}`,
+      createdAt: formatNowTime(),
+    };
+    setAppState((prev) => ({
+      ...prev,
+      storeCoupons: [newCoupon, ...prev.storeCoupons],
+    }));
+    showToast('가게 자체 쿠폰이 발행되었습니다.');
+  };
+
+  const handleToggleStoreCoupon = (couponId: string) => {
+    setAppState((prev) => ({
+      ...prev,
+      storeCoupons: prev.storeCoupons.map((c) =>
+        c.id === couponId ? { ...c, isActive: !c.isActive } : c
+      ),
+    }));
+  };
+
+  const handleDeleteStoreCoupon = (couponId: string) => {
+    setAppState((prev) => ({
+      ...prev,
+      storeCoupons: prev.storeCoupons.filter((c) => c.id !== couponId),
+    }));
+    showToast('가게 쿠폰이 삭제되었습니다.');
+  };
+
   const handleCreateMarketBundleOrder = (payload: {
     items: Array<{ menuId: string; quantity: number }>;
     customerNote: string;
@@ -2202,7 +2329,7 @@ export default function App() {
       setAiChatInitialPrompt('어제 야근해서 얼큰한 국물 2인분 30분 이내로 추천해줘');
       setRole(DemoRole.CONSUMER);
       setStep(ConsumerStep.AI_CHAT);
-      showToast('① 올이 10초 음성·채팅 주문 시연');
+      showToast('① 올레 10초 음성·채팅 주문 시연');
     } else if (scene === 'b2b_checkout') {
       const targetMenu =
         appState.menus.find((m) => {
@@ -2227,6 +2354,7 @@ export default function App() {
             },
           ],
           couponCode: 'NONE',
+          deliveryMethod: 'partner_direct',
           sharedDeliveryApplied: false,
           reservationSlot: 'now',
           paymentMethod: 'b2b_meal_point',
@@ -2263,7 +2391,7 @@ export default function App() {
 
   const cartSummary = useMemo(() => {
     if (!cart || cart.items.length === 0) {
-      return { totalCount: 0, totalAmount: 0, label: '' };
+      return { totalCount: 0, totalAmount: 0, label: '', nextTierLabel: null as string | null };
     }
     const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
     let totalCount = 0;
@@ -2284,8 +2412,16 @@ export default function App() {
       cart.items.length > 1
         ? `${firstName} 외 ${cart.items.length - 1}건`
         : firstName;
-    return { totalCount, totalAmount, label };
-  }, [cart, appState.menus]);
+    const feeInfo = cartStore
+      ? calculateStoreDeliveryFee(cartStore, totalAmount, 'partner_direct')
+      : null;
+    return {
+      totalCount,
+      totalAmount,
+      label,
+      nextTierLabel: feeInfo?.nextTierLabel ?? null,
+    };
+  }, [cart, cartStore, appState.menus]);
 
   const quickPayStore = quickPayDraft
     ? appState.stores.find((s) => s.id === quickPayDraft.storeId) ?? null
@@ -2315,11 +2451,7 @@ export default function App() {
   ).length;
 
   return (
-    <div
-      className={`min-h-screen flex flex-col bg-[#F7F8F5] text-[#1A1D1A] ${
-        appState.easyMode ? 'alle-easy-mode' : ''
-      }`}
-    >
+    <div className="min-h-screen flex flex-col bg-[#F7F8F5] text-[#1A1D1A] alle-easy-mode">
       {/* Contextual Role Strip (Only visible in Owner / Partner mode) */}
       {role !== DemoRole.CONSUMER && (
         <div className="bg-[#1A1D1A] text-white border-b border-white/10">
@@ -2400,26 +2532,6 @@ export default function App() {
               <span className="hidden sm:inline">카테고리 검색</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleToggleEasyMode}
-              aria-pressed={appState.easyMode}
-              aria-label="큰 글씨 쉬운 모드 전환"
-              className={`easy-compact min-h-[34px] px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
-                appState.easyMode
-                  ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
-                  : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
-              <span className="hidden sm:inline">
-                {appState.easyMode ? '쉬운 모드 ON' : '가+ 쉬운 모드'}
-              </span>
-              <span className="sm:hidden">
-                {appState.easyMode ? '쉬운 ON' : '쉬운모드'}
-              </span>
-            </button>
-
             {showPresenterMode && (
               <div className="relative">
                 <button
@@ -2477,7 +2589,7 @@ export default function App() {
                           className="flex-1 text-left cursor-pointer"
                         >
                           <p className="text-xs font-semibold text-white">
-                            ① [고객] 컨디션 홈 & 올이 10초 주문
+                            ① [고객] 컨디션 홈 & 올레 10초 주문
                           </p>
                           <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
                             비가격 효용 지표 · 원탭 Zero-UI 진입
@@ -2488,7 +2600,7 @@ export default function App() {
                           onClick={() => handleJumpDemoScene('customer_chat')}
                           className="px-2.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[10.5px] font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
                         >
-                          올이 대화 →
+                          올레 대화 →
                         </button>
                       </div>
                     </div>
@@ -2623,7 +2735,7 @@ export default function App() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1A1D1A]">
-                    올이 · 실시간 배달 알림
+                    올레 · 실시간 배달 알림
                   </span>
                   <button
                     type="button"
@@ -2812,6 +2924,16 @@ export default function App() {
               (appState.ownerSaasSubscribed ? 'pro' : 'trial')
             }
             onSelectOwnerSaasPlan={handleSelectOwnerSaasPlan}
+            storePromotions={appState.storePromotions}
+            storeCoupons={appState.storeCoupons}
+            onSetMenuDiscountPercent={handleSetMenuDiscountPercent}
+            onUpdateStoreDeliveryPolicy={handleUpdateStoreDeliveryPolicy}
+            onAddStorePromotion={handleAddStorePromotion}
+            onToggleStorePromotion={handleToggleStorePromotion}
+            onDeleteStorePromotion={handleDeleteStorePromotion}
+            onAddStoreCoupon={handleAddStoreCoupon}
+            onToggleStoreCoupon={handleToggleStoreCoupon}
+            onDeleteStoreCoupon={handleDeleteStoreCoupon}
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
             onOpenAiSettings={() => setShowGeminiModal(true)}
           />
@@ -2829,40 +2951,26 @@ export default function App() {
           />
         ) : step === ConsumerStep.HOME ? (
           <ConditionHome
-            rawInput={rawInput}
-            parsedCondition={parsedCondition}
-            preferences={appState.preferences}
             stores={appState.stores}
             menus={appState.menus}
             orders={appState.orders}
             reviews={INITIAL_REVIEWS}
             reviewReplies={appState.reviewReplies}
-            stampCount={appState.stampCount}
-            wishlistIds={appState.wishlistIds}
-            easyMode={appState.easyMode}
-            onToggleEasyMode={handleToggleEasyMode}
-            onToggleWishlist={handleToggleWishlist}
+            storePromotions={appState.storePromotions}
+            storeCoupons={appState.storeCoupons}
             onOpenAiChat={(prompt) => {
               setAiChatInitialPrompt(prompt);
               setRole(DemoRole.CONSUMER);
               setStep(ConsumerStep.AI_CHAT);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onEarnStamp={handleEarnStamp}
             onRawInputChange={handleRawInputChange}
-            onUpdateParsedCondition={setParsedCondition}
-            onSubmitSearch={handleSubmitSearch}
-            onQuickSelectMenu={handleQuickSelectMenu}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
             onOpenQuickPay={handleOpenQuickPay}
-            onAddToCart={handleAddToCart}
             onOpenSuperApp={handleOpenSuperApp}
             onOpenBrowse={handleOpenBrowse}
             onOpenStoreMenu={handleOpenStoreMenu}
-            onSavePreferences={handleSavePreferences}
-            onApplyPreferencesToInput={handleApplyPreferencesToInput}
             activeLocation={activeLocation}
-            onOpenLocationPicker={() => setShowLocationPicker(true)}
           />
         ) : step === ConsumerStep.BROWSE ? (
           <CategoryBrowseView
@@ -2870,6 +2978,8 @@ export default function App() {
             menus={appState.menus}
             reviews={INITIAL_REVIEWS}
             wishlistIds={appState.wishlistIds}
+            storePromotions={appState.storePromotions}
+            storeCoupons={appState.storeCoupons}
             activeLocation={activeLocation}
             initialCategory={browseInitialCategory}
             initialQuery={browseInitialQuery}
@@ -2894,6 +3004,8 @@ export default function App() {
             menus={appState.menus}
             reviews={INITIAL_REVIEWS}
             wishlistIds={appState.wishlistIds}
+            storePromotions={appState.storePromotions}
+            storeCoupons={appState.storeCoupons}
             activeLocation={activeLocation}
             initialPrompt={aiChatInitialPrompt}
             walletBalance={appState.walletBalance}
@@ -2950,10 +3062,13 @@ export default function App() {
             storeMenus={appState.menus.filter(
               (m) => m.storeId === confirmStore.id
             )}
+            storePromotions={appState.storePromotions}
+            storeCoupons={appState.storeCoupons}
             initialItems={confirmDraft.items}
             initialServings={confirmDraft.items[0]?.quantity ?? 1}
             initialOptionIds={confirmDraft.items[0]?.selectedOptionIds ?? []}
             initialCouponCode={confirmDraft.couponCode}
+            initialDeliveryMethod={confirmDraft.deliveryMethod}
             initialSharedDelivery={confirmDraft.sharedDeliveryApplied}
             initialReservationSlot={confirmDraft.reservationSlot}
             initialPaymentMethod={confirmDraft.paymentMethod}
@@ -2990,7 +3105,6 @@ export default function App() {
             orderCount={appState.orders.length}
             orders={appState.orders}
             menus={appState.menus}
-            easyMode={appState.easyMode}
             showPresenterMode={showPresenterMode}
             regularMenuId={appState.orders[0]?.menuId ?? 'm1'}
             regularMenuName={appState.orders[0]?.menuName ?? '얼큰 소고기국밥'}
@@ -3002,7 +3116,6 @@ export default function App() {
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onEarnStamp={handleEarnStamp}
             onChangeRole={setRole}
-            onToggleEasyMode={handleToggleEasyMode}
             onTogglePresenterMode={() => setShowPresenterMode((prev) => !prev)}
             onOpenAiSettings={() => setShowGeminiModal(true)}
             onShareDemoSummary={handleShareDemoSummary}
@@ -3103,6 +3216,7 @@ export default function App() {
                 <div className="min-w-0">
                   <p className="text-[11px] text-[#B8C4B2] truncate">
                     {cartStore.name}
+                    {cartSummary.nextTierLabel ? ` · ${cartSummary.nextTierLabel}` : ''}
                   </p>
                   <p className="text-xs sm:text-sm font-bold text-white truncate">
                     {cartSummary.label} · {formatWon(cartSummary.totalAmount)}
@@ -3119,6 +3233,7 @@ export default function App() {
                       storeId: cart.storeId,
                       items: cart.items,
                       couponCode: 'NONE',
+                      deliveryMethod: 'partner_direct',
                       sharedDeliveryApplied: false,
                       reservationSlot: 'now',
                     });
@@ -3197,7 +3312,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">올이 주문</span>
+            <span className="text-[11px] leading-none">올레 주문</span>
           </button>
 
           <button
@@ -3331,7 +3446,9 @@ export default function App() {
         )}
         store={quickPayStore}
         items={quickPayItems}
+        storeCoupons={appState.storeCoupons}
         defaultPaymentMethod={quickPayDraft?.paymentMethod}
+        defaultDeliveryMethod={quickPayDraft?.deliveryMethod}
         defaultCouponCode={quickPayDraft?.couponCode}
         walletBalance={appState.walletBalance}
         stampCount={appState.stampCount}
@@ -3339,9 +3456,8 @@ export default function App() {
         customerNote={
           quickPayDraft?.customerNote ?? appState.preferences.memoNote
         }
-        easyMode={appState.easyMode}
         onTopupWallet={handleTopupWalletConfirmed}
-        onOpenFullCheckout={({ paymentMethod, couponCode }) => {
+        onOpenFullCheckout={({ paymentMethod, deliveryMethod, couponCode }) => {
           if (!quickPayDraft) return;
           setPrevStepBeforeConfirm(step);
           setConfirmDraft({
@@ -3349,7 +3465,8 @@ export default function App() {
             storeId: quickPayDraft.storeId,
             items: quickPayDraft.items,
             couponCode,
-            sharedDeliveryApplied: false,
+            deliveryMethod,
+            sharedDeliveryApplied: deliveryMethod === 'auto_bundle',
             reservationSlot: 'now',
             paymentMethod,
           });
@@ -3371,7 +3488,8 @@ export default function App() {
             items: payload.items,
             couponCode: payload.couponCode,
             couponDiscount: payload.couponDiscount,
-            sharedDeliveryApplied: false,
+            deliveryMethod: payload.deliveryMethod,
+            sharedDeliveryApplied: payload.deliveryMethod === 'auto_bundle',
             reservationSlot: null,
             customerAlias: '단골 고객',
             addressAlias: activeLocation.detailAddress,
@@ -3398,6 +3516,8 @@ export default function App() {
               )
             : []
         }
+        storePromotions={appState.storePromotions}
+        storeCoupons={appState.storeCoupons}
         highlightMenuId={storeMenuModal?.highlightMenuId}
         initialServings={storeMenuModal?.initialServings}
         initialOptionIds={storeMenuModal?.initialOptionIds}

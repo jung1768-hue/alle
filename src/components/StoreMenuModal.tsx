@@ -21,14 +21,19 @@ import {
   Review,
   ReviewReply,
   Store,
+  StoreCoupon,
+  StorePromotion,
 } from '../types/alle';
 import { buildRuleReviewSummary } from '../utils/gemini';
 import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
+import { calculateStoreDeliveryFee } from '../utils/pricing';
 import { FoodImage } from './FoodImage';
 
 interface StoreMenuModalProps {
   store: Store | null;
   storeMenus: MenuItem[];
+  storePromotions?: StorePromotion[];
+  storeCoupons?: StoreCoupon[];
   highlightMenuId?: string | null;
   initialServings?: number;
   initialOptionIds?: string[];
@@ -54,6 +59,8 @@ interface StoreMenuModalProps {
 export function StoreMenuModal({
   store,
   storeMenus,
+  storePromotions = [],
+  storeCoupons = [],
   highlightMenuId,
   initialServings = 1,
   initialOptionIds = [],
@@ -168,6 +175,22 @@ export function StoreMenuModal({
     [storeReviews]
   );
 
+  const activeStorePromos = useMemo(
+    () =>
+      store
+        ? storePromotions.filter((p) => p.storeId === store.id && p.isActive)
+        : [],
+    [storePromotions, store?.id]
+  );
+
+  const activeStoreCoupons = useMemo(
+    () =>
+      store
+        ? storeCoupons.filter((c) => c.storeId === store.id && c.isActive)
+        : [],
+    [storeCoupons, store?.id]
+  );
+
   const totals = useMemo(() => {
     let menuSubtotal = 0;
     let optionsSubtotal = 0;
@@ -185,12 +208,23 @@ export function StoreMenuModal({
       totalQty += item.quantity;
     }
 
-    const deliveryFee = store?.deliveryFee ?? 0;
+    const feeCalc = store
+      ? calculateStoreDeliveryFee(store, menuSubtotal, 'partner_direct')
+      : null;
+    const deliveryFee = feeCalc?.finalDeliveryFee ?? 0;
     const grandTotal =
       draftItems.length > 0 ? menuSubtotal + optionsSubtotal + deliveryFee : 0;
 
-    return { menuSubtotal, optionsSubtotal, totalQty, deliveryFee, grandTotal };
-  }, [draftItems, menuById, store?.deliveryFee]);
+    return {
+      menuSubtotal,
+      optionsSubtotal,
+      totalQty,
+      deliveryFee,
+      nextTierLabel: feeCalc?.nextTierLabel ?? null,
+      tierSavings: feeCalc?.tierSavings ?? 0,
+      grandTotal,
+    };
+  }, [draftItems, menuById, store]);
 
   if (!store) return null;
 
@@ -290,7 +324,7 @@ export function StoreMenuModal({
                   )}
                   {isSameStore && (
                     <span className="px-1.5 py-0.5 rounded-md bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
-                      매장 동일가 ✓
+                      💚 착한가격 · 매장 동일가
                     </span>
                   )}
                   {hasClosing && (
@@ -466,7 +500,7 @@ export function StoreMenuModal({
                   </span>
                   {!store.singlePriceRevoked && (
                     <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] font-bold">
-                      매장 동일가 ✓
+                      💚 착한가격 · 매장 동일가
                     </span>
                   )}
                 </div>
@@ -502,13 +536,58 @@ export function StoreMenuModal({
               배달비 {store.deliveryFee === 0 ? '무료' : formatWon(store.deliveryFee)}
             </span>
             <span>·</span>
-            <span>
-              최소주문{' '}
-              {(store.minOrderAmount ?? 0) === 0
-                ? '없음'
-                : formatWon(store.minOrderAmount ?? 0)}
+            <span className="font-bold text-[#3D5720]">
+              최소주문 없음 · 1개도 배달
             </span>
           </div>
+
+          {store.deliveryFeeTiers && store.deliveryFeeTiers.length > 0 && (
+            <p className="text-[11px] font-semibold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg inline-block">
+              🤝 점주 상생 배달비:{' '}
+              {[...store.deliveryFeeTiers]
+                .sort((a, b) => a.minSubtotal - b.minSubtotal)
+                .map(
+                  (t) =>
+                    `${formatWon(t.minSubtotal)}↑ ${
+                      t.deliveryFee === 0 ? '무료' : formatWon(t.deliveryFee)
+                    }`
+                )
+                .join(' · ')}
+            </p>
+          )}
+
+          {(activeStorePromos.length > 0 || activeStoreCoupons.length > 0) && (
+            <div className="space-y-1.5 pt-0.5">
+              {activeStorePromos.map((promo) => (
+                <div
+                  key={promo.id}
+                  className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950"
+                >
+                  <span className="font-extrabold mr-1.5">
+                    🎉 [{promo.badgeText ?? '가게 이벤트'}]
+                  </span>
+                  <span className="font-bold">{promo.title}</span>
+                  {promo.description && (
+                    <p className="text-[11px] text-amber-900 mt-0.5">
+                      {promo.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {activeStoreCoupons.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {activeStoreCoupons.map((cp) => (
+                    <span
+                      key={cp.id}
+                      className="px-2.5 py-1 rounded-lg bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-[11px] font-bold"
+                    >
+                      🎟️ {cp.label} (결제 시 자동 적용)
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-1 text-[11px] text-[#687064]">
             <MapPin className="w-3 h-3 text-[#4E6E2A] shrink-0" />
@@ -646,6 +725,11 @@ export function StoreMenuModal({
 
         {/* Sticky Bottom Action Bar */}
         <div className="px-4 sm:px-5 py-3.5 bg-white border-t border-[#E8ECE4] space-y-2.5 shrink-0">
+          {draftItems.length > 0 && totals.nextTierLabel && (
+            <p className="text-[11px] font-bold text-[#3D5720] bg-[#EAF1E2] px-3 py-1 rounded-xl text-center">
+              💡 {totals.nextTierLabel}
+            </p>
+          )}
           {draftItems.length > 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="font-semibold text-[#1A1D1A]">
@@ -655,6 +739,11 @@ export function StoreMenuModal({
                 {totals.deliveryFee === 0
                   ? '무료'
                   : formatWon(totals.deliveryFee)}
+                {totals.tierSavings > 0 && (
+                  <strong className="ml-1 text-[#4E6E2A]">
+                    (상생 -{formatWon(totals.tierSavings)})
+                  </strong>
+                )}
               </span>
               <span className="font-mono font-extrabold text-base text-[#4E6E2A] tabular-nums">
                 총 {formatWon(totals.grandTotal)}

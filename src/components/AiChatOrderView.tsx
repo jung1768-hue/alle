@@ -30,6 +30,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { MOCK_COUPONS, VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
 import {
   CartLineItem,
+  DeliveryMethod,
   MenuItem,
   OrderLineItem,
   ParsedCondition,
@@ -37,6 +38,8 @@ import {
   Review,
   SavedLocation,
   Store,
+  StoreCoupon,
+  StorePromotion,
   SuperAppTab,
 } from '../types/alle';
 import { PlatformCategoryId } from '../utils/categories';
@@ -56,8 +59,12 @@ import {
   parseConditionInput,
 } from '../utils/parser';
 import {
+  calculateStoreDeliveryFee,
+  DELIVERY_METHOD_OPTIONS,
   estimateCompetitorSavings,
+  getAvailableCouponsForStore,
   getBestCoupon,
+  getDeliveryMethodMeta,
   getLocalCurrencyLabel,
 } from '../utils/pricing';
 import {
@@ -70,91 +77,12 @@ import {
 import { AlleBotIllustration } from './AlleBrand';
 import { FoodImage } from './FoodImage';
 
-interface IntentChip {
-  id: string;
-  label: string;
-  tone: 'primary' | 'secondary' | 'accent';
-}
-
-function buildIntentChips(
-  condition: ParsedCondition,
-  hasWishlistOrRegular: boolean
-): IntentChip[] {
-  const chips: IntentChip[] = [];
-
-  const remainingTags = [...condition.tags];
-  if (remainingTags.includes('얼큰한') && remainingTags.includes('국물')) {
-    chips.push({ id: 'tag-spicy-soup', label: '#얼큰한국물', tone: 'primary' });
-    remainingTags.splice(remainingTags.indexOf('얼큰한'), 1);
-    remainingTags.splice(remainingTags.indexOf('국물'), 1);
-  } else if (remainingTags.includes('담백한') && remainingTags.includes('국물')) {
-    chips.push({ id: 'tag-mild-soup', label: '#담백한국물', tone: 'primary' });
-    remainingTags.splice(remainingTags.indexOf('담백한'), 1);
-    remainingTags.splice(remainingTags.indexOf('국물'), 1);
-  } else if (remainingTags.includes('커피') && remainingTags.includes('케이크')) {
-    chips.push({ id: 'tag-coffee-cake', label: '#커피·케이크', tone: 'primary' });
-    remainingTags.splice(remainingTags.indexOf('커피'), 1);
-    remainingTags.splice(remainingTags.indexOf('케이크'), 1);
-  } else if (remainingTags.includes('다이어트') && remainingTags.includes('샐러드')) {
-    chips.push({ id: 'tag-diet-salad', label: '#다이어트샐러드', tone: 'primary' });
-    remainingTags.splice(remainingTags.indexOf('다이어트'), 1);
-    remainingTags.splice(remainingTags.indexOf('샐러드'), 1);
-  } else if (remainingTags.includes('전') && remainingTags.includes('국물')) {
-    chips.push({ id: 'tag-rainy-jeon', label: '#비오는날전·국물', tone: 'primary' });
-    remainingTags.splice(remainingTags.indexOf('전'), 1);
-    remainingTags.splice(remainingTags.indexOf('국물'), 1);
-  } else if (remainingTags.includes('바삭한') && remainingTags.includes('돈까스')) {
-    chips.push({ id: 'tag-crispy-katsu', label: '#바삭돈가스', tone: 'primary' });
-    remainingTags.splice(remainingTags.indexOf('바삭한'), 1);
-    remainingTags.splice(remainingTags.indexOf('돈까스'), 1);
-  }
-
-  for (const tag of remainingTags.slice(0, 3)) {
-    chips.push({ id: `tag-${tag}`, label: `#${tag}`, tone: 'primary' });
-  }
-
-  for (const exTag of condition.excludeTags ?? []) {
-    chips.push({ id: `ex-${exTag}`, label: `#제외:${exTag}`, tone: 'accent' });
-  }
-
-  if (condition.maxMinutes !== null) {
-    chips.push({
-      id: `min-${condition.maxMinutes}`,
-      label: `#${condition.maxMinutes}분이내`,
-      tone: 'accent',
-    });
-  }
-
-  if (condition.maxBudget !== null) {
-    chips.push({
-      id: `budget-${condition.maxBudget}`,
-      label: `#${condition.maxBudget.toLocaleString('ko-KR')}원이하`,
-      tone: 'secondary',
-    });
-  }
-
-  chips.push({
-    id: `servings-${condition.servings}`,
-    label: condition.servings === 1 ? '#혼밥1인' : `#성인${condition.servings}명`,
-    tone: 'secondary',
-  });
-
-  if (hasWishlistOrRegular) {
-    chips.push({
-      id: 'ctx-regular-store',
-      label: '#단골매장',
-      tone: 'accent',
-    });
-  }
-
-  return chips;
-}
-
 interface VoiceCheckoutDraft {
   menuId: string;
   servings: number;
   selectedOptionIds: string[];
   extraItems?: CartLineItem[];
+  deliveryMethod?: DeliveryMethod;
   paymentMethod: PaymentMethod;
   customerNote: string;
 }
@@ -196,6 +124,8 @@ interface AiChatOrderViewProps {
   walletBalance?: number;
   stampCount?: number;
   defaultNote?: string;
+  storePromotions?: StorePromotion[];
+  storeCoupons?: StoreCoupon[];
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
   onOpenAiSettings?: () => void;
@@ -242,6 +172,7 @@ interface AiChatOrderViewProps {
     items: OrderLineItem[];
     couponCode: string;
     couponDiscount: number;
+    deliveryMethod?: DeliveryMethod;
     sharedDeliveryApplied: boolean;
     reservationSlot: string | null;
     customerAlias: string;
@@ -381,28 +312,20 @@ function isLikelyBotEcho(
 
 const COUNSELOR_QUICK_STARTERS = [
   {
-    label: '🔥 마감 30% 특가',
-    prompt: '오늘 마감 특가 뭐 있어?',
+    label: '🍲 따뜻한 국밥 추천',
+    prompt: '따뜻한 국밥 추천해줘',
   },
   {
-    label: '🧺 전통시장·골목 묶음',
-    prompt: '전통시장 여러 가게 한 바구니로 묶어 시켜줘',
-  },
-  {
-    label: '🎁 옆집 릴레이 쿠폰',
-    prompt: '옆집 릴레이 쿠폰 쓸 수 있는 곳 알려줘',
-  },
-  {
-    label: '치킨 시켜줘',
+    label: '🍗 바삭한 치킨',
     prompt: '치킨 시켜줘',
   },
   {
-    label: '마라탕 땡기네',
-    prompt: '마라탕 땡기네',
+    label: '🎉 이벤트·할인 맛집',
+    prompt: '오늘 이벤트나 할인되는 메뉴 뭐 있어?',
   },
   {
-    label: '비 오는데 전이나 국물',
-    prompt: '비 오는데 전이나 국물',
+    label: '☕ 커피·디저트 1개',
+    prompt: '달달한 커피랑 케이크 찾아줘',
   },
 ];
 
@@ -484,18 +407,6 @@ function mergeConversationalCondition(
   };
 }
 
-const DIRECT_SEARCH_CATEGORIES = [
-  '전체',
-  '한식',
-  '치킨',
-  '중식',
-  '일식',
-  '양식',
-  '분식',
-  '카페',
-  '전통시장',
-] as const;
-
 export function AiChatOrderView({
   stores,
   menus,
@@ -506,6 +417,8 @@ export function AiChatOrderView({
   walletBalance = 0,
   stampCount = 0,
   defaultNote = '',
+  storePromotions = [],
+  storeCoupons = [],
   onToggleWishlist,
   onBackToHome,
   onOpenAiSettings: _onOpenAiSettings,
@@ -520,12 +433,7 @@ export function AiChatOrderView({
   onProceedToConfirm,
   onCompleteVoiceOrder,
 }: AiChatOrderViewProps) {
-  const [viewMode, setViewMode] = useState<'chat' | 'search'>('chat');
-  const [directSearchText, setDirectSearchText] = useState('');
-  const [directCategory, setDirectCategory] =
-    useState<(typeof DIRECT_SEARCH_CATEGORIES)[number]>('전체');
   const [input, setInput] = useState('');
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -569,7 +477,6 @@ export function AiChatOrderView({
   const autoListenTimerRef = useRef<number | null>(null);
   const restartListenTimerRef = useRef<number | null>(null);
   const voiceReplyEnabledRef = useRef(voiceReplyEnabled);
-  const viewModeRef = useRef(viewMode);
   const isListeningRef = useRef(isListening);
   const isSpeakingRef = useRef(isSpeaking);
   const isNearSpeechEndRef = useRef(false);
@@ -588,7 +495,6 @@ export function AiChatOrderView({
   const runChatQueryRef = useRef<(rawText: string) => void>(() => {});
 
   voiceReplyEnabledRef.current = voiceReplyEnabled;
-  viewModeRef.current = viewMode;
   isListeningRef.current = isListening;
   isSpeakingRef.current = isSpeaking;
   voiceCheckoutCompletedRef.current = voiceCheckoutCompleted;
@@ -674,6 +580,26 @@ export function AiChatOrderView({
     return map;
   }, [menus]);
 
+  const activePromoByStore = useMemo(() => {
+    const map = new Map<string, StorePromotion>();
+    for (const p of storePromotions) {
+      if (p.isActive && !map.has(p.storeId)) {
+        map.set(p.storeId, p);
+      }
+    }
+    return map;
+  }, [storePromotions]);
+
+  const activeCouponByStore = useMemo(() => {
+    const map = new Map<string, StoreCoupon>();
+    for (const c of storeCoupons) {
+      if (c.isActive && !map.has(c.storeId)) {
+        map.set(c.storeId, c);
+      }
+    }
+    return map;
+  }, [storeCoupons]);
+
   const adjustStoreExtraItem = (
     storeId: string,
     menu: MenuItem,
@@ -752,59 +678,6 @@ export function AiChatOrderView({
     return null;
   }, [messages]);
 
-  const directSearchResults = useMemo(() => {
-    const q = directSearchText.trim().toLowerCase();
-    const filteredMenus = menus.filter((m) => {
-      const st = storeMap.get(m.storeId);
-      if (!st) return false;
-      if (directCategory !== '전체') {
-        const grp = st.categoryGroup ?? '';
-        const catHit =
-          grp.includes(directCategory) ||
-          st.category.includes(directCategory) ||
-          m.tags.includes(directCategory) ||
-          (directCategory === '전통시장' && st.minOrderAmount === 0);
-        if (!catHit) return false;
-      }
-      if (!q) return true;
-      return (
-        m.name.toLowerCase().includes(q) ||
-        st.name.toLowerCase().includes(q) ||
-        st.category.toLowerCase().includes(q) ||
-        m.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    });
-
-    return evaluateRecommendations(
-      {
-        rawInput: directSearchText,
-        servings: 1,
-        tags: [],
-        excludeTags: [],
-        maxBudget: null,
-        maxMinutes: null,
-        unknownTokens: [],
-        needsConfirmation: false,
-      },
-      stores,
-      filteredMenus,
-      activeLocation
-    ).matches;
-  }, [directSearchText, directCategory, menus, stores, storeMap, activeLocation]);
-
-  // Live intent preview updates as the user types or speaks
-  const liveIntentCondition = useMemo(() => {
-    if (input.trim().length > 0) {
-      return mergeConversationalCondition(activeCondition, input);
-    }
-    return activeCondition;
-  }, [activeCondition, input]);
-
-  const liveIntentChips = useMemo(
-    () => buildIntentChips(liveIntentCondition, wishlistIds.length > 0),
-    [liveIntentCondition, wishlistIds.length]
-  );
-
   const clearAutoListenTimer = () => {
     if (autoListenTimerRef.current !== null) {
       window.clearTimeout(autoListenTimerRef.current);
@@ -822,11 +695,7 @@ export function AiChatOrderView({
   const startListening = () => {
     clearAutoListenTimer();
     clearRestartListenTimer();
-    if (
-      viewModeRef.current !== 'chat' ||
-      voiceCheckoutCompletedRef.current ||
-      voiceDeniedRef.current
-    ) {
+    if (voiceCheckoutCompletedRef.current || voiceDeniedRef.current) {
       return;
     }
     if (!getSpeechRecognitionConstructor()) {
@@ -958,7 +827,6 @@ export function AiChatOrderView({
           !isSpeakingRef.current &&
           shouldContinueListeningRef.current &&
           voiceReplyEnabledRef.current &&
-          viewModeRef.current === 'chat' &&
           !voiceCheckoutCompletedRef.current &&
           !voiceDeniedRef.current &&
           getSpeechRecognitionConstructor()
@@ -977,7 +845,7 @@ export function AiChatOrderView({
   const speakBotReply = (spokenMessage: string, allowAutoListen: boolean) => {
     clearAutoListenTimer();
     clearRestartListenTimer();
-    if (!voiceReplyEnabledRef.current || viewModeRef.current !== 'chat') return;
+    if (!voiceReplyEnabledRef.current) return;
     currentSpokenTextRef.current = spokenMessage;
     shouldContinueListeningRef.current = false;
     consecutiveEmptyListenRef.current = 0;
@@ -1015,7 +883,6 @@ export function AiChatOrderView({
         if (
           allowAutoListen &&
           voiceReplyEnabledRef.current &&
-          viewModeRef.current === 'chat' &&
           !voiceCheckoutCompletedRef.current &&
           !voiceDeniedRef.current &&
           !isListeningRef.current &&
@@ -1037,22 +904,6 @@ export function AiChatOrderView({
   useEffect(() => {
     bottomAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isListening, isSpeaking]);
-
-  useEffect(() => {
-    if (viewMode === 'search') {
-      shouldContinueListeningRef.current = false;
-      clearAutoListenTimer();
-      clearRestartListenTimer();
-      stopVoiceRef.current?.();
-      stopSpeaking();
-      setIsSpeaking(false);
-      isSpeakingRef.current = false;
-      setIsListening(false);
-      isListeningRef.current = false;
-      setInterimTranscript('');
-      setRecommendedSpotlight(null);
-    }
-  }, [viewMode]);
 
   useEffect(() => {
     if (voiceCheckoutDraft) {
@@ -1086,7 +937,7 @@ export function AiChatOrderView({
   }, [recommendedSpotlight]);
 
   useEffect(() => {
-    if (!voiceReplyEnabled || viewMode !== 'chat' || messages.length === 0) {
+    if (!voiceReplyEnabled || messages.length === 0) {
       return;
     }
     const last = messages[messages.length - 1];
@@ -1101,14 +952,10 @@ export function AiChatOrderView({
         !voiceCheckoutCompletedRef.current
       );
     }
-  }, [messages, voiceReplyEnabled, viewMode]);
+  }, [messages, voiceReplyEnabled]);
 
   useEffect(() => {
-    if (
-      !didInitialGreetRef.current &&
-      voiceReplyEnabledRef.current &&
-      viewModeRef.current === 'chat'
-    ) {
+    if (!didInitialGreetRef.current && voiceReplyEnabledRef.current) {
       didInitialGreetRef.current = true;
       const last = messages[messages.length - 1];
       if (last && last.sender === 'bot') {
@@ -1206,9 +1053,22 @@ export function AiChatOrderView({
     const optionsSubtotal = primaryOptionsSubtotal + extraOptionsSubtotal;
     const originalMenuSubtotal =
       menu.pricePerPerson * qty + extraOriginalSubtotal;
-    const deliveryFee = store.deliveryFee;
+    const deliveryMethod: DeliveryMethod =
+      draft.deliveryMethod ?? 'partner_direct';
+    const deliveryFeeCalc = calculateStoreDeliveryFee(
+      store,
+      menuSubtotal,
+      deliveryMethod
+    );
+    const deliveryFee = deliveryFeeCalc.finalDeliveryFee;
     const preCouponTotal = menuSubtotal + optionsSubtotal + deliveryFee;
-    const bestCoupon = getBestCoupon(MOCK_COUPONS, {
+    const storeCouponPool = getAvailableCouponsForStore(
+      MOCK_COUPONS,
+      storeCoupons,
+      store.id,
+      menuSubtotal
+    );
+    const bestCoupon = getBestCoupon(storeCouponPool, {
       menuSubtotal,
       stampCount,
       paymentMethod: draft.paymentMethod,
@@ -1222,12 +1082,16 @@ export function AiChatOrderView({
       menuSubtotal,
       originalMenuSubtotal,
       deliveryFee,
-      originalDeliveryFee: deliveryFee,
+      originalDeliveryFee: deliveryFeeCalc.baseFee,
       couponDiscount,
       isSameStorePrice: allSameStore,
     });
-    const effectiveMinutes =
-      menu.estimatedMinutes + (store.extraPrepMinutes ?? 0);
+    const effectiveMinutes = Math.max(
+      10,
+      menu.estimatedMinutes +
+        (store.extraPrepMinutes ?? 0) +
+        deliveryFeeCalc.etaDeltaMinutes
+    );
     const paymentOption =
       paymentOptions.find((p) => p.id === draft.paymentMethod) ??
       paymentOptions[0];
@@ -1242,7 +1106,9 @@ export function AiChatOrderView({
       unitPrice,
       menuSubtotal,
       optionsSubtotal,
+      deliveryMethod,
       deliveryFee,
+      deliveryFeeCalc,
       preCouponTotal,
       bestCoupon,
       couponDiscount,
@@ -1408,7 +1274,8 @@ export function AiChatOrderView({
       items: summary.resolvedLines,
       couponCode: summary.bestCoupon?.code ?? 'NONE',
       couponDiscount: summary.couponDiscount,
-      sharedDeliveryApplied: false,
+      deliveryMethod: summary.deliveryMethod,
+      sharedDeliveryApplied: summary.deliveryMethod === 'auto_bundle',
       reservationSlot: null,
       customerAlias: '음성 주문 고객',
       addressAlias: activeLocation?.detailAddress ?? '문 앞 배달',
@@ -1476,7 +1343,7 @@ export function AiChatOrderView({
       activeIndex: bounded,
       explanation,
     });
-    if (voiceReplyEnabledRef.current && viewModeRef.current === 'chat') {
+    if (voiceReplyEnabledRef.current) {
       speakBotReply(explanation, !voiceCheckoutCompletedRef.current);
     }
   };
@@ -2681,6 +2548,58 @@ export function AiChatOrderView({
       return;
     }
 
+    // Event / coupon / closing-sale routing
+    if (/(이벤트|행사|혜택|할인\s*맛집|할인되)/.test(trimmed)) {
+      const eventStoreIds = new Set([
+        ...Array.from(activePromoByStore.keys()),
+        ...Array.from(activeCouponByStore.keys()),
+      ]);
+      const candidateEventMenus = menus.filter((m) => {
+        const st = storeMap.get(m.storeId);
+        if (!st || !st.isOpen || m.isSoldOut || m.stock <= 0) return false;
+        const hasOffer =
+          eventStoreIds.has(st.id) || (m.closingDiscountPercent ?? 0) > 0;
+        if (!hasOffer) return false;
+        return (
+          !hasDeliverableInArea ||
+          isStoreDeliverableToLocation(st, activeLocation)
+        );
+      });
+      const fallbackEventMenus =
+        candidateEventMenus.length > 0
+          ? candidateEventMenus
+          : menus.filter((m) => {
+              const st = storeMap.get(m.storeId);
+              return (
+                Boolean(st?.isOpen) &&
+                !m.isSoldOut &&
+                m.stock > 0 &&
+                (eventStoreIds.has(m.storeId) ||
+                  (m.closingDiscountPercent ?? 0) > 0)
+              );
+            });
+      const topEventMenus = fallbackEventMenus.slice(0, 3);
+      if (topEventMenus.length > 0) {
+        const firstM = topEventMenus[0];
+        const firstSt = storeMap.get(firstM.storeId);
+        const evSpoken = `${firstSt?.name ?? '인기 매장'} 등 가게 이벤트·쿠폰 혜택이 적용되는 메뉴 ${topEventMenus.length}곳을 찾았어요. 바로 주문할까요?`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-event-${Date.now() + 1}`,
+            sender: 'bot',
+            text: `🎉 점주 자체 이벤트·쿠폰 또는 마감 할인이 진행 중인 가게 ${topEventMenus.length}곳을 찾았어요! 착한가격(매장 동일가)에 추가 혜택까지 받으실 수 있습니다.`,
+            spokenText: evSpoken,
+            matchedMenuIds: topEventMenus.map((m) => m.id),
+            servings: 1,
+            stagedMenuId: topEventMenus[0].id,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
+      }
+    }
+
     // Special local-commerce intent routing (마감특가 / 시장묶음 / 공동구매 / B2B / 릴레이쿠폰)
     if (/(마감|타임세일|떨이|잔여\s*특가)/.test(trimmed)) {
       const closingMenus = menus
@@ -2727,7 +2646,7 @@ export function AiChatOrderView({
 
     if (/(시장|한\s*바구니|여러\s*가게|합배송|골목\s*묶음)/.test(trimmed)) {
       const marketText =
-        '전통시장과 골목 가게 여러 곳의 메뉴를 최소주문금액 없이 한 바구니에 담고, 이웃 도보 통합 배달비 1회(1,500원)로 한 번에 받아보실 수 있어요.';
+        '전통시장과 골목 가게 여러 곳의 메뉴를 최소주문 제한 없이 1개씩 한 바구니에 담고, 이웃 도보 통합 배달비 1회(1,500원)로 한 번에 받아보실 수 있어요.';
       setMessages((prev) => [
         ...prev,
         {
@@ -3181,278 +3100,71 @@ export function AiChatOrderView({
     startListening();
   };
 
-  const isAiActive =
-    isListening || isSpeaking || isInputFocused || input.trim().length > 0;
-
   return (
     <div className="max-w-3xl mx-auto os-card rounded-[32px] overflow-hidden flex flex-col min-h-[76vh]">
-      {/* Calm AI Studio Header (2-row layout prevents mobile truncation) */}
-      <div className="px-4 sm:px-6 py-3 bg-white border-b border-[#E8ECE4] space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+      {/* Simple 1-Row Easy AI Header */}
+      <div className="px-4 sm:px-6 py-3.5 bg-white border-b border-[#E8ECE4] flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onBackToHome}
+            className="easy-compact min-w-[38px] min-h-[38px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center text-[#1A1D1A] cursor-pointer transition-colors shrink-0"
+            aria-label="홈으로 돌아가기"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-extrabold text-[#1A1D1A] tracking-tight whitespace-nowrap">
+              올레 대화 주문
+            </h1>
+            <p className="text-xs text-[#687064] truncate">
+              {activeLocation?.areaName ?? '전국'} · 💚 착한가격 · 1개도 배달
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenBrowse && (
             <button
               type="button"
-              onClick={onBackToHome}
-              className="min-w-[38px] min-h-[38px] rounded-xl hover:bg-[#F7F8F5] flex items-center justify-center text-[#1A1D1A] cursor-pointer transition-colors shrink-0"
-              aria-label="홈으로 돌아가기"
+              onClick={() => onOpenBrowse()}
+              className="easy-compact min-h-[36px] px-2.5 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 cursor-pointer transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <Search className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">카테고리 찾기</span>
             </button>
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight whitespace-nowrap">
-                올이 주문
-              </h1>
-              <p className="text-xs text-[#687064] truncate">
-                {activeLocation?.areaName ?? '전국'} 기준 · 대화부터 결제까지
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {aiReady && (
-              <span className="hidden lg:inline-flex min-h-[36px] px-2.5 py-1 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-semibold rounded-xl items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>alle 분석</span>
-              </span>
-            )}
-            {viewMode === 'chat' && (
-              <button
-                type="button"
-                onClick={() => runChatQuery('초기화')}
-                aria-label="새 대화 시작"
-                className="min-h-[36px] px-2.5 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] hover:text-[#4E6E2A] text-xs font-semibold rounded-xl inline-flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>새 대화</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 p-1 bg-[#F0F3EC] border border-[#E8ECE4] rounded-xl">
-          <button
-            type="button"
-            onClick={() => setViewMode('chat')}
-            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-              viewMode === 'chat'
-                ? 'bg-[#4E6E2A] text-white shadow-2xs'
-                : 'text-[#555E52] hover:text-[#1A1D1A]'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>올이 대화 주문</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('search')}
-            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
-              viewMode === 'search'
-                ? 'bg-[#4E6E2A] text-white shadow-2xs'
-                : 'text-[#555E52] hover:text-[#1A1D1A]'
-            }`}
-          >
-            <Search className="w-3.5 h-3.5" />
-            <span>가게·메뉴 직접 검색</span>
-          </button>
-        </div>
-
-        {viewMode === 'chat' &&
-          (getSpeechRecognitionConstructor() || isSpeechSynthesisSupported()) && (
-            <div className="grid grid-cols-2 gap-2">
-              {getSpeechRecognitionConstructor() && (
-                <button
-                  type="button"
-                  onClick={handleMicToggle}
-                  aria-pressed={isListening}
-                  className={`min-h-[36px] px-3 py-1.5 text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
-                    isListening
-                      ? 'bg-red-50 border-red-300 text-red-700'
-                      : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#687064] hover:bg-[#EAF1E2]'
-                  }`}
-                >
-                  {isListening ? (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                      <Mic className="w-3.5 h-3.5 shrink-0" />
-                      <span>마이크 ON</span>
-                    </>
-                  ) : (
-                    <>
-                      <MicOff className="w-3.5 h-3.5 shrink-0" />
-                      <span>마이크 OFF</span>
-                    </>
-                  )}
-                </button>
-              )}
-              {isSpeechSynthesisSupported() && (
-                <button
-                  type="button"
-                  onClick={handleToggleVoiceReply}
-                  aria-pressed={voiceReplyEnabled}
-                  className={`min-h-[36px] px-3 py-1.5 text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors border ${
-                    voiceReplyEnabled
-                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                      : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
-                  }`}
-                >
-                  {voiceReplyEnabled ? (
-                    <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                  ) : (
-                    <VolumeX className="w-3.5 h-3.5 shrink-0" />
-                  )}
-                  <span>{voiceReplyEnabled ? '음성 대화 ON' : '음성 꺼짐'}</span>
-                </button>
-              )}
-            </div>
           )}
+          {isSpeechSynthesisSupported() && (
+            <button
+              type="button"
+              onClick={handleToggleVoiceReply}
+              aria-pressed={voiceReplyEnabled}
+              className={`easy-compact min-h-[36px] px-2.5 py-1 text-xs font-bold rounded-xl inline-flex items-center gap-1 whitespace-nowrap cursor-pointer transition-colors border ${
+                voiceReplyEnabled
+                  ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                  : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
+              }`}
+            >
+              {voiceReplyEnabled ? (
+                <Volume2 className="w-3.5 h-3.5 shrink-0" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span>{voiceReplyEnabled ? '음성 ON' : '음성 OFF'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => runChatQuery('초기화')}
+            aria-label="새 대화 시작"
+            className="easy-compact min-h-[36px] px-2.5 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#555E52] hover:text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">새 대화</span>
+          </button>
+        </div>
       </div>
 
-      {viewMode === 'search' ? (
-        <div className="flex-1 bg-[#F7F8F5] p-5 sm:p-6 space-y-4 overflow-y-auto">
-          <div className="relative flex items-center">
-            <Search className="w-4 h-4 text-[#4E6E2A] absolute left-4 pointer-events-none" />
-            <input
-              type="text"
-              value={directSearchText}
-              onChange={(e) => setDirectSearchText(e.target.value)}
-              placeholder="가게명, 메뉴명 또는 태그를 입력하세요 (예: 치킨, 광장시장, 국밥)"
-              className="w-full min-h-[48px] pl-10 pr-4 bg-white border border-[#D4E1C5] rounded-2xl text-sm text-[#1A1D1A] placeholder:text-[#687064]"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            {DIRECT_SEARCH_CATEGORIES.map((cat) => {
-              const active = directCategory === cat;
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setDirectCategory(cat)}
-                  className={`min-h-[34px] px-3 py-1 rounded-full border text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                    active
-                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                      : 'bg-white border-[#E8ECE4] text-[#434B40]'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#687064]">
-            <span>
-              검색 결과 {directSearchResults.length}건 ({activeLocation?.areaName ?? '전국'} 배달 가능 매장만 표시)
-            </span>
-            {onOpenBrowse && (
-              <button
-                type="button"
-                onClick={() =>
-                  onOpenBrowse({ query: directSearchText.trim() })
-                }
-                className="easy-compact text-[#4E6E2A] font-bold hover:underline cursor-pointer"
-              >
-                카테고리별 전체 검색 열기 →
-              </button>
-            )}
-          </div>
-
-          {directSearchResults.length === 0 ? (
-            <div className="bg-white border border-[#E8ECE4] rounded-2xl p-8 text-center text-sm text-[#687064]">
-              검색 조건에 맞는 메뉴가 없습니다. 검색어를 바꾸거나 올이 대화 주문을 이용해 보세요.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {directSearchResults.map((item) => {
-                const effectivePrice = getEffectiveMenuPrice(item.menu);
-                return (
-                  <article
-                    key={item.menu.id}
-                    className="bg-white border border-[#E8ECE4] rounded-2xl p-4 flex flex-col justify-between gap-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
-                        <FoodImage
-                          src={item.menu.image}
-                          alt={item.menu.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <div className="flex items-center gap-1.5 text-[11px] text-[#687064]">
-                          {item.isNearbyArea && (
-                            <span className="px-1.5 py-0.5 rounded bg-[#EAF1E2] text-[#3D5720] font-bold">
-                              내 주변
-                            </span>
-                          )}
-                          <span className="truncate font-semibold text-[#4E6E2A]">
-                            {item.store.name}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-bold text-[#1A1D1A] truncate">
-                          {item.menu.name}
-                        </h3>
-                        <p className="text-xs font-mono font-bold text-[#1A1D1A] tabular-nums">
-                          {formatWon(effectivePrice)}{' '}
-                          <span className="font-sans font-normal text-[#687064]">
-                            · 배달비 {formatWon(item.deliveryFee)} · 약 {item.effectiveMinutes}분
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onOpenStoreMenu
-                            ? onOpenStoreMenu(item.store.id, {
-                                highlightMenuId: item.menu.id,
-                                preselectHighlight: true,
-                              })
-                            : onOpenRecommendationWithCondition(
-                                activeCondition,
-                                item.menu.id
-                              )
-                        }
-                        className="easy-compact min-h-[36px] px-2 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
-                      >
-                        {onOpenStoreMenu ? '가게 메뉴' : '상세'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onAddToCart
-                            ? onAddToCart(item.menu.id, 1, [])
-                            : handleStageMenuInChat(item.menu, 1)
-                        }
-                        className="min-h-[36px] px-2 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl cursor-pointer"
-                      >
-                        담기
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onProceedToConfirm({
-                            menuId: item.menu.id,
-                            servings: 1,
-                            selectedOptionIds: [],
-                            couponCode: 'NONE',
-                          })
-                        }
-                        className="min-h-[36px] px-2 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold rounded-xl cursor-pointer"
-                      >
-                        주문
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
       {/* Chat Stream */}
       <div className="flex-1 bg-[#F7F8F5] p-5 sm:p-7 space-y-6 overflow-y-auto">
         {messages.map((msg) => {
@@ -3488,7 +3200,7 @@ export function AiChatOrderView({
                   {msg.aiSource === 'gemini' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
                       <Sparkles className="w-2.5 h-2.5" />
-                      alle 분석
+                      올레 추천
                     </span>
                   )}
                   <p>{msg.text}</p>
@@ -3601,37 +3313,38 @@ export function AiChatOrderView({
                         m.id !== item.id && !m.isSoldOut && m.stock >= 1
                     ).length;
 
+                    const storePromo = activePromoByStore.get(store.id);
+                    const storeCoupon = activeCouponByStore.get(store.id);
+
                     return (
                       <div
                         key={item.id}
-                        className="w-[296px] shrink-0 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl p-4 flex flex-col justify-between gap-3.5 shadow-sm transition-colors"
+                        className="w-[288px] shrink-0 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-sm transition-colors"
                       >
-                        <div className="space-y-3">
-                          {/* Soft Sage Green '✨ AI 추천' Badge + Same-Store Price + Closing Sale */}
-                          <div className="p-2.5 rounded-xl bg-[#EAF1E2] border border-[#DCE7CF] space-y-1">
-                            <div className="flex flex-wrap items-center justify-between gap-1">
-                              <span className="inline-flex items-center text-[11px] font-bold text-[#3D5720]">
-                                ✨ 올이 추천 {idx + 1}순위
-                              </span>
-                              <div className="flex items-center gap-1">
-                                {isSameStore && (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-white text-[#3D5720] text-[10px] font-bold">
-                                    매장 동일가 ✓
-                                  </span>
-                                )}
-                                {hasClosingDiscount && (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-amber-600 text-white text-[10px] font-bold">
-                                    마감 -{item.closingDiscountPercent}%
-                                  </span>
-                                )}
-                              </div>
+                        <div className="space-y-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-1">
+                            <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-extrabold">
+                              ✨ 올레 추천 {idx + 1}순위
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {isSameStore && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-[#F7F8F5] border border-[#D4E1C5] text-[#3D5720] text-[11px] font-bold">
+                                  💚 착한가격
+                                </span>
+                              )}
+                              {hasClosingDiscount && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-amber-600 text-white text-[11px] font-bold">
+                                  -{item.closingDiscountPercent}%
+                                </span>
+                              )}
                             </div>
-                            {item.aiReason && (
-                              <p className="text-[11px] font-medium text-[#3D5720] leading-snug line-clamp-2">
-                                {item.aiReason}
-                              </p>
-                            )}
                           </div>
+
+                          {(storePromo || storeCoupon) && (
+                            <p className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 truncate">
+                              🎉 {storeCoupon ? storeCoupon.label : storePromo?.title}
+                            </p>
+                          )}
 
                           <div className="flex items-center gap-3">
                             <button
@@ -3645,8 +3358,8 @@ export function AiChatOrderView({
                                   servings,
                                 })
                               }
-                              aria-label={`${item.name} 올이 설명 팝업 열기`}
-                              className="easy-compact w-15 h-15 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0 cursor-pointer hover:ring-2 hover:ring-[#82B440] transition-all"
+                              aria-label={`${item.name} 올레 설명 팝업 열기`}
+                              className="easy-compact w-16 h-16 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0 cursor-pointer hover:ring-2 hover:ring-[#82B440] transition-all"
                             >
                               <FoodImage
                                 src={item.image}
@@ -3656,7 +3369,7 @@ export function AiChatOrderView({
                             </button>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-1">
-                                <div className="flex items-center gap-1 text-[11px] font-medium text-[#687064] min-w-0">
+                                <div className="flex items-center gap-1 text-xs font-medium text-[#687064] min-w-0">
                                   <span className="truncate">{store.name}</span>
                                   <span className="inline-flex items-center gap-0.5 text-[#1A1D1A] font-semibold shrink-0 tabular-nums">
                                     <Star className="w-3 h-3 fill-[#82B440] text-[#82B440]" />
@@ -3678,70 +3391,67 @@ export function AiChatOrderView({
                                   />
                                 </button>
                               </div>
-                              <div className="text-sm font-bold text-[#1A1D1A] truncate mt-0.5">
+                              <div className="text-base font-extrabold text-[#1A1D1A] truncate mt-0.5">
                                 {item.name}
                               </div>
-                              <div className="text-xs font-bold text-[#4E6E2A] tabular-nums mt-1">
+                              <div className="text-sm font-extrabold text-[#4E6E2A] tabular-nums mt-0.5">
                                 {formatWon(total)}{' '}
-                                <span className="font-normal text-[#687064]">
+                                <span className="font-normal text-xs text-[#687064]">
                                   · 약 {item.estimatedMinutes + (store.extraPrepMinutes ?? 0)}분
                                 </span>
                               </div>
                             </div>
                           </div>
+
+                          {item.aiReason && (
+                            <p className="text-xs text-[#555E52] leading-snug line-clamp-1">
+                              {item.aiReason}
+                            </p>
+                          )}
                         </div>
 
-                        <div
-                          className={`grid gap-1.5 ${
-                            onOpenStoreMenu && storeOtherCount > 0
-                              ? 'grid-cols-3'
-                              : 'grid-cols-2'
-                          }`}
-                        >
+                        <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() =>
-                              switchSpotlightIndex(idx, {
-                                msgId: msg.id,
-                                menuIds: matchedMenus.map((m) => m.id),
-                                activeIndex: idx,
-                                explanation: msg.spokenText ?? msg.text,
-                                servings,
-                              })
+                              onOpenStoreMenu
+                                ? onOpenStoreMenu(store.id, {
+                                    highlightMenuId: item.id,
+                                    initialServings: servings,
+                                    initialOptionIds: stagedOptions[item.id] ?? [],
+                                    preselectHighlight: true,
+                                  })
+                                : switchSpotlightIndex(idx, {
+                                    msgId: msg.id,
+                                    menuIds: matchedMenus.map((m) => m.id),
+                                    activeIndex: idx,
+                                    explanation: msg.spokenText ?? msg.text,
+                                    servings,
+                                  })
                             }
-                            className="easy-compact min-h-[38px] px-2 py-1.5 bg-[#F7F8F5] hover:bg-[#F0F3EC] text-[#687064] text-[11.5px] font-semibold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
+                            className="easy-compact min-h-[40px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
                           >
-                            상세 · 리뷰
+                            {onOpenStoreMenu && storeOtherCount > 0
+                              ? `다른 메뉴 (+${storeOtherCount})`
+                              : onOpenStoreMenu
+                                ? '가게 메뉴'
+                                : '상세 · 리뷰'}
                           </button>
-                          {onOpenStoreMenu && storeOtherCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onOpenStoreMenu(store.id, {
-                                  highlightMenuId: item.id,
-                                  initialServings: servings,
-                                  initialOptionIds: stagedOptions[item.id] ?? [],
-                                  preselectHighlight: true,
-                                })
-                              }
-                              className="easy-compact min-h-[38px] px-1.5 py-1.5 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-[11px] font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                              메뉴 (+{storeOtherCount})
-                            </button>
-                          )}
                           <button
                             type="button"
-                            onClick={() => {
-                              if (onAddToCart) {
-                                onAddToCart(item.id, servings, []);
-                              } else {
-                                handleStageMenuInChat(item, servings);
-                              }
-                            }}
-                            className="easy-compact min-h-[38px] px-2 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11.5px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                            onClick={() =>
+                              openCheckoutDraftMessage({
+                                menuId: item.id,
+                                servings,
+                                selectedOptionIds: stagedOptions[item.id] ?? [],
+                                paymentMethod: 'kakaopay',
+                                customerNote: defaultNote ?? '',
+                              })
+                            }
+                            className="easy-compact min-h-[40px] px-2.5 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-extrabold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                           >
-                            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-                            <span>담기</span>
+                            <Zap className="w-3.5 h-3.5 shrink-0" />
+                            <span>바로 주문</span>
                           </button>
                         </div>
                       </div>
@@ -4248,13 +3958,59 @@ export function AiChatOrderView({
                           );
                         })()}
 
-                        <div className="space-y-1 text-xs">
+                        <div className="space-y-2 text-xs">
+                          {/* Compact 3 Delivery Method Pills */}
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-bold text-[#687064]">
+                              배송 방식 (최소주문 없음)
+                            </span>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {DELIVERY_METHOD_OPTIONS.map((opt) => {
+                                const active =
+                                  (activeDraft.deliveryMethod ?? 'partner_direct') ===
+                                  opt.id;
+                                return (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setVoiceCheckoutDraft((prev) =>
+                                        prev ? { ...prev, deliveryMethod: opt.id } : prev
+                                      )
+                                    }
+                                    className={`easy-compact px-2 py-1.5 rounded-xl border text-center cursor-pointer transition-colors ${
+                                      active
+                                        ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                        : 'bg-white border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
+                                    }`}
+                                  >
+                                    <div className="text-[11px] font-extrabold truncate">
+                                      {opt.shortLabel}
+                                    </div>
+                                    <div className="text-[10px] opacity-80 truncate">
+                                      {opt.badge}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
                           <div className="flex items-center justify-between text-[#687064]">
-                            <span>배달비</span>
-                            <span className="font-mono tabular-nums">
-                              +{formatWon(summary.deliveryFee)}
+                            <span>
+                              배달비 ({getDeliveryMethodMeta(summary.deliveryMethod).label})
+                            </span>
+                            <span className="font-mono tabular-nums font-bold text-[#1A1D1A]">
+                              {summary.deliveryFee === 0
+                                ? '무료 (0원)'
+                                : `+${formatWon(summary.deliveryFee)}`}
                             </span>
                           </div>
+                          {summary.deliveryFeeCalc.nextTierLabel && (
+                            <p className="text-[11px] font-bold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg">
+                              💡 {summary.deliveryFeeCalc.nextTierLabel}
+                            </p>
+                          )}
                           {summary.bestCoupon && summary.couponDiscount > 0 && (
                             <div className="flex items-center justify-between text-[#4E6E2A] font-semibold">
                               <span className="inline-flex items-center gap-1">
@@ -4268,8 +4024,7 @@ export function AiChatOrderView({
                           )}
                           {summary.savings.totalSaved > 0 && (
                             <div className="text-[11px] font-semibold text-[#3D5720] bg-[#EAF1E2]/70 rounded-lg px-2.5 py-1">
-                              타 배달앱 대비 약{' '}
-                              {formatWon(summary.savings.totalSaved)} 절약
+                              착한가격으로 약 {formatWon(summary.savings.totalSaved)} 절약
                             </div>
                           )}
                         </div>
@@ -4372,7 +4127,7 @@ export function AiChatOrderView({
               className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Volume2 className="w-4 h-4 shrink-0" />
-              <span>터치해서 올이 음성 주문 시작하기 (&quot;어떤 음식을 찾아드릴까요?&quot;)</span>
+              <span>터치해서 올레 음성 주문 시작하기 (&quot;어떤 음식을 찾아드릴까요?&quot;)</span>
             </button>
           </div>
         )}
@@ -4381,7 +4136,7 @@ export function AiChatOrderView({
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
             <span className="inline-flex items-center gap-2">
               <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>올이가 말씀드리고 있어요 · 다 말하면 마이크가 켜져요</span>
+              <span>올레가 말씀드리고 있어요 · 다 말하면 마이크가 켜져요</span>
             </span>
             <button
               type="button"
@@ -4454,127 +4209,27 @@ export function AiChatOrderView({
         <div ref={bottomAnchorRef} />
       </div>
 
-      {/* Ambient Zero-UI Intent Recognition & Input Dock */}
-      <div className="bg-white border-t border-[#E8ECE4] px-4 sm:px-6 pt-3.5 pb-4 space-y-3">
-        {/* Live AI Waveform + Translucent Pill Intent Chips */}
-        <div aria-live="polite" className="space-y-2">
-          <div className="flex items-center justify-between gap-2 text-[11px]">
-            <div className="inline-flex items-center gap-2 font-semibold text-[#4E6E2A]">
-              {/* Soft Animated 5-Bar AI Understanding Waveform */}
-              <span className="inline-flex items-center gap-[2.5px] h-3.5" aria-hidden="true">
-                {[0, 1, 2, 3, 4].map((bar) => (
-                  <motion.span
-                    key={bar}
-                    className={`w-[2.5px] rounded-full ${
-                      isListening ? 'bg-red-500' : 'bg-[#4E6E2A]'
-                    }`}
-                    animate={
-                      isAiActive
-                        ? {
-                            height: [
-                              '4px',
-                              `${9 + ((bar * 3) % 7)}px`,
-                              '5px',
-                              `${12 - (bar % 4)}px`,
-                              '4px',
-                            ],
-                            opacity: [0.55, 1, 0.7, 1, 0.55],
-                          }
-                        : {
-                            height: ['4px', '7px', '4px'],
-                            opacity: [0.35, 0.7, 0.35],
-                          }
-                    }
-                    transition={{
-                      duration: isAiActive ? 0.9 + bar * 0.12 : 2.2 + bar * 0.2,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                  />
-                ))}
-              </span>
-              <span>
-                {isListening
-                  ? '음성 의도를 실시간으로 이해하고 있어요...'
-                  : input.trim().length > 0
-                    ? '입력 문장에서 조건을 실시간 추출 중'
-                    : '실시간 추출 의도'}
-              </span>
-            </div>
-            <span className="font-mono tabular-nums text-[#687064]">
-              {liveIntentChips.length}개 인식
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 min-h-[30px]">
-            <AnimatePresence mode="popLayout">
-              {liveIntentChips.map((chip) => (
-                <motion.span
-                  key={chip.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.86, y: 6 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.86, y: -4 }}
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold tracking-tight whitespace-nowrap tabular-nums backdrop-blur-xs border ${
-                    chip.tone === 'primary'
-                      ? 'bg-[#4E6E2A]/12 text-[#3D5720] border-[#4E6E2A]/25'
-                      : chip.tone === 'accent'
-                        ? 'bg-[#EAF1E2]/90 text-[#4E6E2A] border-[#D4E1C5]/80'
-                        : 'bg-[#F0F3EC] text-[#687064] border-[#E8ECE4]'
-                  }`}
-                >
-                  {chip.label}
-                </motion.span>
-              ))}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Soft Glowing Input Bar */}
-        <motion.form
+      {/* Simple Easy-Mode Input Bar */}
+      <div className="bg-white border-t border-[#E8ECE4] px-4 sm:px-6 py-3.5">
+        <form
           onSubmit={(e) => {
             e.preventDefault();
             runChatQuery(input);
           }}
-          animate={
+          className={`min-w-0 w-full p-1.5 rounded-2xl bg-[#F7F8F5] border-2 transition-colors flex items-center gap-2 ${
             isListening
-              ? {
-                  boxShadow: [
-                    '0 0 0 2px rgba(239,68,68,0.22), 0 8px 24px -6px rgba(239,68,68,0.28)',
-                    '0 0 0 5px rgba(239,68,68,0.14), 0 10px 30px -4px rgba(239,68,68,0.34)',
-                    '0 0 0 2px rgba(239,68,68,0.22), 0 8px 24px -6px rgba(239,68,68,0.28)',
-                  ],
-                }
-              : isAiActive
-                ? {
-                    boxShadow: [
-                      '0 0 0 2px rgba(78,110,42,0.16), 0 8px 24px -6px rgba(78,110,42,0.20)',
-                      '0 0 0 4px rgba(130,180,64,0.14), 0 10px 28px -4px rgba(78,110,42,0.28)',
-                      '0 0 0 2px rgba(78,110,42,0.16), 0 8px 24px -6px rgba(78,110,42,0.20)',
-                    ],
-                  }
-                : {
-                    boxShadow: '0 2px 10px rgba(26,29,26,0.04)',
-                  }
-          }
-          transition={{ duration: 1.8, repeat: isAiActive ? Infinity : 0, ease: 'easeInOut' }}
-          className={`min-w-0 w-full p-1.5 rounded-2xl bg-[#F7F8F5] border transition-colors flex items-center gap-1.5 sm:gap-2 ${
-            isListening
-              ? 'border-red-300'
-              : isAiActive
-                ? 'border-[#82B440]'
-                : 'border-[#E8ECE4]'
+              ? 'border-red-400'
+              : 'border-[#D4E1C5] focus-within:border-[#4E6E2A]'
           }`}
         >
           <button
             type="button"
             onClick={handleMicToggle}
             aria-label={isListening ? '음성 중지' : '음성으로 말하기'}
-            className={`min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+            className={`easy-compact min-w-[48px] min-h-[48px] rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
               isListening
                 ? 'bg-red-600 text-white'
-                : 'bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A]'
+                : 'bg-[#4E6E2A] hover:bg-[#3F5A21] text-white'
             }`}
           >
             {isListening ? (
@@ -4587,25 +4242,21 @@ export function AiChatOrderView({
           <input
             type="text"
             value={input}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="원하는 맛, 인원, 시간을 말씀해 주세요"
-            className="flex-1 min-w-0 w-full min-h-[44px] px-2 bg-transparent text-sm text-[#1A1D1A] placeholder:text-[#687064] focus:outline-none"
+            placeholder="예: 따뜻한 국밥 1그릇, 바삭한 치킨 추천해줘"
+            className="flex-1 min-w-0 w-full min-h-[48px] px-2 bg-transparent text-base text-[#1A1D1A] placeholder:text-[#687064] focus:outline-none"
           />
 
           <button
             type="submit"
             disabled={!input.trim()}
             aria-label="전송"
-            className="min-w-[44px] min-h-[44px] rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#E8ECE4] disabled:text-[#919A8D] text-white flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed transition-colors"
+            className="easy-compact min-w-[48px] min-h-[48px] px-4 rounded-xl bg-[#1A1D1A] hover:bg-[#2F352F] disabled:bg-[#E8ECE4] disabled:text-[#919A8D] text-white font-bold flex items-center justify-center shrink-0 cursor-pointer disabled:cursor-not-allowed transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>
-        </motion.form>
+        </form>
       </div>
-        </>
-      )}
 
       {/* AI Recommended Menu Spotlight Popup (shows menu while AI explains it) */}
       <AnimatePresence>
@@ -4644,7 +4295,7 @@ export function AiChatOrderView({
                 onClick={() => setRecommendedSpotlight(null)}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`${spotMenu.name} 올이 추천 설명`}
+                aria-label={`${spotMenu.name} 올레 추천 설명`}
                 className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
               >
                 <motion.div
@@ -4729,12 +4380,12 @@ export function AiChatOrderView({
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="px-2.5 py-1 rounded-full bg-[#3D5720] text-white text-xs font-bold inline-flex items-center gap-1 shadow-sm">
                           <Sparkles className="w-3.5 h-3.5" />
-                          올이 추천 {recommendedSpotlight.activeIndex + 1}순위
+                          올레 추천 {recommendedSpotlight.activeIndex + 1}순위
                         </span>
                         {isSpeaking && (
                           <span className="px-2.5 py-1 rounded-full bg-white/95 text-[#3D5720] text-xs font-bold inline-flex items-center gap-1 shadow-sm animate-pulse">
                             <AudioLines className="w-3.5 h-3.5 text-[#82B440]" />
-                            올이 설명 중
+                            올레 설명 중
                           </span>
                         )}
                       </div>
@@ -5044,7 +4695,7 @@ export function AiChatOrderView({
                           <>
                             <Volume2 className="w-3.5 h-3.5 animate-pulse shrink-0" />
                             <span className="truncate">
-                              올이 설명 중 (마이크 꺼짐) · 다 말하면 자동 켜짐
+                              올레 설명 중 (마이크 꺼짐) · 다 말하면 자동 켜짐
                             </span>
                           </>
                         ) : isListening ? (

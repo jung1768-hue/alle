@@ -28,6 +28,7 @@ import {
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
+import { getDeliveryMethodMeta } from '../utils/pricing';
 import { FoodImage } from './FoodImage';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
@@ -947,9 +948,22 @@ export function OrderStatusView({
                               ? '🧺 시장·골목 묶음'
                               : order.isB2B
                                 ? '🏢 B2B 단체식'
-                                : order.sharedDeliveryApplied
-                                  ? '👥 이웃 묶음'
-                                  : '🍽️ 일반 배달'}
+                                : (() => {
+                                    const method =
+                                      order.deliveryMethod ??
+                                      (order.sharedDeliveryApplied
+                                        ? 'auto_bundle'
+                                        : 'partner_direct');
+                                    const label =
+                                      getDeliveryMethodMeta(method).label;
+                                    if (method === 'auto_bundle') {
+                                      return `📦 ${label}`;
+                                    }
+                                    if (method === 'single_express') {
+                                      return `⚡ ${label}`;
+                                    }
+                                    return `🚶 ${label}`;
+                                  })()}
                           </span>
                           {!isCancelled && (
                             <span

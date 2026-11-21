@@ -19,6 +19,8 @@ import {
   Review,
   SavedLocation,
   Store,
+  StoreCoupon,
+  StorePromotion,
 } from '../types/alle';
 import {
   matchesMenuPlatformCategory,
@@ -45,6 +47,8 @@ interface CategoryBrowseViewProps {
   stores: Store[];
   menus: MenuItem[];
   reviews: Review[];
+  storePromotions?: StorePromotion[];
+  storeCoupons?: StoreCoupon[];
   wishlistIds: string[];
   activeLocation?: SavedLocation;
   initialCategory?: PlatformCategoryId;
@@ -73,6 +77,8 @@ export function CategoryBrowseView({
   stores,
   menus,
   reviews,
+  storePromotions = [],
+  storeCoupons = [],
   wishlistIds,
   activeLocation,
   initialCategory = 'all',
@@ -92,6 +98,8 @@ export function CategoryBrowseView({
   const [sortBy, setSortBy] = useState<BrowseSortKey>('recommended');
   const [onlyClosingSale, setOnlyClosingSale] = useState<boolean>(false);
   const [onlySameStorePrice, setOnlySameStorePrice] = useState<boolean>(false);
+  const [onlyWithPromoOrCoupon, setOnlyWithPromoOrCoupon] =
+    useState<boolean>(false);
   const [onlyLowDeliveryFee, setOnlyLowDeliveryFee] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'stores' | 'menus'>('stores');
   const [visibleCount, setVisibleCount] = useState<number>(12);
@@ -113,10 +121,20 @@ export function CategoryBrowseView({
     sortBy,
     onlyClosingSale,
     onlySameStorePrice,
+    onlyWithPromoOrCoupon,
     onlyLowDeliveryFee,
     viewMode,
     activeLocation?.id,
   ]);
+
+  const promoStoreIds = useMemo(
+    () =>
+      new Set([
+        ...storePromotions.filter((p) => p.isActive).map((p) => p.storeId),
+        ...storeCoupons.filter((c) => c.isActive).map((c) => c.storeId),
+      ]),
+    [storePromotions, storeCoupons]
+  );
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
 
@@ -225,6 +243,9 @@ export function CategoryBrowseView({
       if (onlyLowDeliveryFee && store.deliveryFee > 2000) {
         return false;
       }
+      if (onlyWithPromoOrCoupon && !promoStoreIds.has(store.id)) {
+        return false;
+      }
 
       if (trimmedQuery) {
         const storeHit =
@@ -286,7 +307,9 @@ export function CategoryBrowseView({
     selectedCategory,
     onlyClosingSale,
     onlySameStorePrice,
+    onlyWithPromoOrCoupon,
     onlyLowDeliveryFee,
+    promoStoreIds,
     trimmedQuery,
     sortBy,
     activeLocation,
@@ -322,6 +345,9 @@ export function CategoryBrowseView({
         return false;
       }
       if (onlyLowDeliveryFee && store.deliveryFee > 2000) {
+        return false;
+      }
+      if (onlyWithPromoOrCoupon && !promoStoreIds.has(store.id)) {
         return false;
       }
       if (trimmedQuery) {
@@ -377,7 +403,9 @@ export function CategoryBrowseView({
     selectedCategory,
     onlyClosingSale,
     onlySameStorePrice,
+    onlyWithPromoOrCoupon,
     onlyLowDeliveryFee,
+    promoStoreIds,
     sortBy,
     reviewCountByMenu,
   ]);
@@ -422,7 +450,7 @@ export function CategoryBrowseView({
             className="easy-compact text-xs font-bold text-[#4E6E2A] hover:underline underline-offset-2 inline-flex items-center gap-1 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>AI 올이에게 추천받기 →</span>
+            <span>AI 올레에게 추천받기 →</span>
           </button>
         </div>
 
@@ -623,7 +651,18 @@ export function CategoryBrowseView({
                 : 'bg-white border-[#E8ECE4] text-[#434B40]'
             }`}
           >
-            ✓ 매장 동일가
+            💚 착한가격
+          </button>
+          <button
+            type="button"
+            onClick={() => setOnlyWithPromoOrCoupon((p) => !p)}
+            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold cursor-pointer transition-colors ${
+              onlyWithPromoOrCoupon
+                ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                : 'bg-white border-[#E8ECE4] text-[#434B40]'
+            }`}
+          >
+            🎉 가게 이벤트·쿠폰
           </button>
           <button
             type="button"
@@ -650,6 +689,7 @@ export function CategoryBrowseView({
           searchQuery ||
           onlyClosingSale ||
           onlySameStorePrice ||
+          onlyWithPromoOrCoupon ||
           onlyLowDeliveryFee) && (
           <button
             type="button"
@@ -658,6 +698,7 @@ export function CategoryBrowseView({
               setSearchQuery('');
               setOnlyClosingSale(false);
               setOnlySameStorePrice(false);
+              setOnlyWithPromoOrCoupon(false);
               setOnlyLowDeliveryFee(false);
             }}
             className="easy-compact text-[#4E6E2A] font-bold hover:underline cursor-pointer"
@@ -695,6 +736,7 @@ export function CategoryBrowseView({
                 setSearchQuery('');
                 setOnlyClosingSale(false);
                 setOnlySameStorePrice(false);
+                setOnlyWithPromoOrCoupon(false);
                 setOnlyLowDeliveryFee(false);
               }}
               className="min-h-[42px] px-4 py-2 rounded-xl bg-[#EAF1E2] text-[#3D5720] text-xs sm:text-sm font-bold cursor-pointer"
@@ -757,7 +799,15 @@ export function CategoryBrowseView({
                         )}
                         {!store.singlePriceRevoked && (
                           <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
-                            매장 동일가 ✓
+                            💚 착한가격 · 매장 동일가
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-[10px] font-bold">
+                          1개도 배달
+                        </span>
+                        {promoStoreIds.has(store.id) && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
+                            🎉 이벤트·쿠폰
                           </span>
                         )}
                         {hasClosing && (
@@ -800,6 +850,12 @@ export function CategoryBrowseView({
                           {store.deliveryFee === 0
                             ? '무료'
                             : formatWon(store.deliveryFee)}
+                          {store.deliveryFeeTiers &&
+                            store.deliveryFeeTiers.length > 0 && (
+                              <strong className="ml-1 text-[#4E6E2A]">
+                                (구간 지원)
+                              </strong>
+                            )}
                         </span>
                       </div>
                     </div>
