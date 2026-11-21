@@ -527,17 +527,17 @@ export function ConditionHome({
         <button
           type="button"
           onClick={onOpenB2BMeal}
-          className="min-h-[76px] w-full px-5 py-4 rounded-2xl bg-[#1A1D1A] hover:bg-[#2A2F2A] text-white border border-[#3A4038] shadow-sm flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
+          className="min-h-[76px] w-full px-5 py-4 rounded-2xl bg-white hover:bg-[#EAF1E2] text-[#1A1D1A] border-2 border-[#D4E1C5] hover:border-[#4E6E2A] shadow-sm flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
         >
           <div className="min-w-0">
             <div className="text-base sm:text-lg font-extrabold truncate">
               🏢 B2B 기업 단체 선주문
             </div>
-            <div className="text-xs sm:text-sm text-[#C8D0C4] mt-0.5 truncate">
+            <div className="text-xs sm:text-sm text-[#555E52] mt-0.5 truncate">
               원하는 시간 예약 · 카드/계좌 즉시 결제 · 거래명세표
             </div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl bg-[#82B440] text-[#111411] text-xs sm:text-sm font-extrabold shrink-0 whitespace-nowrap">
+          <span className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] border border-[#82B440]/60 text-[#3D5720] text-xs sm:text-sm font-extrabold shrink-0 whitespace-nowrap">
             바로 주문 →
           </span>
         </button>
