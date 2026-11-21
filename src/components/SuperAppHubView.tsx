@@ -214,11 +214,14 @@ export function SuperAppHubView({
   );
 
   // C2C Errand state
-  const [errandTitle, setErrandTitle] = useState<string>('약국 일반 상비약 구매 대행');
-  const [errandCategory, setErrandCategory] = useState<string>('생활/약국 심부름');
-  const [pickupAlias, setPickupAlias] = useState<string>('동네 약국 A');
+  const [errandTitle, setErrandTitle] = useState<string>(
+    '동네 마트 우유 · 두부 · 계란 장보기 대행'
+  );
+  const [errandCategory, setErrandCategory] =
+    useState<string>('동네 장보기/편의점');
+  const [pickupAlias, setPickupAlias] = useState<string>('동네 마트 A');
   const [dropoffAlias, setDropoffAlias] = useState<string>(activeOrigin);
-  const [estimatedItemCost, setEstimatedItemCost] = useState<number>(6000);
+  const [estimatedItemCost, setEstimatedItemCost] = useState<number>(8000);
   const [errandFee, setErrandFee] = useState<number>(2000);
   const [errandError, setErrandError] = useState<string | null>(null);
   const [receiptInputs, setReceiptInputs] = useState<Record<string, number>>({});
@@ -1039,9 +1042,48 @@ export function SuperAppHubView({
                     type="text"
                     value={errandTitle}
                     onChange={(e) => setErrandTitle(e.target.value)}
-                    placeholder="예: 세탁소 정장 수령 또는 약국 상비약 구매"
+                    placeholder="예: 동네 마트 우유·두부 장보기 또는 세탁소 정장 수령"
                     className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-xs sm:text-sm"
                   />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[
+                      {
+                        label: '동네 마트 장보기',
+                        title: '동네 마트 우유 · 두부 · 계란 장보기 대행',
+                        category: '동네 장보기/편의점',
+                        pickup: '동네 마트 A',
+                        cost: 8000,
+                      },
+                      {
+                        label: '편의점 생수·생필품',
+                        title: '편의점 생수 2L · 컵라면 · 휴지 구매 대행',
+                        category: '동네 장보기/편의점',
+                        pickup: '24시 동네 편의점',
+                        cost: 7000,
+                      },
+                      {
+                        label: '세탁소 정장 수령',
+                        title: '세탁소 드라이클리닝 정장 수령 및 전달',
+                        category: '세탁물 수령',
+                        pickup: '동네 크린 세탁소',
+                        cost: 0,
+                      },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setErrandTitle(preset.title);
+                          setErrandCategory(preset.category);
+                          setPickupAlias(preset.pickup);
+                          setEstimatedItemCost(preset.cost);
+                        }}
+                        className="easy-compact px-2.5 py-1 rounded-full bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[11px] font-semibold text-[#3D5720] cursor-pointer transition-colors"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
@@ -1054,8 +1096,9 @@ export function SuperAppHubView({
                       onChange={(e) => setErrandCategory(e.target.value)}
                       className="w-full min-h-[40px] px-2.5 bg-white border border-[#E8ECE4] rounded-xl text-xs"
                     >
-                      <option value="생활/약국 심부름">생활/약국 심부름</option>
+                      <option value="동네 장보기/편의점">동네 장보기/편의점</option>
                       <option value="세탁물 수령">세탁물 수령</option>
+                      <option value="빵집/꽃집 픽업">빵집/꽃집 픽업</option>
                       <option value="분리수거/문서전달">분리수거/문서전달</option>
                     </select>
                   </div>

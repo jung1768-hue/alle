@@ -193,14 +193,17 @@
   font-size: 1.0625rem;
 }
 
-.alle-easy-mode button,
-.alle-easy-mode input,
+.alle-easy-mode main button:not(.easy-compact):not([aria-label*="닫기"]):not([aria-label*="찜"]):not([aria-label*="감소"]):not([aria-label*="증가"]):not([aria-label*="삭제"]):not([aria-label*="지우기"]):not([aria-label*="이전"]):not([aria-label*="다음"]) {
+  min-height: 46px;
+}
+
+.alle-easy-mode input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .alle-easy-mode select {
-  min-height: 54px;
+  min-height: 48px;
 }
 
 .alle-easy-mode nav button {
-  min-height: 52px;
+  min-height: 50px;
 }
 
 .alle-easy-mode h1 {

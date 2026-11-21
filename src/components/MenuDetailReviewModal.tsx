@@ -16,19 +16,23 @@ import { FoodImage } from './FoodImage';
 interface MenuDetailReviewModalProps {
   menu: MenuItem | null;
   store: Store | null;
+  storeMenuCount?: number;
   reviews: Review[];
   reviewReplies: Record<string, ReviewReply>;
   onClose: () => void;
   onQuickOrder: (menuId: string, servings: number) => void;
+  onOpenStoreMenu?: () => void;
 }
 
 export function MenuDetailReviewModal({
   menu,
   store,
+  storeMenuCount = 0,
   reviews,
   reviewReplies,
   onClose,
   onQuickOrder,
+  onOpenStoreMenu,
 }: MenuDetailReviewModalProps) {
   const isOpen = Boolean(menu && store);
 
@@ -170,6 +174,22 @@ export function MenuDetailReviewModal({
             </div>
           )}
         </div>
+
+        {storeMenuCount > 1 && onOpenStoreMenu && (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenStoreMenu();
+            }}
+            className="w-full min-h-[42px] px-4 py-2 rounded-2xl bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440] text-[#3D5720] text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <StoreIcon className="w-4 h-4 shrink-0" />
+            <span>
+              이 가게 다른 메뉴 보기 ({storeMenuCount - 1}개 더 있음) →
+            </span>
+          </button>
+        )}
 
         <div className="pt-2 grid grid-cols-2 gap-2">
           <button

@@ -11,6 +11,7 @@ import {
   Navigation,
   Presentation,
   RotateCcw,
+  Search,
   ShoppingBag,
   Sparkles,
   Store as StoreIcon,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { AiChatOrderView } from './components/AiChatOrderView';
 import { AlleLogo } from './components/AlleBrand';
+import { CategoryBrowseView } from './components/CategoryBrowseView';
 import { ConditionHome } from './components/ConditionHome';
 import { FutureScopeModal } from './components/FutureScopeModal';
 import { GeminiKeyModal } from './components/GeminiKeyModal';
@@ -34,6 +36,7 @@ import {
   QuickPayResolvedItem,
 } from './components/QuickPayBottomSheet';
 import { RecommendationView } from './components/RecommendationView';
+import { StoreMenuModal } from './components/StoreMenuModal';
 import { SuperAppHubView } from './components/SuperAppHubView';
 import { WishlistView } from './components/WishlistView';
 import { INITIAL_REVIEWS, PROHIBITED_ERRAND_KEYWORDS } from './data/seedData';
@@ -71,6 +74,7 @@ import {
   estimateCompetitorSavings,
   getLocalCurrencyLabel,
 } from './utils/pricing';
+import { PlatformCategoryId } from './utils/categories';
 import { checkServerGeminiAvailable } from './utils/gemini';
 import {
   extractSharedState,
@@ -206,12 +210,23 @@ export default function App() {
 
   const [cart, setCart] = useState<CartState | null>(null);
   const [pendingCartSwitch, setPendingCartSwitch] = useState<{
-    menuId: string;
     storeId: string;
     storeName: string;
-    menuName: string;
-    quantity: number;
-    selectedOptionIds: string[];
+    summaryLabel: string;
+    items: CartLineItem[];
+  } | null>(null);
+
+  const [browseInitialCategory, setBrowseInitialCategory] =
+    useState<PlatformCategoryId>('all');
+  const [browseInitialQuery, setBrowseInitialQuery] = useState<string>('');
+  const [prevStepBeforeConfirm, setPrevStepBeforeConfirm] =
+    useState<ConsumerStep>(ConsumerStep.HOME);
+  const [storeMenuModal, setStoreMenuModal] = useState<{
+    storeId: string;
+    highlightMenuId?: string;
+    initialServings?: number;
+    initialOptionIds?: string[];
+    preselectHighlight?: boolean;
   } | null>(null);
 
   const [quickPayDraft, setQuickPayDraft] = useState<{
@@ -303,6 +318,7 @@ export default function App() {
       setShowLocationPicker(false);
       setShowNotifications(false);
       setShowDemoSwitcher(false);
+      setStoreMenuModal(null);
 
       if (navState?.role && navState?.step) {
         isPopstateNavRef.current = true;
@@ -616,6 +632,112 @@ export default function App() {
     ];
   };
 
+  const handleOpenBrowse = (options?: {
+    category?: PlatformCategoryId;
+    query?: string;
+  }) => {
+    setBrowseInitialCategory(options?.category ?? 'all');
+    setBrowseInitialQuery(options?.query ?? '');
+    setRole(DemoRole.CONSUMER);
+    setStep(ConsumerStep.BROWSE);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenStoreMenu = (
+    storeId: string,
+    options?: {
+      highlightMenuId?: string;
+      initialServings?: number;
+      initialOptionIds?: string[];
+      preselectHighlight?: boolean;
+    }
+  ) => {
+    setStoreMenuModal({
+      storeId,
+      highlightMenuId: options?.highlightMenuId,
+      initialServings: options?.initialServings,
+      initialOptionIds: options?.initialOptionIds,
+      preselectHighlight: options?.preselectHighlight,
+    });
+  };
+
+  const handleAddMultipleToCart = (
+    storeId: string,
+    incomingItems: CartLineItem[],
+    options?: { replaceSameStore?: boolean }
+  ) => {
+    const targetStore = appState.stores.find((s) => s.id === storeId);
+    if (!targetStore || !targetStore.isOpen) {
+      showToast('해당 매장이 현재 영업 중단 상태입니다.');
+      return;
+    }
+    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
+    const validIncoming = incomingItems.filter((line) => {
+      const m = menuMap.get(line.menuId);
+      return Boolean(
+        m && m.storeId === storeId && !m.isSoldOut && m.stock >= 1 && line.quantity > 0
+      );
+    });
+    if (validIncoming.length === 0) {
+      showToast('장바구니에 담을 수 있는 메뉴가 없습니다.');
+      return;
+    }
+
+    const firstMenu = menuMap.get(validIncoming[0].menuId);
+    const summaryLabel =
+      validIncoming.length > 1
+        ? `${firstMenu?.name ?? '메뉴'} 외 ${validIncoming.length - 1}종`
+        : firstMenu?.name ?? '메뉴';
+
+    if (cart && cart.storeId !== targetStore.id && cart.items.length > 0) {
+      setPendingCartSwitch({
+        storeId: targetStore.id,
+        storeName: targetStore.name,
+        summaryLabel,
+        items: validIncoming.map((it) => {
+          const m = menuMap.get(it.menuId)!;
+          return {
+            menuId: it.menuId,
+            quantity: Math.min(Math.max(1, it.quantity), m.stock),
+            selectedOptionIds: [...it.selectedOptionIds],
+          };
+        }),
+      });
+      return;
+    }
+
+    setCart((prev) => {
+      if (options?.replaceSameStore && prev?.storeId === targetStore.id) {
+        return {
+          storeId: targetStore.id,
+          items: validIncoming.map((it) => {
+            const m = menuMap.get(it.menuId)!;
+            return {
+              menuId: it.menuId,
+              quantity: Math.min(Math.max(1, it.quantity), m.stock),
+              selectedOptionIds: [...it.selectedOptionIds],
+            };
+          }),
+        };
+      }
+      let items = prev && prev.storeId === targetStore.id ? [...prev.items] : [];
+      for (const line of validIncoming) {
+        const m = menuMap.get(line.menuId);
+        if (!m) continue;
+        items = mergeCartItems(items, line, m.stock);
+      }
+      return {
+        storeId: targetStore.id,
+        items,
+      };
+    });
+    showToast(
+      validIncoming.length > 1
+        ? `${targetStore.name} ${summaryLabel}이(가) 장바구니에 담겼습니다.`
+        : `'${summaryLabel}'이(가) 장바구니에 담겼습니다.`
+    );
+  };
+
   const handleAddToCart = (
     menuId: string,
     quantity = 1,
@@ -638,12 +760,16 @@ export default function App() {
 
     if (cart && cart.storeId !== targetStore.id && cart.items.length > 0) {
       setPendingCartSwitch({
-        menuId: targetMenu.id,
         storeId: targetStore.id,
         storeName: targetStore.name,
-        menuName: targetMenu.name,
-        quantity: Math.min(Math.max(1, quantity), targetMenu.stock),
-        selectedOptionIds: [...selectedOptionIds],
+        summaryLabel: targetMenu.name,
+        items: [
+          {
+            menuId: targetMenu.id,
+            quantity: Math.min(Math.max(1, quantity), targetMenu.stock),
+            selectedOptionIds: [...selectedOptionIds],
+          },
+        ],
       });
       return;
     }
@@ -772,6 +898,7 @@ export default function App() {
       showToast('해당 메뉴가 현재 품절이거나 영업 중단 상태입니다.');
       return;
     }
+    setPrevStepBeforeConfirm(step);
     setConfirmDraft({
       draftId: `draft-${Date.now()}`,
       storeId: targetStore.id,
@@ -895,6 +1022,7 @@ export default function App() {
   }) => {
     const targetMenu = appState.menus.find((m) => m.id === payload.menuId);
     if (!targetMenu) return;
+    setPrevStepBeforeConfirm(step);
     setConfirmDraft({
       draftId: `draft-${Date.now()}`,
       storeId: targetMenu.storeId,
@@ -907,6 +1035,48 @@ export default function App() {
       ],
       couponCode: payload.couponCode,
     });
+    setStep(ConsumerStep.CONFIRM);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleProceedToConfirmWithItems = (payload: {
+    storeId: string;
+    items: CartLineItem[];
+    couponCode?: string;
+  }) => {
+    const targetStore = appState.stores.find((s) => s.id === payload.storeId);
+    if (!targetStore || !targetStore.isOpen) {
+      showToast('해당 매장이 현재 영업 중단 상태입니다.');
+      return;
+    }
+    const menuMap = new Map(appState.menus.map((m) => [m.id, m]));
+    const validItems = payload.items.filter((it) => {
+      const m = menuMap.get(it.menuId);
+      return Boolean(
+        m && m.storeId === payload.storeId && !m.isSoldOut && m.stock >= 1
+      );
+    });
+    if (validItems.length === 0) {
+      showToast('주문 가능한 메뉴가 없습니다.');
+      return;
+    }
+    setPrevStepBeforeConfirm(step);
+    setConfirmDraft({
+      draftId: `draft-multi-${Date.now()}`,
+      storeId: payload.storeId,
+      items: validItems.map((it) => {
+        const m = menuMap.get(it.menuId)!;
+        return {
+          menuId: it.menuId,
+          quantity: Math.min(Math.max(1, it.quantity), m.stock),
+          selectedOptionIds: [...it.selectedOptionIds],
+        };
+      }),
+      couponCode: payload.couponCode ?? 'NONE',
+      sharedDeliveryApplied: false,
+      reservationSlot: 'now',
+    });
+    setRole(DemoRole.CONSUMER);
     setStep(ConsumerStep.CONFIRM);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -2005,6 +2175,7 @@ export default function App() {
     setCart(null);
     setQuickPayDraft(null);
     setPendingCartSwitch(null);
+    setStoreMenuModal(null);
     setDeliveryNotifications([]);
     setActiveDeliveryAlert(null);
     setMapFocusRequest(null);
@@ -2213,14 +2384,28 @@ export default function App() {
             </button>
           </div>
 
-          {/* Right Easy Mode Toggle + Presenter Demo Switcher + Notification Bell */}
+          {/* Right Search + Easy Mode Toggle + Presenter Demo Switcher + Notification Bell */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleOpenBrowse()}
+              aria-label="카테고리·가게 검색"
+              className={`easy-compact min-h-[34px] px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
+                role === DemoRole.CONSUMER && step === ConsumerStep.BROWSE
+                  ? 'bg-[#4E6E2A] text-white border-[#4E6E2A]'
+                  : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">카테고리 검색</span>
+            </button>
+
             <button
               type="button"
               onClick={handleToggleEasyMode}
               aria-pressed={appState.easyMode}
               aria-label="큰 글씨 쉬운 모드 전환"
-              className={`min-h-[34px] px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
+              className={`easy-compact min-h-[34px] px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
                 appState.easyMode
                   ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
                   : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
@@ -2245,7 +2430,7 @@ export default function App() {
                   }}
                   aria-expanded={showDemoSwitcher}
                   aria-label="Demo Mode 발표자 시연 전환 열기"
-                className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`easy-compact min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1.5 transition-all cursor-pointer ${
                   showDemoSwitcher
                     ? 'bg-[#1A1D1A] text-[#EAF1E2] border-[#4E6E2A]'
                     : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
@@ -2412,7 +2597,7 @@ export default function App() {
                 }}
                 aria-expanded={showNotifications}
                 aria-label="알림 보기"
-                className="relative w-10 h-10 rounded-xl hover:bg-[#F7F8F5] text-[#1A1D1A] flex items-center justify-center transition-colors cursor-pointer"
+                className="easy-compact relative w-10 h-10 rounded-xl hover:bg-[#F7F8F5] text-[#1A1D1A] flex items-center justify-center transition-colors cursor-pointer"
               >
               <Bell className="w-5 h-5" strokeWidth={1.9} />
               {deliveryNotifications.some((n) => !n.read) ? (
@@ -2672,10 +2857,36 @@ export default function App() {
             onOpenQuickPay={handleOpenQuickPay}
             onAddToCart={handleAddToCart}
             onOpenSuperApp={handleOpenSuperApp}
+            onOpenBrowse={handleOpenBrowse}
+            onOpenStoreMenu={handleOpenStoreMenu}
             onSavePreferences={handleSavePreferences}
             onApplyPreferencesToInput={handleApplyPreferencesToInput}
             activeLocation={activeLocation}
             onOpenLocationPicker={() => setShowLocationPicker(true)}
+          />
+        ) : step === ConsumerStep.BROWSE ? (
+          <CategoryBrowseView
+            stores={appState.stores}
+            menus={appState.menus}
+            reviews={INITIAL_REVIEWS}
+            wishlistIds={appState.wishlistIds}
+            activeLocation={activeLocation}
+            initialCategory={browseInitialCategory}
+            initialQuery={browseInitialQuery}
+            onBackToHome={() => setStep(ConsumerStep.HOME)}
+            onOpenLocationPicker={() => setShowLocationPicker(true)}
+            onOpenAiChat={(prompt) => {
+              setAiChatInitialPrompt(prompt);
+              setRole(DemoRole.CONSUMER);
+              setStep(ConsumerStep.AI_CHAT);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onToggleWishlist={handleToggleWishlist}
+            onAddToCart={handleAddToCart}
+            onOpenStoreMenu={handleOpenStoreMenu}
+            onQuickOrderMenu={(menuId, servings) =>
+              handleQuickReorderToConfirm(menuId, servings)
+            }
           />
         ) : step === ConsumerStep.AI_CHAT ? (
           <AiChatOrderView
@@ -2699,6 +2910,10 @@ export default function App() {
               handleQuickReorderToConfirm(menuId, 1, { couponCode: 'RELAY1000' })
             }
             onAddToCart={handleAddToCart}
+            onAddMultipleToCart={handleAddMultipleToCart}
+            onOpenStoreMenu={handleOpenStoreMenu}
+            onProceedToConfirmWithItems={handleProceedToConfirmWithItems}
+            onOpenBrowse={handleOpenBrowse}
             onOpenRecommendationWithCondition={handleOpenRecommendationWithCondition}
             onProceedToConfirm={handleProceedToConfirm}
             onCompleteVoiceOrder={handleConfirmOrder}
@@ -2719,6 +2934,9 @@ export default function App() {
             onQuickRelaxCondition={handleQuickRelaxCondition}
             onReportPriceDifference={handleReportPriceDifference}
             onAddToCart={handleAddToCart}
+            onAddMultipleToCart={handleAddMultipleToCart}
+            onOpenStoreMenu={handleOpenStoreMenu}
+            onProceedToConfirmWithItems={handleProceedToConfirmWithItems}
             onProceedToConfirm={handleProceedToConfirm}
           />
         ) : step === ConsumerStep.CONFIRM &&
@@ -2746,7 +2964,7 @@ export default function App() {
             defaultNote={appState.preferences.memoNote}
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onOpenLocationPicker={() => setShowLocationPicker(true)}
-            onBack={() => setStep(ConsumerStep.RECOMMEND)}
+            onBack={() => setStep(prevStepBeforeConfirm)}
             onConfirmOrder={handleConfirmOrder}
           />
         ) : step === ConsumerStep.WISHLIST ? (
@@ -2869,6 +3087,7 @@ export default function App() {
         cartStore &&
         cartSummary.totalCount > 0 &&
         (step === ConsumerStep.HOME ||
+          step === ConsumerStep.BROWSE ||
           step === ConsumerStep.AI_CHAT ||
           step === ConsumerStep.RECOMMEND ||
           step === ConsumerStep.WISHLIST) && (
@@ -2894,6 +3113,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
+                    setPrevStepBeforeConfirm(step);
                     setConfirmDraft({
                       draftId: `draft-cart-${Date.now()}`,
                       storeId: cart.storeId,
@@ -2906,7 +3126,7 @@ export default function App() {
                     setStep(ConsumerStep.CONFIRM);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#82B440] hover:bg-[#72A135] text-[#111411] text-xs sm:text-sm font-bold whitespace-nowrap cursor-pointer"
+                  className="easy-compact min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#82B440] hover:bg-[#72A135] text-[#111411] text-xs sm:text-sm font-bold whitespace-nowrap cursor-pointer"
                 >
                   주문하기
                 </button>
@@ -2914,7 +3134,7 @@ export default function App() {
                   type="button"
                   onClick={() => setCart(null)}
                   aria-label="장바구니 비우기"
-                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-[#DCE2D9] flex items-center justify-center cursor-pointer"
+                  className="easy-compact w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-[#DCE2D9] flex items-center justify-center cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -3072,7 +3292,7 @@ export default function App() {
                 </strong>{' '}
                 메뉴가 담겨 있습니다. 비우고{' '}
                 <strong className="text-[#1A1D1A]">
-                  {pendingCartSwitch.storeName} · {pendingCartSwitch.menuName}
+                  {pendingCartSwitch.storeName} · {pendingCartSwitch.summaryLabel}
                 </strong>
                 을(를) 담을까요?
               </p>
@@ -3091,16 +3311,10 @@ export default function App() {
                   const next = pendingCartSwitch;
                   setCart({
                     storeId: next.storeId,
-                    items: [
-                      {
-                        menuId: next.menuId,
-                        quantity: next.quantity,
-                        selectedOptionIds: next.selectedOptionIds,
-                      },
-                    ],
+                    items: next.items,
                   });
                   setPendingCartSwitch(null);
-                  showToast(`'${next.menuName}'을(를) 장바구니에 담았습니다.`);
+                  showToast(`'${next.summaryLabel}'이(가) 장바구니에 담겼습니다.`);
                 }}
                 className="min-h-[44px] px-3 py-2 rounded-2xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold cursor-pointer"
               >
@@ -3129,6 +3343,7 @@ export default function App() {
         onTopupWallet={handleTopupWalletConfirmed}
         onOpenFullCheckout={({ paymentMethod, couponCode }) => {
           if (!quickPayDraft) return;
+          setPrevStepBeforeConfirm(step);
           setConfirmDraft({
             draftId: `draft-quick-${Date.now()}`,
             storeId: quickPayDraft.storeId,
@@ -3167,6 +3382,34 @@ export default function App() {
           });
         }}
         onClose={() => setQuickPayDraft(null)}
+      />
+
+      <StoreMenuModal
+        store={
+          storeMenuModal
+            ? appState.stores.find((s) => s.id === storeMenuModal.storeId) ??
+              null
+            : null
+        }
+        storeMenus={
+          storeMenuModal
+            ? appState.menus.filter(
+                (m) => m.storeId === storeMenuModal.storeId
+              )
+            : []
+        }
+        highlightMenuId={storeMenuModal?.highlightMenuId}
+        initialServings={storeMenuModal?.initialServings}
+        initialOptionIds={storeMenuModal?.initialOptionIds}
+        preselectHighlight={storeMenuModal?.preselectHighlight}
+        reviews={INITIAL_REVIEWS}
+        reviewReplies={appState.reviewReplies}
+        cart={cart}
+        wishlistIds={appState.wishlistIds}
+        onToggleWishlist={handleToggleWishlist}
+        onAddMultipleToCart={handleAddMultipleToCart}
+        onProceedToConfirmWithItems={handleProceedToConfirmWithItems}
+        onClose={() => setStoreMenuModal(null)}
       />
 
       <LocationPickerModal

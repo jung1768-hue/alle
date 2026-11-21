@@ -686,6 +686,19 @@ export function evaluateRecommendations(
     const store = storeMap.get(menu.storeId);
     if (!store) continue;
 
+    if (menu.isSideMenu) {
+      const sideTokens = menu.name
+        .split(/[\s·&/()]+/)
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t.length >= 2);
+      const explicitlyQueried =
+        rawLower.length >= 2 &&
+        sideTokens.some((tok) => rawLower.includes(tok));
+      if (!explicitlyQueried) {
+        continue;
+      }
+    }
+
     const reasons: string[] = [];
     const { isNearbyArea, locationBoost } = resolveLocationMatch(
       store,

@@ -15,6 +15,7 @@ export enum DemoRole {
 
 export enum ConsumerStep {
   HOME = 'home',
+  BROWSE = 'browse',
   AI_CHAT = 'ai_chat',
   RECOMMEND = 'recommend',
   CONFIRM = 'confirm',
@@ -84,6 +85,7 @@ export interface MenuItem {
   image: string;
   aiReason?: string;
   closingDiscountPercent?: number;
+  isSideMenu?: boolean;
 }
 
 export interface Review {

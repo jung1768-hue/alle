@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
+  Store as StoreIcon,
   Users,
   X,
   Zap,
@@ -39,6 +40,11 @@ import {
   SuperAppTab,
   UserPreferences,
 } from '../types/alle';
+import {
+  matchesMenuPlatformCategory,
+  PLATFORM_CATEGORIES,
+  PlatformCategoryId,
+} from '../utils/categories';
 import {
   evaluateRecommendations,
   formatWon,
@@ -95,73 +101,40 @@ interface ConditionHomeProps {
     selectedOptionIds?: string[]
   ) => void;
   onOpenSuperApp: (tab: SuperAppTab) => void;
+  onOpenBrowse?: (options?: {
+    category?: PlatformCategoryId;
+    query?: string;
+  }) => void;
+  onOpenStoreMenu?: (
+    storeId: string,
+    options?: {
+      highlightMenuId?: string;
+      initialServings?: number;
+      preselectHighlight?: boolean;
+    }
+  ) => void;
   onSavePreferences: (next: UserPreferences) => void;
   onApplyPreferencesToInput: (prefs: UserPreferences) => void;
   activeLocation?: SavedLocation;
   onOpenLocationPicker?: () => void;
 }
 
-const QUICK_CATEGORY_CHIPS = [
-  { id: 'all', label: '전체' },
-  { id: 'closing', label: '🔥 마감특가' },
-  { id: 'korean', label: '한식·국밥' },
-  { id: 'chicken', label: '치킨' },
-  { id: 'chinese', label: '중식·마라' },
-  { id: 'japanese', label: '일식·돈까스' },
-  { id: 'western', label: '피자·샐러드' },
-  { id: 'snack', label: '분식·야식' },
-  { id: 'cafe', label: '카페·디저트' },
-  { id: 'market', label: '전통시장' },
-] as const;
-
-type QuickCategoryId = (typeof QUICK_CATEGORY_CHIPS)[number]['id'];
-
-const EASY_CATEGORIES = [
-  { id: 'korean' as QuickCategoryId, emoji: '🍲', label: '따뜻한 국물' },
-  { id: 'chicken' as QuickCategoryId, emoji: '🍗', label: '바삭 치킨' },
-  { id: 'chinese' as QuickCategoryId, emoji: '🍜', label: '중식·분식' },
-  { id: 'cafe' as QuickCategoryId, emoji: '☕', label: '커피·간식' },
+const EASY_GRID_CATEGORIES: Array<{
+  id: PlatformCategoryId;
+  emoji: string;
+  label: string;
+}> = [
+  { id: 'korean', emoji: '🍲', label: '한식·국밥' },
+  { id: 'chicken', emoji: '🍗', label: '치킨' },
+  { id: 'chinese', emoji: '🥟', label: '중식·마라' },
+  { id: 'japanese', emoji: '🍱', label: '일식·돈까스' },
+  { id: 'western', emoji: '🍕', label: '피자·양식' },
+  { id: 'snack', emoji: '🌶️', label: '분식·야식' },
+  { id: 'cafe', emoji: '☕', label: '카페·디저트' },
+  { id: 'market', emoji: '🧺', label: '전통시장' },
+  { id: 'closing', emoji: '🔥', label: '마감특가' },
+  { id: 'all', emoji: '🔍', label: '전체 검색' },
 ];
-
-function matchesCategoryChip(
-  chipId: QuickCategoryId,
-  store: Store,
-  menu: MenuItem
-): boolean {
-  if (chipId === 'all') return true;
-  if (chipId === 'closing') return (menu.closingDiscountPercent ?? 0) > 0;
-  const grp = store.categoryGroup ?? '';
-  if (chipId === 'korean') {
-    return grp.includes('한식') || menu.tags.includes('한식');
-  }
-  if (chipId === 'chicken') {
-    return grp === '치킨' || menu.tags.includes('치킨');
-  }
-  if (chipId === 'chinese') {
-    return grp === '중식' || menu.tags.includes('중식');
-  }
-  if (chipId === 'japanese') {
-    return grp.includes('일식') || menu.tags.includes('일식');
-  }
-  if (chipId === 'western') {
-    return (
-      grp.includes('피자') ||
-      grp.includes('양식') ||
-      menu.tags.includes('양식') ||
-      menu.tags.includes('샐러드')
-    );
-  }
-  if (chipId === 'snack') {
-    return grp.includes('분식') || grp.includes('야식') || menu.tags.includes('분식');
-  }
-  if (chipId === 'cafe') {
-    return grp.includes('카페') || menu.tags.includes('카페') || menu.tags.includes('디저트');
-  }
-  if (chipId === 'market') {
-    return grp.includes('전통시장') || store.minOrderAmount === 0;
-  }
-  return true;
-}
 
 function VoiceWaveformIcon({ className = '' }: { className?: string }) {
   return (
@@ -206,12 +179,15 @@ export function ConditionHome({
   onOpenQuickPay,
   onAddToCart,
   onOpenSuperApp,
+  onOpenBrowse,
+  onOpenStoreMenu,
   onSavePreferences,
   onApplyPreferencesToInput,
   activeLocation,
 }: ConditionHomeProps) {
   const [activeCategoryChip, setActiveCategoryChip] =
-    useState<QuickCategoryId>('all');
+    useState<PlatformCategoryId>('all');
+  const [easySearchQuery, setEasySearchQuery] = useState<string>('');
   const [visibleCount, setVisibleCount] = useState<number>(12);
   const [detailMenuId, setDetailMenuId] = useState<string | null>(null);
   const [showAdvancedInput, setShowAdvancedInput] = useState(false);
@@ -234,6 +210,15 @@ export function ConditionHome({
   }, []);
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
+  const menusByStore = useMemo(() => {
+    const map = new Map<string, MenuItem[]>();
+    for (const m of menus) {
+      const list = map.get(m.storeId) ?? [];
+      list.push(m);
+      map.set(m.storeId, list);
+    }
+    return map;
+  }, [menus]);
 
   const autoRecommendations = useMemo(() => {
     const baseCondition: ParsedCondition =
@@ -310,7 +295,9 @@ export function ConditionHome({
       stores,
       menus.filter((m) => {
         const st = storeMap.get(m.storeId);
-        return Boolean(st && matchesCategoryChip(activeCategoryChip, st, m));
+        return Boolean(
+          st && matchesMenuPlatformCategory(activeCategoryChip, st, m)
+        );
       }),
       activeLocation
     );
@@ -540,19 +527,39 @@ export function ConditionHome({
     [detailMenu, storeMap]
   );
 
+  const detailStoreMenuCount = useMemo(
+    () =>
+      detailStore
+        ? (menusByStore.get(detailStore.id) ?? []).filter(
+            (m) => !m.isSoldOut && m.stock >= 1
+          ).length
+        : 0,
+    [detailStore, menusByStore]
+  );
+
   const detailModal = (
     <MenuDetailReviewModal
       menu={detailMenu}
       store={detailStore}
+      storeMenuCount={detailStoreMenuCount}
       reviews={reviews}
       reviewReplies={reviewReplies}
       onClose={() => setDetailMenuId(null)}
       onQuickOrder={(id, servings) => onQuickReorderToConfirm(id, servings)}
+      onOpenStoreMenu={
+        detailStore && detailMenu && onOpenStoreMenu
+          ? () =>
+              onOpenStoreMenu(detailStore.id, {
+                highlightMenuId: detailMenu.id,
+                preselectHighlight: true,
+              })
+          : undefined
+      }
     />
   );
 
   // ============================================================================
-  // EASY MODE HOME (Large Text, Voice-First, Max 2~3 Clear Choices)
+  // EASY MODE HOME (Large Text, Voice-First, Platform Category Grid & Search)
   // ============================================================================
   if (easyMode) {
     const easyPicks = (
@@ -563,7 +570,7 @@ export function ConditionHome({
 
     return (
       <div className="max-w-3xl mx-auto space-y-6">
-        <section className="bg-[#EAF1E2] border-2 border-[#82B440] rounded-3xl p-6 space-y-5 shadow-sm">
+        <section className="bg-[#EAF1E2] border-2 border-[#82B440] rounded-3xl p-5 sm:p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-[#3D5720]">
               큰 글씨 · 쉬운 주문 모드 ({activeLocation?.areaName ?? '서울 강남구 역삼동'})
@@ -572,7 +579,7 @@ export function ConditionHome({
               <button
                 type="button"
                 onClick={onToggleEasyMode}
-                className="px-4 py-2 rounded-xl bg-white border border-[#D4E1C5] text-sm font-bold text-[#1A1D1A] cursor-pointer"
+                className="easy-compact px-4 py-2 rounded-xl bg-white border border-[#D4E1C5] text-sm font-bold text-[#1A1D1A] cursor-pointer"
               >
                 일반 화면으로
               </button>
@@ -582,7 +589,7 @@ export function ConditionHome({
           <button
             type="button"
             onClick={handleVoiceTrigger}
-            className={`w-full min-h-[84px] px-6 py-5 rounded-3xl font-extrabold text-lg sm:text-xl flex items-center justify-center gap-3 shadow-md transition-colors cursor-pointer ${
+            className={`w-full min-h-[82px] px-6 py-5 rounded-3xl font-extrabold text-lg sm:text-xl flex items-center justify-center gap-3 shadow-md transition-colors cursor-pointer ${
               isListening
                 ? 'bg-red-600 text-white'
                 : 'bg-[#4E6E2A] hover:bg-[#3F5A21] text-white'
@@ -599,6 +606,36 @@ export function ConditionHome({
                 : '🎙️ 누르고 먹고 싶은 음식을 말하세요'}
             </span>
           </button>
+
+          {/* Direct Manual Search Bar in Easy Mode */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (onOpenBrowse) {
+                onOpenBrowse({ category: 'all', query: easySearchQuery.trim() });
+              } else if (easySearchQuery.trim()) {
+                onOpenAiChat(easySearchQuery.trim());
+              }
+            }}
+            className="flex gap-2"
+          >
+            <div className="relative flex-1 flex items-center">
+              <Search className="w-4 h-4 text-[#4E6E2A] absolute left-4 pointer-events-none" />
+              <input
+                type="text"
+                value={easySearchQuery}
+                onChange={(e) => setEasySearchQuery(e.target.value)}
+                placeholder="가게명·메뉴명 직접 검색 (예: 국밥, 치킨)"
+                className="w-full min-h-[52px] pl-10 pr-4 bg-white border border-[#D4E1C5] rounded-2xl text-base text-[#1A1D1A] placeholder:text-[#687064]"
+              />
+            </div>
+            <button
+              type="submit"
+              className="min-h-[52px] px-5 rounded-2xl bg-[#1A1D1A] hover:bg-[#2F352F] text-white text-base font-extrabold whitespace-nowrap cursor-pointer shrink-0"
+            >
+              검색
+            </button>
+          </form>
 
           {showVoiceFallback && (
             <div className="p-4 bg-white border border-[#D4E1C5] rounded-2xl space-y-2.5">
@@ -623,29 +660,43 @@ export function ConditionHome({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            {EASY_CATEGORIES.map((cat) => {
-              const active = activeCategoryChip === cat.id;
-              return (
+          {/* Classic Platform Category Grid (Large Accessible Tiles) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-sm font-extrabold text-[#3D5720]">
+                카테고리로 직접 골라 주문하기
+              </span>
+              {onOpenBrowse && (
+                <button
+                  type="button"
+                  onClick={() => onOpenBrowse({ category: 'all' })}
+                  className="easy-compact text-xs font-bold text-[#3D5720] underline underline-offset-2 cursor-pointer"
+                >
+                  전체 보기 →
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {EASY_GRID_CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() =>
-                    setActiveCategoryChip((prev) =>
-                      prev === cat.id ? 'all' : cat.id
-                    )
-                  }
-                  className={`min-h-[72px] px-4 py-3 rounded-2xl border-2 text-base font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-                    active
-                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                      : 'bg-white border-[#D4E1C5] text-[#1A1D1A] hover:bg-[#F7F8F5]'
-                  }`}
+                  onClick={() => {
+                    if (onOpenBrowse) {
+                      onOpenBrowse({ category: cat.id });
+                    } else {
+                      setActiveCategoryChip((prev) =>
+                        prev === cat.id ? 'all' : cat.id
+                      );
+                    }
+                  }}
+                  className="min-h-[72px] px-3 py-3 rounded-2xl border-2 bg-white border-[#D4E1C5] hover:border-[#4E6E2A] hover:bg-[#F7F8F5] text-[#1A1D1A] text-sm sm:text-base font-extrabold flex items-center sm:flex-col justify-center gap-2 sm:gap-1 cursor-pointer transition-colors"
                 >
-                  <span className="text-2xl">{cat.emoji}</span>
+                  <span className="text-2xl leading-none">{cat.emoji}</span>
                   <span>{cat.label}</span>
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </section>
 
@@ -699,71 +750,131 @@ export function ConditionHome({
         )}
 
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-xl font-extrabold text-[#1A1D1A]">
               지금 바로 배달되는 근처 맛집
             </h2>
-            {activeCategoryChip !== 'all' && (
+            {onOpenBrowse && (
               <button
                 type="button"
-                onClick={() => setActiveCategoryChip('all')}
-                className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] text-sm font-bold text-[#3D5720] cursor-pointer"
+                onClick={() => onOpenBrowse({ category: 'all' })}
+                className="easy-compact px-3.5 py-1.5 rounded-xl bg-[#EAF1E2] text-sm font-bold text-[#3D5720] cursor-pointer shrink-0"
               >
-                전체 보기
+                더 찾아보기 →
               </button>
             )}
           </div>
 
           <div className="space-y-4">
-            {easyPicks.map((item) => (
-              <article
-                key={item.menu.id}
-                className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-sm"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
-                    <FoodImage
-                      src={item.menu.image}
-                      alt={item.menu.name}
-                      className="w-full h-full object-cover"
-                    />
+            {easyPicks.map((item) => {
+              const storeMenuCount = (
+                menusByStore.get(item.store.id) ?? []
+              ).filter((m) => !m.isSoldOut && m.stock >= 1).length;
+
+              return (
+                <article
+                  key={item.menu.id}
+                  className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-sm"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-24 h-24 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                      <FoodImage
+                        src={item.menu.image}
+                        alt={item.menu.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-sm font-bold text-[#4E6E2A] truncate">
+                        {item.store.name} · 약 {item.effectiveMinutes}분
+                      </p>
+                      <h3 className="text-lg font-extrabold text-[#1A1D1A] truncate">
+                        {item.menu.name}
+                      </h3>
+                      <p className="text-base font-extrabold text-[#1A1D1A] tabular-nums">
+                        배달비 포함 {formatWon(item.estimatedTotal)}
+                        {item.isSameStorePrice && ' (매장가 그대로)'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm font-bold text-[#4E6E2A] truncate">
-                      {item.store.name} · 약 {item.effectiveMinutes}분
-                    </p>
-                    <h3 className="text-lg font-extrabold text-[#1A1D1A] truncate">
-                      {item.menu.name}
-                    </h3>
-                    <p className="text-base font-extrabold text-[#1A1D1A] tabular-nums">
-                      배달비 포함 {formatWon(item.estimatedTotal)}
-                      {item.isSameStorePrice && ' (매장가 그대로)'}
-                    </p>
+                  <div
+                    className={`grid gap-2.5 ${
+                      onOpenStoreMenu && storeMenuCount > 1
+                        ? 'grid-cols-3'
+                        : 'grid-cols-2'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setDetailMenuId(item.menu.id)}
+                      className="min-h-[54px] px-2 bg-white hover:bg-[#F7F8F5] border-2 border-[#E8ECE4] text-[#1A1D1A] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer"
+                    >
+                      상세 · 리뷰
+                    </button>
+                    {onOpenStoreMenu && storeMenuCount > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenStoreMenu(item.store.id, {
+                            highlightMenuId: item.menu.id,
+                            initialServings: item.servings,
+                            preselectHighlight: true,
+                          })
+                        }
+                        className="min-h-[54px] px-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] border-2 border-[#D4E1C5] text-[#3D5720] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer"
+                      >
+                        가게 메뉴
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        triggerQuickPay({
+                          menuId: item.menu.id,
+                          servings: item.servings,
+                        })
+                      }
+                      className="min-h-[54px] px-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border-2 border-[#4E6E2A] text-[#3D5720] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer"
+                    >
+                      바로 시키기
+                    </button>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setDetailMenuId(item.menu.id)}
-                    className="min-h-[56px] bg-white hover:bg-[#F7F8F5] border-2 border-[#E8ECE4] text-[#1A1D1A] text-base font-extrabold rounded-2xl cursor-pointer"
-                  >
-                    상세 · 리뷰
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      triggerQuickPay({
-                        menuId: item.menu.id,
-                        servings: item.servings,
-                      })
-                    }
-                    className="min-h-[56px] bg-[#EAF1E2] hover:bg-[#DCE7CF] border-2 border-[#4E6E2A] text-[#3D5720] text-base font-extrabold rounded-2xl cursor-pointer"
-                  >
-                    바로 시키기
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
+          </div>
+
+          {onOpenBrowse && (
+            <button
+              type="button"
+              onClick={() => onOpenBrowse({ category: 'all' })}
+              className="w-full min-h-[56px] px-5 py-3 bg-white hover:bg-[#EAF1E2] border-2 border-[#82B440] text-[#3D5720] text-base font-extrabold rounded-2xl cursor-pointer transition-colors"
+            >
+              🍽️ 전체 카테고리 · 맛집 더 찾아보기 →
+            </button>
+          )}
+        </section>
+
+        {/* Easy-Mode Quick Local Living Services (Errand / Market / Group / B2B) */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-extrabold text-[#1A1D1A]">
+            우리 동네 생활 · 심부름 서비스
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {quickServices.map((svc) => {
+              const Icon = svc.icon;
+              return (
+                <button
+                  key={svc.id}
+                  type="button"
+                  onClick={svc.onClick}
+                  className="min-h-[64px] px-4 py-3 bg-white hover:bg-[#EAF1E2] border-2 border-[#E8ECE4] hover:border-[#82B440] rounded-2xl text-left flex items-center gap-2.5 text-sm sm:text-base font-extrabold text-[#1A1D1A] cursor-pointer transition-colors"
+                >
+                  <Icon className="w-5 h-5 text-[#4E6E2A] shrink-0" />
+                  <span className="leading-snug">{svc.label}</span>
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -1084,6 +1195,50 @@ export function ConditionHome({
         })}
       </section>
 
+      {/* 3-0. Platform Category Quick Browse Grid */}
+      {onOpenBrowse && (
+        <section
+          aria-label="배달 카테고리 바로가기"
+          className="os-card rounded-3xl p-4 sm:p-5 space-y-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-[#1A1D1A]">
+                카테고리별 직접 찾기
+              </h2>
+              <p className="text-xs text-[#687064]">
+                원하는 업종이나 가게 이름을 직접 검색해서 담을 수도 있어요
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenBrowse({ category: 'all' })}
+              className="easy-compact text-xs font-bold text-[#4E6E2A] hover:underline inline-flex items-center gap-0.5 shrink-0 cursor-pointer"
+            >
+              <span>가게·메뉴 검색</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+            {PLATFORM_CATEGORIES.filter((c) => c.id !== 'closing').map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => onOpenBrowse({ category: cat.id })}
+                className="p-2 rounded-2xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] hover:border-[#82B440] flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+              >
+                <span className="text-lg sm:text-xl leading-none">
+                  {cat.emoji}
+                </span>
+                <span className="text-[11px] font-bold text-[#1A1D1A] truncate max-w-full">
+                  {cat.shortLabel}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* 3-1. Closing Time-Sale Strip */}
       {closingSaleItems.length > 0 && (
         <section
@@ -1163,7 +1318,11 @@ export function ConditionHome({
           </div>
           <button
             type="button"
-            onClick={() => onSubmitSearch(parsedCondition)}
+            onClick={() =>
+              onOpenBrowse
+                ? onOpenBrowse({ category: activeCategoryChip })
+                : onSubmitSearch(parsedCondition)
+            }
             className="text-xs sm:text-sm font-semibold text-[#687064] hover:text-[#4E6E2A] inline-flex items-center gap-0.5 shrink-0 cursor-pointer transition-colors"
           >
             <span>전체보기</span>
@@ -1177,7 +1336,7 @@ export function ConditionHome({
           aria-label="빠른 카테고리 둘러보기"
           className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar"
         >
-          {QUICK_CATEGORY_CHIPS.map((chip) => {
+          {PLATFORM_CATEGORIES.map((chip) => {
             const active = activeCategoryChip === chip.id;
             return (
               <button
@@ -1192,7 +1351,7 @@ export function ConditionHome({
                     : 'bg-white border-[#E8ECE4] text-[#434B40] hover:border-[#82B440]'
                 }`}
               >
-                {chip.label}
+                {chip.id === 'closing' ? `🔥 ${chip.shortLabel}` : chip.label}
               </button>
             );
           })}
@@ -1300,18 +1459,51 @@ export function ConditionHome({
                     </div>
 
                     <div className="p-4 space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => onQuickSelectMenu(item.menu.id)}
-                        className="text-left w-full cursor-pointer"
-                      >
-                        <h3 className="text-base font-bold text-[#1A1D1A] truncate">
-                          {item.store.name}
-                        </h3>
-                        <p className="text-xs font-medium text-[#687064] truncate mt-0.5">
-                          {item.menu.name} · {formatWon(item.estimatedTotal)}
-                        </p>
-                      </button>
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenStoreMenu
+                              ? onOpenStoreMenu(item.store.id, {
+                                  highlightMenuId: item.menu.id,
+                                  initialServings: item.servings,
+                                  preselectHighlight: true,
+                                })
+                              : onQuickSelectMenu(item.menu.id)
+                          }
+                          className="easy-compact text-left min-w-0 flex-1 cursor-pointer"
+                        >
+                          <h3 className="text-base font-bold text-[#1A1D1A] truncate hover:text-[#4E6E2A]">
+                            {item.store.name}
+                          </h3>
+                          <p className="text-xs font-medium text-[#687064] truncate mt-0.5">
+                            {item.menu.name} · {formatWon(item.estimatedTotal)}
+                          </p>
+                        </button>
+                        {onOpenStoreMenu && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onOpenStoreMenu(item.store.id, {
+                                highlightMenuId: item.menu.id,
+                                initialServings: item.servings,
+                                preselectHighlight: true,
+                              })
+                            }
+                            className="easy-compact px-2 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[10.5px] font-bold inline-flex items-center gap-0.5 shrink-0 cursor-pointer"
+                          >
+                            <StoreIcon className="w-3 h-3" />
+                            <span>
+                              메뉴{' '}
+                              {
+                                (menusByStore.get(item.store.id) ?? []).filter(
+                                  (m) => !m.isSoldOut && m.stock >= 1
+                                ).length
+                              }
+                            </span>
+                          </button>
+                        )}
+                      </div>
 
                       <div className="flex items-center justify-between gap-1.5 text-xs tabular-nums">
                         <div className="flex items-center gap-1">

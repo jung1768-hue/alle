@@ -911,7 +911,7 @@ export const INITIAL_STORES: Store[] = [
   ...DAEGU_ALL_STORES,
 ];
 
-export const INITIAL_MENUS: MenuItem[] = [
+const BASE_INITIAL_MENUS: MenuItem[] = [
   // --- 한식 / 국밥 / 찜 ---
   {
     id: 'm1',
@@ -1824,6 +1824,302 @@ export const INITIAL_MENUS: MenuItem[] = [
   ...BEOMEO_MENUS,
   ...DAEGU_ALL_MENUS,
 ];
+
+interface CompanionMenuTemplate {
+  name: string;
+  description: string;
+  servingSpec: string;
+  tags: string[];
+  price: number;
+}
+
+const COMPANION_TEMPLATES_BY_CATEGORY: Record<string, CompanionMenuTemplate[]> = {
+  korean: [
+    {
+      name: '수육 한 접시 (소)',
+      description: '야들야들하게 삶아낸 한방 수육 소 사이즈 추가 메뉴입니다.',
+      servingSpec: '추가 사이드 (180g + 새우젓·마늘)',
+      tags: ['한식', '고기', '담백한'],
+      price: 11000,
+    },
+    {
+      name: '부드러운 왕 계란말이',
+      description: '신선한 국내산 달걀을 도톰하게 말아낸 인기 곁들임 메뉴입니다.',
+      servingSpec: '추가 사이드 (1줄)',
+      tags: ['한식', '순한맛', '담백한'],
+      price: 6500,
+    },
+    {
+      name: '바삭 고기만두 (6알)',
+      description: '속이 꽉 찬 고기만두를 노릇하게 쪄낸 든든한 사이드입니다.',
+      servingSpec: '추가 사이드 (6알)',
+      tags: ['한식', '만두', '순한맛'],
+      price: 5500,
+    },
+  ],
+  chicken: [
+    {
+      name: '바삭 치즈볼 (5알) & 감자튀김',
+      description: '쫄깃한 찹쌀 도우 안에 모짜렐라 치즈가 가득 들어간 치즈볼과 감자튀김입니다.',
+      servingSpec: '치즈볼 5알 + 감자튀김',
+      tags: ['치킨', '바삭한', '야식'],
+      price: 6500,
+    },
+    {
+      name: '매콤 국물 떡볶이 (사이드)',
+      description: '치킨과 함께 찍어 먹기 좋은 칼칼달콤 국물 떡볶이입니다.',
+      servingSpec: '사이드 1인분',
+      tags: ['치킨', '분식', '떡볶이', '얼큰한'],
+      price: 6000,
+    },
+    {
+      name: '콜라 1.25L & 치킨무 세트',
+      description: '시원한 콜라 1.25L와 아삭한 치킨무 추가 세트입니다.',
+      servingSpec: '1.25L + 치킨무 1',
+      tags: ['치킨', '음료'],
+      price: 3500,
+    },
+  ],
+  chinese: [
+    {
+      name: '바삭 수제 군만두 (6조각)',
+      description: '육즙 가득한 중화식 수제 군만두입니다.',
+      servingSpec: '6조각 + 간장',
+      tags: ['중식', '바삭한', '분식'],
+      price: 5500,
+    },
+    {
+      name: '미니 찹쌀 탕수육',
+      description: '겉은 바삭하고 속은 쫀득한 1인 찹쌀 탕수육(소스 분리)입니다.',
+      servingSpec: '미니 220g + 소스 별도',
+      tags: ['중식', '탕수육', '바삭한'],
+      price: 9500,
+    },
+    {
+      name: '고슬고슬 계란 볶음밥',
+      description: '불향 가득 고슬고슬하게 볶아낸 중화 계란 볶음밥입니다.',
+      servingSpec: '1인분',
+      tags: ['중식', '덮밥', '순한맛'],
+      price: 8500,
+    },
+  ],
+  japanese: [
+    {
+      name: '따끈한 미니 가쓰오 우동',
+      description: '가쓰오부시 육수로 담백하게 끓여낸 곁들임 미니 우동입니다.',
+      servingSpec: '미니 우동 1그릇',
+      tags: ['일식', '면', '국물', '순한맛'],
+      price: 4500,
+    },
+    {
+      name: '바삭 왕새우튀김 (3마리)',
+      description: '통통한 새우를 바삭하게 튀겨낸 인기 사이드 메뉴입니다.',
+      servingSpec: '3마리 + 타르타르 소스',
+      tags: ['일식', '바삭한', '해물'],
+      price: 6000,
+    },
+    {
+      name: '모짜렐라 치즈카츠 (2조각)',
+      description: '고소한 모짜렐라 치즈가 쭉 늘어나는 추가 치즈카츠입니다.',
+      servingSpec: '2조각',
+      tags: ['일식', '돈까스', '바삭한'],
+      price: 5500,
+    },
+  ],
+  western: [
+    {
+      name: '오븐 치즈 토마토 스파게티',
+      description: '자연 모짜렐라 치즈를 듬뿍 올려 구워낸 사이드 오븐 스파게티입니다.',
+      servingSpec: '1인 사이드',
+      tags: ['양식', '파스타', '순한맛'],
+      price: 7500,
+    },
+    {
+      name: '바삭 버팔로 윙·봉 (6조각)',
+      description: '짭짤매콤한 소스를 입혀 오븐에 구운 윙·봉 6조각입니다.',
+      servingSpec: '6조각',
+      tags: ['양식', '치킨', '바삭한'],
+      price: 7000,
+    },
+    {
+      name: '트러플 파마산 감자튀김',
+      description: '바삭한 감자튀김에 파마산 치즈와 트러플 향을 더했습니다.',
+      servingSpec: '1팩 + 갈릭디핑',
+      tags: ['양식', '버거', '바삭한'],
+      price: 5500,
+    },
+  ],
+  snack: [
+    {
+      name: '바삭 모둠튀김 (김말이·오징어·만두)',
+      description: '국물에 찍어 먹기 좋은 인기 모둠튀김 5종 세트입니다.',
+      servingSpec: '모둠튀김 6조각',
+      tags: ['분식', '바삭한', '야식'],
+      price: 5500,
+    },
+    {
+      name: '고소한 참치마요 주먹밥',
+      description: '김가루와 참치마요가 어우러진 곁들임 셀프 주먹밥입니다.',
+      servingSpec: '1인분',
+      tags: ['분식', '김밥', '순한맛'],
+      price: 4500,
+    },
+    {
+      name: '매콤 비빔 막국수 (소)',
+      description: '매콤달콤 새콤한 양념장의 시원한 미니 막국수입니다.',
+      servingSpec: '사이드 1인분',
+      tags: ['분식', '야식', '면'],
+      price: 6500,
+    },
+  ],
+  cafe: [
+    {
+      name: '스페셜티 아이스 아메리카노',
+      description: '산미가 과하지 않고 고소한 바디감이 살아있는 데일리 아메리카노입니다.',
+      servingSpec: 'ICE / HOT 선택 (1잔)',
+      tags: ['카페', '커피', '음료'],
+      price: 4500,
+    },
+    {
+      name: '부드러운 바닐라 카페라떼',
+      description: '천연 바닐라 빈 시럽과 스페셜티 에스프레소가 어우러진 라떼입니다.',
+      servingSpec: '1잔 (ICE/HOT)',
+      tags: ['카페', '커피', '달달한'],
+      price: 5200,
+    },
+    {
+      name: '겉바속촉 버터 크로플',
+      description: '발효 버터 생지를 와플팬에 구워 낸 바삭한 디저트 크로플입니다.',
+      servingSpec: '1조각 + 메이플 시럽',
+      tags: ['카페', '디저트', '크로플', '달달한'],
+      price: 5800,
+    },
+  ],
+  market: [
+    {
+      name: '시장표 바삭 녹두빈대떡',
+      description: '맷돌에 갈아 낸 녹두 반죽에 숙주·김치를 넣어 구운 전통시장 인기 전입니다.',
+      servingSpec: '1장 + 양파간장',
+      tags: ['전', '한식', '분식', '바삭한'],
+      price: 6000,
+    },
+    {
+      name: '따끈한 꼬치 어묵탕 (3꼬치)',
+      description: '시원한 무·멸치 육수에 불린 쫄깃한 시장 꼬치어묵 3개입니다.',
+      servingSpec: '3꼬치 + 육수',
+      tags: ['분식', '국물', '순한맛'],
+      price: 4500,
+    },
+    {
+      name: '전통 식혜 500ml',
+      description: '국내산 엿기름으로 직접 달여 시원하게 담은 전통 식혜입니다.',
+      servingSpec: '500ml 보틀',
+      tags: ['카페', '디저트', '달달한'],
+      price: 3500,
+    },
+  ],
+  convenience: [
+    {
+      name: '참치마요 삼각김밥 2입 & 컵라면',
+      description: '언제든 가볍게 즐기기 좋은 삼각김밥 2개와 소컵 라면 조합입니다.',
+      servingSpec: '삼각김밥 2 + 컵라면 1',
+      tags: ['편의점', '간편식', '김밥', '라면'],
+      price: 4800,
+    },
+    {
+      name: '생수 2L (2병) & 탄산음료 팩',
+      description: '무거운 생수 2L 2병과 탄산음료를 문 앞까지 바로 배달해 드립니다.',
+      servingSpec: '생수 2L×2 + 음료 1',
+      tags: ['편의점', '생필품', '간편식'],
+      price: 4500,
+    },
+    {
+      name: '간편 샐러드 & 삶은계란 팩',
+      description: '신선한 믹스 샐러드와 구운 계란 2알로 구성한 가벼운 식단 팩입니다.',
+      servingSpec: '샐러드 1 + 계란 2',
+      tags: ['편의점', '샐러드', '다이어트'],
+      price: 5500,
+    },
+  ],
+};
+
+function resolveCompanionBucket(store: Store): keyof typeof COMPANION_TEMPLATES_BY_CATEGORY {
+  const grp = store.categoryGroup ?? '';
+  const desc = `${store.name} ${store.category} ${grp}`.toLowerCase();
+  if (grp.includes('전통시장') || store.name.includes('시장')) return 'market';
+  if (grp.includes('편의점') || grp.includes('간편식')) return 'convenience';
+  if (grp.includes('카페') || grp.includes('디저트')) return 'cafe';
+  if (grp.includes('중식') || grp.includes('아시안')) return 'chinese';
+  if (grp.includes('일식') || grp.includes('돈까스') || grp.includes('돈가스')) return 'japanese';
+  if (grp === '치킨') return 'chicken';
+  if (grp === '치킨/피자/버거') {
+    return /(피자|버거|햄버거|파스타)/.test(desc) && !/(치킨|통닭|닭)/.test(desc)
+      ? 'western'
+      : 'chicken';
+  }
+  if (grp.includes('피자') || grp.includes('양식') || grp.includes('버거')) return 'western';
+  if (grp.includes('분식') || grp.includes('야식')) return 'snack';
+  return 'korean';
+}
+
+function enrichStoresWithCompanionMenus(
+  stores: Store[],
+  baseMenus: MenuItem[]
+): MenuItem[] {
+  const byStore = new Map<string, MenuItem[]>();
+  for (const menu of baseMenus) {
+    const list = byStore.get(menu.storeId) ?? [];
+    list.push(menu);
+    byStore.set(menu.storeId, list);
+  }
+
+  const extras: MenuItem[] = [];
+  for (const store of stores) {
+    const existing = byStore.get(store.id) ?? [];
+    if (existing.length >= 3) continue;
+
+    const needed = 3 - existing.length;
+    const bucket = resolveCompanionBucket(store);
+    const templates = COMPANION_TEMPLATES_BY_CATEGORY[bucket];
+    let added = 0;
+
+    for (let i = 0; i < templates.length && added < needed; i++) {
+      const tpl = templates[i];
+      const coreToken = tpl.name.split(/\s+/)[0] ?? '';
+      const duplicatesExisting = existing.some(
+        (m) => m.name === tpl.name || (coreToken.length >= 2 && m.name.includes(coreToken))
+      );
+      if (duplicatesExisting) continue;
+
+      extras.push({
+        id: `m-extra-${store.id}-${added + 1}`,
+        storeId: store.id,
+        name: tpl.name,
+        description: tpl.description,
+        servingSpec: tpl.servingSpec,
+        tags: tpl.tags,
+        pricePerPerson: tpl.price,
+        options: [],
+        stock: 15,
+        isSoldOut: false,
+        storePrice: tpl.price,
+        comparisonDate: '2026-11-18',
+        estimatedMinutes: store.basePrepMinutes + 6,
+        image: resolveFallbackFoodImage(`${tpl.name} ${store.category}`),
+        aiReason: `${store.name} 함께 주문하기 좋은 인기 추가 메뉴 · 매장 동일가`,
+        isSideMenu: true,
+      });
+      added += 1;
+    }
+  }
+
+  return [...baseMenus, ...extras];
+}
+
+export const INITIAL_MENUS: MenuItem[] = enrichStoresWithCompanionMenus(
+  INITIAL_STORES,
+  BASE_INITIAL_MENUS
+);
 
 export const INITIAL_OWNER_PROFIT_COMPARISON: OwnerProfitComparison = {
   periodLabel: '최근 30일 누적 (전국 가맹점 평균 기준)',

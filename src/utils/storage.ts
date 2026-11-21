@@ -10,7 +10,7 @@ import {
 } from '../data/seedData';
 import { AllePersistedState, MenuItem, Store } from '../types/alle';
 
-const STORAGE_KEY = 'alle_mvp_nationwide_v7';
+const STORAGE_KEY = 'alle_mvp_nationwide_v8';
 
 export type StorageMode = 'localStorage' | 'memory';
 
@@ -34,7 +34,7 @@ export function getDefaultState(): AllePersistedState {
     priceReports: [],
     savedLocations: structuredClone(INITIAL_SAVED_LOCATIONS),
     selectedLocationId: INITIAL_SAVED_LOCATIONS[0].id,
-    easyMode: false,
+    easyMode: true,
   };
 }
 
@@ -123,6 +123,7 @@ export function loadDemoState(): {
           storeSeedById.get(menu.storeId)?.image ||
           menu.image,
         aiReason: menu.aiReason ?? seedMenu?.aiReason,
+        isSideMenu: menu.isSideMenu ?? seedMenu?.isSideMenu,
       };
     });
 
@@ -161,7 +162,7 @@ export function loadDemoState(): {
           ).some((loc) => loc.id === parsed.selectedLocationId)
             ? parsed.selectedLocationId
             : INITIAL_SAVED_LOCATIONS[0].id,
-        easyMode: typeof parsed.easyMode === 'boolean' ? parsed.easyMode : false,
+        easyMode: typeof parsed.easyMode === 'boolean' ? parsed.easyMode : true,
       },
       storageMode: 'localStorage',
     };

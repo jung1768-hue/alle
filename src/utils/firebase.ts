@@ -54,7 +54,7 @@ export interface SharedOperationalState {
 
 export type FirebaseSyncStatus = 'connecting' | 'synced' | 'local-fallback';
 
-const SHARED_DOC_REF = doc(db, 'alle_demo', 'shared_state_v7');
+const SHARED_DOC_REF = doc(db, 'alle_demo', 'shared_state_v8');
 
 const seedStoreById = new Map(INITIAL_STORES.map((s) => [s.id, s]));
 
@@ -104,6 +104,7 @@ function normalizeRemoteSharedState(
     return {
       ...m,
       image: resolveBundledImage(m.image) || seedMenu?.image || m.image,
+      isSideMenu: m.isSideMenu ?? seedMenu?.isSideMenu,
     };
   });
   const remoteMenuIds = new Set(mergedMenus.map((m) => m.id));

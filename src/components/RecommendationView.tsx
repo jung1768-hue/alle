@@ -9,6 +9,7 @@ import {
   Heart,
   Info,
   MessageSquare,
+  Plus,
   RotateCcw,
   ShoppingBag,
   Sparkles,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { MOCK_COUPONS } from '../data/seedData';
 import {
+  CartLineItem,
   ExcludedCandidate,
   MenuItem,
   ParsedCondition,
@@ -60,6 +62,21 @@ interface RecommendationViewProps {
     quantity?: number,
     selectedOptionIds?: string[]
   ) => void;
+  onAddMultipleToCart?: (storeId: string, items: CartLineItem[]) => void;
+  onOpenStoreMenu?: (
+    storeId: string,
+    options?: {
+      highlightMenuId?: string;
+      initialServings?: number;
+      initialOptionIds?: string[];
+      preselectHighlight?: boolean;
+    }
+  ) => void;
+  onProceedToConfirmWithItems?: (payload: {
+    storeId: string;
+    items: CartLineItem[];
+    couponCode?: string;
+  }) => void;
   onProceedToConfirm: (payload: {
     menuId: string;
     servings: number;
@@ -83,10 +100,16 @@ export function RecommendationView({
   onQuickRelaxCondition,
   onReportPriceDifference,
   onAddToCart,
+  onAddMultipleToCart,
+  onOpenStoreMenu,
+  onProceedToConfirmWithItems,
   onProceedToConfirm,
 }: RecommendationViewProps) {
   const [selectedOptionsByMenu, setSelectedOptionsByMenu] = useState<
     Record<string, string[]>
+  >({});
+  const [extraQtyByStoreMenu, setExtraQtyByStoreMenu] = useState<
+    Record<string, number>
   >({});
   const [selectedCouponCode, setSelectedCouponCode] = useState<string>('NONE');
   const [showOriginalReviews, setShowOriginalReviews] = useState<boolean>(false);
@@ -230,6 +253,61 @@ export function RecommendationView({
         m.stock >= 1
     );
   }, [activeMatch, allMenus]);
+
+  const selectedExtraMenus = useMemo(() => {
+    return sameStoreOtherMenus
+      .map((m) => ({
+        menu: m,
+        quantity: extraQtyByStoreMenu[m.id] ?? 0,
+      }))
+      .filter((entry) => entry.quantity > 0);
+  }, [sameStoreOtherMenus, extraQtyByStoreMenu]);
+
+  const extraMenusSubtotal = useMemo(
+    () =>
+      selectedExtraMenus.reduce(
+        (sum, entry) => sum + getEffectiveMenuPrice(entry.menu) * entry.quantity,
+        0
+      ),
+    [selectedExtraMenus]
+  );
+
+  const combinedMenuSubtotal = effectiveMenuSubtotal + extraMenusSubtotal;
+  const combinedCouponDiscount = activeMatch
+    ? Math.min(rawCouponDiscount, combinedMenuSubtotal)
+    : 0;
+  const combinedEstimatedTotal = activeMatch
+    ? combinedMenuSubtotal +
+      optionsSubtotal +
+      activeMatch.deliveryFee -
+      combinedCouponDiscount
+    : 0;
+
+  const adjustExtraMenuQty = (menu: MenuItem, delta: number) => {
+    setExtraQtyByStoreMenu((prev) => {
+      const next = Math.max(0, Math.min(menu.stock, (prev[menu.id] ?? 0) + delta));
+      return { ...prev, [menu.id]: next };
+    });
+  };
+
+  const buildCombinedCartItems = (): CartLineItem[] => {
+    if (!activeMatch) return [];
+    const lines: CartLineItem[] = [
+      {
+        menuId: activeMatch.menu.id,
+        quantity: activeMatch.servings,
+        selectedOptionIds: activeOptionIds,
+      },
+    ];
+    for (const extra of selectedExtraMenus) {
+      lines.push({
+        menuId: extra.menu.id,
+        quantity: extra.quantity,
+        selectedOptionIds: [],
+      });
+    }
+    return lines;
+  };
 
   const conditionSummaryText = [
     `${condition.servings}인`,
@@ -597,6 +675,16 @@ export function RecommendationView({
                         +{formatWon(optionsSubtotal)}
                       </dd>
                     </div>
+                    {selectedExtraMenus.length > 0 && (
+                      <div className="flex items-center justify-between text-[#3D5720]">
+                        <dt>
+                          같은 가게 추가 메뉴 ({selectedExtraMenus.length}종)
+                        </dt>
+                        <dd className="font-mono tabular-nums font-semibold">
+                          +{formatWon(extraMenusSubtotal)}
+                        </dd>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-[#555E52]">
                       <dt>배달비</dt>
                       <dd className="font-mono tabular-nums">
@@ -606,13 +694,13 @@ export function RecommendationView({
                     <div className="flex items-center justify-between text-[#4E6E2A]">
                       <dt>쿠폰 할인</dt>
                       <dd className="font-mono tabular-nums font-bold">
-                        -{formatWon(effectiveCouponDiscount)}
+                        -{formatWon(combinedCouponDiscount)}
                       </dd>
                     </div>
                     <div className="pt-2.5 border-t border-[#E8ECE4] flex items-center justify-between text-base font-bold text-[#1A1D1A]">
                       <dt>예상 결제 금액</dt>
                       <dd className="font-mono tabular-nums text-lg text-[#4E6E2A]">
-                        {formatWon(finalEstimatedTotal)}
+                        {formatWon(combinedEstimatedTotal)}
                       </dd>
                     </div>
                   </dl>
@@ -883,84 +971,156 @@ export function RecommendationView({
                 </div>
 
                 {/* Same-Store Additional Menu Cross-Sell */}
-                {sameStoreOtherMenus.length > 0 && onAddToCart && (
+                {sameStoreOtherMenus.length > 0 && (
                   <div className="pt-4 border-t border-[#E8ECE4] space-y-2.5">
-                    <h3 className="text-sm font-bold text-[#1A1D1A]">
-                      이 가게 다른 메뉴 함께 담기
-                    </h3>
-                    <div className="space-y-2">
-                      {sameStoreOtherMenus.map((other) => (
-                        <div
-                          key={other.id}
-                          className="p-3 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] flex items-center justify-between gap-3"
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-bold text-[#1A1D1A]">
+                        이 가게 다른 메뉴 함께 추가 ({sameStoreOtherMenus.length}개)
+                      </h3>
+                      {onOpenStoreMenu && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenStoreMenu(activeMatch.store.id, {
+                              highlightMenuId: activeMatch.menu.id,
+                              initialServings: activeMatch.servings,
+                              initialOptionIds: activeOptionIds,
+                              preselectHighlight: true,
+                            })
+                          }
+                          className="easy-compact text-xs font-bold text-[#4E6E2A] hover:underline cursor-pointer"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
-                              <FoodImage
-                                src={other.image}
-                                alt={other.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-[#1A1D1A] truncate">
-                                {other.name}
-                              </p>
-                              <p className="text-xs font-mono font-semibold text-[#4E6E2A] tabular-nums">
-                                {formatWon(getEffectiveMenuPrice(other))}
-                                {(other.closingDiscountPercent ?? 0) > 0 &&
-                                  ` (-${other.closingDiscountPercent}%)`}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => onAddToCart(other.id, 1, [])}
-                            className="min-h-[36px] px-3 py-1.5 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                          가게 전체 메뉴 보기 →
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {sameStoreOtherMenus.map((other) => {
+                        const extraQty = extraQtyByStoreMenu[other.id] ?? 0;
+                        return (
+                          <div
+                            key={other.id}
+                            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 transition-colors ${
+                              extraQty > 0
+                                ? 'bg-[#EAF1E2]/60 border-[#82B440]'
+                                : 'bg-[#F7F8F5] border-[#E8ECE4]'
+                            }`}
                           >
-                            <ShoppingBag className="w-3.5 h-3.5" />
-                            <span>담기</span>
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                                <FoodImage
+                                  src={other.image}
+                                  alt={other.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-[#1A1D1A] truncate">
+                                  {other.name}
+                                </p>
+                                <p className="text-xs font-mono font-semibold text-[#4E6E2A] tabular-nums">
+                                  {formatWon(getEffectiveMenuPrice(other))}
+                                  {(other.closingDiscountPercent ?? 0) > 0 &&
+                                    ` (-${other.closingDiscountPercent}%)`}
+                                </p>
+                              </div>
+                            </div>
+
+                            {extraQty === 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => adjustExtraMenuQty(other, 1)}
+                                className="easy-compact min-h-[36px] px-3 py-1.5 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>추가</span>
+                              </button>
+                            ) : (
+                              <div className="inline-flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => adjustExtraMenuQty(other, -1)}
+                                  aria-label={`${other.name} 수량 감소`}
+                                  className="easy-compact w-7 h-7 rounded-lg bg-white border border-[#D4E1C5] text-xs font-bold cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <span className="w-5 text-center font-mono text-xs font-bold text-[#3D5720]">
+                                  {extraQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => adjustExtraMenuQty(other, 1)}
+                                  aria-label={`${other.name} 수량 증가`}
+                                  className="easy-compact w-7 h-7 rounded-lg bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
                 {/* Large Unmistakable One-Tap Primary CTA */}
                 <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {onAddToCart && (
+                  {(onAddMultipleToCart || onAddToCart) && (
                     <button
                       type="button"
-                      onClick={() =>
-                        onAddToCart(
-                          activeMatch.menu.id,
-                          activeMatch.servings,
-                          activeOptionIds
-                        )
-                      }
+                      onClick={() => {
+                        const lines = buildCombinedCartItems();
+                        if (onAddMultipleToCart) {
+                          onAddMultipleToCart(activeMatch.store.id, lines);
+                        } else if (onAddToCart) {
+                          onAddToCart(
+                            activeMatch.menu.id,
+                            activeMatch.servings,
+                            activeOptionIds
+                          );
+                        }
+                      }}
                       className="min-h-[58px] py-3.5 px-5 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440] text-[#3D5720] font-bold text-sm sm:text-base rounded-2xl transition-all cursor-pointer inline-flex items-center justify-center gap-2"
                     >
                       <ShoppingBag className="w-5 h-5 shrink-0" />
-                      <span>장바구니 담기</span>
+                      <span>
+                        {selectedExtraMenus.length > 0
+                          ? `장바구니 담기 (${1 + selectedExtraMenus.length}종)`
+                          : '장바구니 담기'}
+                      </span>
                     </button>
                   )}
                   <button
                     type="button"
-                    onClick={() =>
-                      onProceedToConfirm({
-                        menuId: activeMatch.menu.id,
-                        servings: activeMatch.servings,
-                        selectedOptionIds: activeOptionIds,
-                        couponCode: selectedCouponCode,
-                      })
-                    }
+                    onClick={() => {
+                      if (
+                        selectedExtraMenus.length > 0 &&
+                        onProceedToConfirmWithItems
+                      ) {
+                        onProceedToConfirmWithItems({
+                          storeId: activeMatch.store.id,
+                          items: buildCombinedCartItems(),
+                          couponCode: selectedCouponCode,
+                        });
+                      } else {
+                        onProceedToConfirm({
+                          menuId: activeMatch.menu.id,
+                          servings: activeMatch.servings,
+                          selectedOptionIds: activeOptionIds,
+                          couponCode: selectedCouponCode,
+                        });
+                      }
+                    }}
                     className={`${
-                      onAddToCart ? '' : 'sm:col-span-2'
+                      onAddMultipleToCart || onAddToCart ? '' : 'sm:col-span-2'
                     } w-full min-h-[58px] py-4 px-6 bg-[#4E6E2A] hover:bg-[#3F5A21] active:scale-[0.99] text-white font-bold text-base sm:text-lg rounded-2xl transition-all cursor-pointer shadow-[0_14px_30px_-8px_rgba(78,110,42,0.48)] inline-flex items-center justify-center gap-2.5`}
                   >
                     <Zap className="w-5 h-5 shrink-0" />
-                    <span>원탭 바로 주문 · {formatWon(finalEstimatedTotal)}</span>
+                    <span>
+                      원탭 바로 주문 · {formatWon(combinedEstimatedTotal)}
+                    </span>
                   </button>
                 </div>
               </div>

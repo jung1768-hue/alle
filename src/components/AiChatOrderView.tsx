@@ -12,12 +12,14 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  Plus,
   RotateCcw,
   Search,
   Send,
   ShoppingBag,
   Sparkles,
   Star,
+  Store as StoreIcon,
   Ticket,
   Volume2,
   VolumeX,
@@ -27,6 +29,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { MOCK_COUPONS, VOICE_TRANSCRIPT_SAMPLES } from '../data/seedData';
 import {
+  CartLineItem,
   MenuItem,
   OrderLineItem,
   ParsedCondition,
@@ -36,6 +39,7 @@ import {
   Store,
   SuperAppTab,
 } from '../types/alle';
+import { PlatformCategoryId } from '../utils/categories';
 import {
   buildRuleReviewSummary,
   checkServerGeminiAvailable,
@@ -150,6 +154,7 @@ interface VoiceCheckoutDraft {
   menuId: string;
   servings: number;
   selectedOptionIds: string[];
+  extraItems?: CartLineItem[];
   paymentMethod: PaymentMethod;
   customerNote: string;
 }
@@ -201,6 +206,25 @@ interface AiChatOrderViewProps {
     quantity?: number,
     selectedOptionIds?: string[]
   ) => void;
+  onAddMultipleToCart?: (storeId: string, items: CartLineItem[]) => void;
+  onOpenStoreMenu?: (
+    storeId: string,
+    options?: {
+      highlightMenuId?: string;
+      initialServings?: number;
+      initialOptionIds?: string[];
+      preselectHighlight?: boolean;
+    }
+  ) => void;
+  onProceedToConfirmWithItems?: (payload: {
+    storeId: string;
+    items: CartLineItem[];
+    couponCode?: string;
+  }) => void;
+  onOpenBrowse?: (options?: {
+    category?: PlatformCategoryId;
+    query?: string;
+  }) => void;
   onOpenRecommendationWithCondition: (
     condition: ParsedCondition,
     selectedMenuId?: string
@@ -488,6 +512,10 @@ export function AiChatOrderView({
   onOpenSuperApp,
   onUseRelayCoupon,
   onAddToCart,
+  onAddMultipleToCart,
+  onOpenStoreMenu,
+  onProceedToConfirmWithItems,
+  onOpenBrowse,
   onOpenRecommendationWithCondition,
   onProceedToConfirm,
   onCompleteVoiceOrder,
@@ -525,6 +553,10 @@ export function AiChatOrderView({
 
   const [stagedServings, setStagedServings] = useState<Record<string, number>>({});
   const [stagedOptions, setStagedOptions] = useState<Record<string, string[]>>({});
+  const [extraItemsByStore, setExtraItemsByStore] = useState<
+    Record<string, CartLineItem[]>
+  >({});
+  const [showCheckoutExtraMenus, setShowCheckoutExtraMenus] = useState(false);
   const [recommendedSpotlight, setRecommendedSpotlight] =
     useState<RecommendedSpotlightState | null>(null);
   const spotlightPillRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -632,6 +664,53 @@ export function AiChatOrderView({
 
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const menusByStore = useMemo(() => {
+    const map = new Map<string, MenuItem[]>();
+    for (const m of menus) {
+      const list = map.get(m.storeId) ?? [];
+      list.push(m);
+      map.set(m.storeId, list);
+    }
+    return map;
+  }, [menus]);
+
+  const adjustStoreExtraItem = (
+    storeId: string,
+    menu: MenuItem,
+    delta: number
+  ) => {
+    setExtraItemsByStore((prev) => {
+      const list = prev[storeId] ?? [];
+      const idx = list.findIndex((it) => it.menuId === menu.id);
+      if (idx === -1) {
+        if (delta <= 0 || menu.isSoldOut || menu.stock < 1) return prev;
+        return {
+          ...prev,
+          [storeId]: [
+            ...list,
+            {
+              menuId: menu.id,
+              quantity: Math.min(delta, menu.stock),
+              selectedOptionIds: [],
+            },
+          ],
+        };
+      }
+      const nextQty = list[idx].quantity + delta;
+      const updatedList =
+        nextQty <= 0
+          ? list.filter((_, i) => i !== idx)
+          : list.map((it, i) =>
+              i === idx
+                ? { ...it, quantity: Math.min(menu.stock, nextQty) }
+                : it
+            );
+      return {
+        ...prev,
+        [storeId]: updatedList,
+      };
+    });
+  };
   const hasDeliverableInArea = useMemo(
     () =>
       Boolean(
@@ -1064,10 +1143,69 @@ export function AiChatOrderView({
     const selectedOpts = menu.options.filter((o) =>
       draft.selectedOptionIds.includes(o.id)
     );
-    const optionsSubtotal =
+    const primaryOptionsSubtotal =
       selectedOpts.reduce((sum, o) => sum + o.priceDelta, 0) * qty;
-    const menuSubtotal = unitPrice * qty;
-    const originalMenuSubtotal = menu.pricePerPerson * qty;
+    const primaryMenuSubtotal = unitPrice * qty;
+
+    const resolvedLines: OrderLineItem[] = [
+      {
+        menuId: menu.id,
+        menuName: menu.name,
+        unitPrice,
+        originalUnitPrice: menu.pricePerPerson,
+        quantity: qty,
+        selectedOptionIds: selectedOpts.map((o) => o.id),
+        selectedOptionNames: selectedOpts.map((o) => o.name),
+        optionsSubtotal: primaryOptionsSubtotal,
+        lineSubtotal: primaryMenuSubtotal,
+      },
+    ];
+
+    let extraMenuSubtotal = 0;
+    let extraOriginalSubtotal = 0;
+    let extraOptionsSubtotal = 0;
+    let totalQty = qty;
+    let allSameStore = menu.storePrice === menu.pricePerPerson;
+
+    for (const extra of draft.extraItems ?? []) {
+      const extraMenu = menuMap.get(extra.menuId);
+      if (!extraMenu || extraMenu.storeId !== store.id || extra.quantity <= 0) {
+        continue;
+      }
+      const extraQty = Math.min(extra.quantity, Math.max(1, extraMenu.stock));
+      const extraUnit = getEffectiveMenuPrice(extraMenu);
+      const extraOpts = extraMenu.options.filter((o) =>
+        extra.selectedOptionIds.includes(o.id)
+      );
+      const extraOptSum =
+        extraOpts.reduce((sum, o) => sum + o.priceDelta, 0) * extraQty;
+      const lineSub = extraUnit * extraQty;
+
+      extraMenuSubtotal += lineSub;
+      extraOriginalSubtotal += extraMenu.pricePerPerson * extraQty;
+      extraOptionsSubtotal += extraOptSum;
+      totalQty += extraQty;
+      if (extraMenu.storePrice !== extraMenu.pricePerPerson) {
+        allSameStore = false;
+      }
+
+      resolvedLines.push({
+        menuId: extraMenu.id,
+        menuName: extraMenu.name,
+        unitPrice: extraUnit,
+        originalUnitPrice: extraMenu.pricePerPerson,
+        quantity: extraQty,
+        selectedOptionIds: extraOpts.map((o) => o.id),
+        selectedOptionNames: extraOpts.map((o) => o.name),
+        optionsSubtotal: extraOptSum,
+        lineSubtotal: lineSub,
+      });
+    }
+
+    const menuSubtotal = primaryMenuSubtotal + extraMenuSubtotal;
+    const optionsSubtotal = primaryOptionsSubtotal + extraOptionsSubtotal;
+    const originalMenuSubtotal =
+      menu.pricePerPerson * qty + extraOriginalSubtotal;
     const deliveryFee = store.deliveryFee;
     const preCouponTotal = menuSubtotal + optionsSubtotal + deliveryFee;
     const bestCoupon = getBestCoupon(MOCK_COUPONS, {
@@ -1086,7 +1224,7 @@ export function AiChatOrderView({
       deliveryFee,
       originalDeliveryFee: deliveryFee,
       couponDiscount,
-      isSameStorePrice: menu.storePrice === menu.pricePerPerson,
+      isSameStorePrice: allSameStore,
     });
     const effectiveMinutes =
       menu.estimatedMinutes + (store.extraPrepMinutes ?? 0);
@@ -1098,6 +1236,8 @@ export function AiChatOrderView({
       menu,
       store,
       qty,
+      totalQty,
+      resolvedLines,
       selectedOpts,
       unitPrice,
       menuSubtotal,
@@ -1156,8 +1296,16 @@ export function AiChatOrderView({
       optionQuestionSpoken = `추가 옵션은 없고, 바로 ${summary.paymentOption.label}로 결제할까요?`;
     }
 
-    const priceHeadline = `${summary.qty}인분 핵심 가격: 총 ${formatWon(summary.finalTotal)} (메뉴 ${formatWon(summary.menuSubtotal)} · ${feeText}${discountText}${notePart})`;
-    const spoken = `${leadPrefix ? `${leadPrefix} ` : ''}${summary.qty}인분 총 ${formatWon(summary.finalTotal)}입니다. ${optionQuestionSpoken}`;
+    const priceHeadline = `${
+      summary.resolvedLines.length > 1
+        ? `${summary.resolvedLines.length}종 ${summary.totalQty}개`
+        : `${summary.qty}인분`
+    } 핵심 가격: 총 ${formatWon(summary.finalTotal)} (메뉴 ${formatWon(summary.menuSubtotal)} · ${feeText}${discountText}${notePart})`;
+    const spoken = `${leadPrefix ? `${leadPrefix} ` : ''}${
+      summary.resolvedLines.length > 1
+        ? `${summary.resolvedLines.length}종 총 ${formatWon(summary.finalTotal)}`
+        : `${summary.qty}인분 총 ${formatWon(summary.finalTotal)}`
+    }입니다. ${optionQuestionSpoken}`;
 
     setMessages((prev) => [
       ...prev,
@@ -1177,11 +1325,22 @@ export function AiChatOrderView({
     const summary = buildVoiceCheckoutSummary(draft);
     if (!summary) return;
 
-    if (
-      !summary.store.isOpen ||
-      summary.menu.isSoldOut ||
-      summary.menu.stock < summary.qty
-    ) {
+    const qtyByMenuId = new Map<string, number>();
+    for (const line of summary.resolvedLines) {
+      qtyByMenuId.set(
+        line.menuId,
+        (qtyByMenuId.get(line.menuId) ?? 0) + line.quantity
+      );
+    }
+
+    const hasStockProblem = Array.from(qtyByMenuId.entries()).some(
+      ([mId, needed]) => {
+        const m = menuMap.get(mId);
+        return !m || m.isSoldOut || m.stock < needed;
+      }
+    );
+
+    if (!summary.store.isOpen || hasStockProblem) {
       const msgText =
         '죄송하지만 선택한 메뉴가 방금 품절되었거나 영업이 중단되었어요. 다른 메뉴를 찾아드릴까요?';
       setVoiceCheckoutDraft(null);
@@ -1215,26 +1374,26 @@ export function AiChatOrderView({
     }
 
     if (!onCompleteVoiceOrder) {
-      onProceedToConfirm({
-        menuId: summary.menu.id,
-        servings: summary.qty,
-        selectedOptionIds: summary.selectedOpts.map((o) => o.id),
-        couponCode: summary.bestCoupon?.code ?? 'NONE',
-      });
+      if (summary.resolvedLines.length > 1 && onProceedToConfirmWithItems) {
+        onProceedToConfirmWithItems({
+          storeId: summary.store.id,
+          items: summary.resolvedLines.map((l) => ({
+            menuId: l.menuId,
+            quantity: l.quantity,
+            selectedOptionIds: l.selectedOptionIds,
+          })),
+          couponCode: summary.bestCoupon?.code ?? 'NONE',
+        });
+      } else {
+        onProceedToConfirm({
+          menuId: summary.menu.id,
+          servings: summary.qty,
+          selectedOptionIds: summary.selectedOpts.map((o) => o.id),
+          couponCode: summary.bestCoupon?.code ?? 'NONE',
+        });
+      }
       return;
     }
-
-    const orderLine: OrderLineItem = {
-      menuId: summary.menu.id,
-      menuName: summary.menu.name,
-      unitPrice: summary.unitPrice,
-      originalUnitPrice: summary.menu.pricePerPerson,
-      quantity: summary.qty,
-      selectedOptionIds: summary.selectedOpts.map((o) => o.id),
-      selectedOptionNames: summary.selectedOpts.map((o) => o.name),
-      optionsSubtotal: summary.optionsSubtotal,
-      lineSubtotal: summary.menuSubtotal,
-    };
 
     keepSpeechOnUnmountRef.current = true;
     clearAutoListenTimer();
@@ -1244,9 +1403,9 @@ export function AiChatOrderView({
 
     const result = onCompleteVoiceOrder({
       menuId: summary.menu.id,
-      servings: summary.qty,
+      servings: summary.totalQty,
       selectedOptionIds: summary.selectedOpts.map((o) => o.id),
-      items: [orderLine],
+      items: summary.resolvedLines,
       couponCode: summary.bestCoupon?.code ?? 'NONE',
       couponDiscount: summary.couponDiscount,
       sharedDeliveryApplied: false,
@@ -2052,6 +2211,39 @@ export function AiChatOrderView({
             return;
           }
         }
+      }
+    }
+
+    // 1-2. Ask about other menus inside the currently active store
+    if (
+      activeStore &&
+      /(이\s*가게|여기|해당\s*가게|상점)\s*(?:의\s*)?(?:다른\s*메뉴|전체\s*메뉴|메뉴\s*(?:뭐|보여|알려)|사이드)/.test(
+        trimmed
+      )
+    ) {
+      const storeOtherMenus = (menusByStore.get(activeStore.id) ?? []).filter(
+        (m) => !m.isSoldOut && m.stock > 0
+      );
+      if (storeOtherMenus.length > 0) {
+        const previewText = storeOtherMenus
+          .slice(0, 4)
+          .map((m) => `${m.name}(${formatWon(getEffectiveMenuPrice(m))})`)
+          .join(', ');
+        const replyText = `${activeStore.name}에는 총 ${storeOtherMenus.length}개 메뉴가 있어요: ${previewText}. 아래 카드나 '가게 메뉴' 버튼으로 함께 담아보세요!`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `b-storemenus-${Date.now() + 1}`,
+            sender: 'bot',
+            text: replyText,
+            spokenText: replyText,
+            matchedMenuIds: storeOtherMenus.slice(0, 4).map((m) => m.id),
+            stagedMenuId: activeMenu?.id ?? storeOtherMenus[0].id,
+            servings: 1,
+            aiSource: 'rule',
+          },
+        ]);
+        return;
       }
     }
 
@@ -3148,8 +3340,21 @@ export function AiChatOrderView({
             })}
           </div>
 
-          <div className="text-xs font-semibold text-[#687064]">
-            검색 결과 {directSearchResults.length}건 ({activeLocation?.areaName ?? '전국'} 배달 가능 매장만 표시)
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#687064]">
+            <span>
+              검색 결과 {directSearchResults.length}건 ({activeLocation?.areaName ?? '전국'} 배달 가능 매장만 표시)
+            </span>
+            {onOpenBrowse && (
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenBrowse({ query: directSearchText.trim() })
+                }
+                className="easy-compact text-[#4E6E2A] font-bold hover:underline cursor-pointer"
+              >
+                카테고리별 전체 검색 열기 →
+              </button>
+            )}
           </div>
 
           {directSearchResults.length === 0 ? (
@@ -3200,11 +3405,19 @@ export function AiChatOrderView({
                       <button
                         type="button"
                         onClick={() =>
-                          onOpenRecommendationWithCondition(activeCondition, item.menu.id)
+                          onOpenStoreMenu
+                            ? onOpenStoreMenu(item.store.id, {
+                                highlightMenuId: item.menu.id,
+                                preselectHighlight: true,
+                              })
+                            : onOpenRecommendationWithCondition(
+                                activeCondition,
+                                item.menu.id
+                              )
                         }
-                        className="min-h-[36px] px-2 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
+                        className="easy-compact min-h-[36px] px-2 py-1 bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
                       >
-                        상세
+                        {onOpenStoreMenu ? '가게 메뉴' : '상세'}
                       </button>
                       <button
                         type="button"
@@ -3381,10 +3594,17 @@ export function AiChatOrderView({
                     const isSameStore = item.storePrice === item.pricePerPerson;
                     const hasClosingDiscount = (item.closingDiscountPercent ?? 0) > 0;
 
+                    const storeOtherCount = (
+                      menusByStore.get(store.id) ?? []
+                    ).filter(
+                      (m) =>
+                        m.id !== item.id && !m.isSoldOut && m.stock >= 1
+                    ).length;
+
                     return (
                       <div
                         key={item.id}
-                        className="w-[268px] shrink-0 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl p-4 flex flex-col justify-between gap-3.5 shadow-sm transition-colors"
+                        className="w-[296px] shrink-0 bg-white border border-[#E8ECE4] hover:border-[#82B440] rounded-2xl p-4 flex flex-col justify-between gap-3.5 shadow-sm transition-colors"
                       >
                         <div className="space-y-3">
                           {/* Soft Sage Green '✨ AI 추천' Badge + Same-Store Price + Closing Sale */}
@@ -3426,7 +3646,7 @@ export function AiChatOrderView({
                                 })
                               }
                               aria-label={`${item.name} 올이 설명 팝업 열기`}
-                              className="w-15 h-15 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0 cursor-pointer hover:ring-2 hover:ring-[#82B440] transition-all"
+                              className="easy-compact w-15 h-15 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0 cursor-pointer hover:ring-2 hover:ring-[#82B440] transition-all"
                             >
                               <FoodImage
                                 src={item.image}
@@ -3447,7 +3667,7 @@ export function AiChatOrderView({
                                   type="button"
                                   onClick={() => onToggleWishlist(item.id)}
                                   aria-label={`${item.name} 찜하기`}
-                                  className="p-0.5 cursor-pointer shrink-0"
+                                  className="easy-compact p-0.5 cursor-pointer shrink-0"
                                 >
                                   <Heart
                                     className={`w-3.5 h-3.5 ${
@@ -3471,7 +3691,13 @@ export function AiChatOrderView({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div
+                          className={`grid gap-1.5 ${
+                            onOpenStoreMenu && storeOtherCount > 0
+                              ? 'grid-cols-3'
+                              : 'grid-cols-2'
+                          }`}
+                        >
                           <button
                             type="button"
                             onClick={() =>
@@ -3483,10 +3709,26 @@ export function AiChatOrderView({
                                 servings,
                               })
                             }
-                            className="min-h-[38px] px-2.5 py-1.5 bg-[#F7F8F5] hover:bg-[#F0F3EC] text-[#687064] text-xs font-semibold rounded-xl cursor-pointer transition-colors"
+                            className="easy-compact min-h-[38px] px-2 py-1.5 bg-[#F7F8F5] hover:bg-[#F0F3EC] text-[#687064] text-[11.5px] font-semibold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
                           >
                             상세 · 리뷰
                           </button>
+                          {onOpenStoreMenu && storeOtherCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onOpenStoreMenu(store.id, {
+                                  highlightMenuId: item.id,
+                                  initialServings: servings,
+                                  initialOptionIds: stagedOptions[item.id] ?? [],
+                                  preselectHighlight: true,
+                                })
+                              }
+                              className="easy-compact min-h-[38px] px-1.5 py-1.5 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-[11px] font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
+                            >
+                              메뉴 (+{storeOtherCount})
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -3496,9 +3738,9 @@ export function AiChatOrderView({
                                 handleStageMenuInChat(item, servings);
                               }
                             }}
-                            className="min-h-[38px] px-2.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            className="easy-compact min-h-[38px] px-2 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11.5px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                           >
-                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                             <span>담기</span>
                           </button>
                         </div>
@@ -3617,14 +3859,147 @@ export function AiChatOrderView({
                           .filter((o) => optIds.includes(o.id))
                           .reduce((s, o) => s + o.priceDelta, 0) * qty;
                       const effectiveUnit = getEffectiveMenuPrice(stagedMenu);
+
+                      const storeOtherMenus = (
+                        menusByStore.get(stagedStore.id) ?? []
+                      ).filter(
+                        (m) =>
+                          m.id !== stagedMenu.id && !m.isSoldOut && m.stock >= 1
+                      );
+                      const storeExtras = (
+                        extraItemsByStore[stagedStore.id] ?? []
+                      ).filter((it) => it.menuId !== stagedMenu.id);
+                      const extrasSubtotal = storeExtras.reduce((sum, it) => {
+                        const m = menuMap.get(it.menuId);
+                        return m
+                          ? sum + getEffectiveMenuPrice(m) * it.quantity
+                          : sum;
+                      }, 0);
+
                       const estTotal =
-                        effectiveUnit * qty + optSum + stagedStore.deliveryFee;
+                        effectiveUnit * qty +
+                        optSum +
+                        extrasSubtotal +
+                        stagedStore.deliveryFee;
+
+                      const combinedItems: CartLineItem[] = [
+                        {
+                          menuId: stagedMenu.id,
+                          quantity: qty,
+                          selectedOptionIds: optIds,
+                        },
+                        ...storeExtras,
+                      ];
 
                       return (
                         <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
+                          {storeOtherMenus.length > 0 && (
+                            <div className="p-2.5 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2">
+                              <div className="flex items-center justify-between gap-2 text-[11px]">
+                                <span className="font-bold text-[#1A1D1A]">
+                                  🍽️ 이 가게 다른 메뉴 함께 추가 (
+                                  {storeOtherMenus.length}개)
+                                </span>
+                                {onOpenStoreMenu && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      onOpenStoreMenu(stagedStore.id, {
+                                        highlightMenuId: stagedMenu.id,
+                                        initialServings: qty,
+                                        initialOptionIds: optIds,
+                                        preselectHighlight: true,
+                                      })
+                                    }
+                                    className="easy-compact text-[#4E6E2A] font-bold hover:underline cursor-pointer"
+                                  >
+                                    전체 메뉴 →
+                                  </button>
+                                )}
+                              </div>
+                              <div className="space-y-1.5">
+                                {storeOtherMenus.slice(0, 3).map((other) => {
+                                  const extraQty =
+                                    storeExtras.find(
+                                      (it) => it.menuId === other.id
+                                    )?.quantity ?? 0;
+                                  return (
+                                    <div
+                                      key={other.id}
+                                      className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-white border border-[#E8ECE4] text-xs"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="font-semibold text-[#1A1D1A] truncate">
+                                          {other.name}
+                                        </p>
+                                        <p className="text-[11px] font-mono text-[#4E6E2A]">
+                                          {formatWon(getEffectiveMenuPrice(other))}
+                                        </p>
+                                      </div>
+                                      {extraQty === 0 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            adjustStoreExtraItem(
+                                              stagedStore.id,
+                                              other,
+                                              1
+                                            )
+                                          }
+                                          className="easy-compact px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11px] font-bold shrink-0 cursor-pointer"
+                                        >
+                                          + 추가
+                                        </button>
+                                      ) : (
+                                        <div className="inline-flex items-center gap-1 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              adjustStoreExtraItem(
+                                                stagedStore.id,
+                                                other,
+                                                -1
+                                              )
+                                            }
+                                            aria-label={`${other.name} 수량 감소`}
+                                            className="easy-compact w-6 h-6 rounded border border-[#D4E1C5] bg-[#F7F8F5] text-xs font-bold cursor-pointer"
+                                          >
+                                            -
+                                          </button>
+                                          <span className="w-4 text-center font-mono text-xs font-bold">
+                                            {extraQty}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              adjustStoreExtraItem(
+                                                stagedStore.id,
+                                                other,
+                                                1
+                                              )
+                                            }
+                                            aria-label={`${other.name} 수량 증가`}
+                                            className="easy-compact w-6 h-6 rounded bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="text-xs text-[#687064]">
                               배달비 포함 최종 예상 금액
+                              {storeExtras.length > 0 && (
+                                <strong className="ml-1 text-[#3D5720]">
+                                  ({combinedItems.length}종)
+                                </strong>
+                              )}
                               {(stagedMenu.closingDiscountPercent ?? 0) > 0 && (
                                 <strong className="ml-1 text-amber-800">
                                   (마감 -{stagedMenu.closingDiscountPercent}%)
@@ -3638,28 +4013,47 @@ export function AiChatOrderView({
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
-                              onClick={() =>
-                                onAddToCart
-                                  ? onAddToCart(stagedMenu.id, qty, optIds)
-                                  : onOpenRecommendationWithCondition(
-                                      activeCondition,
-                                      stagedMenu.id
-                                    )
-                              }
+                              onClick={() => {
+                                if (storeExtras.length > 0 && onAddMultipleToCart) {
+                                  onAddMultipleToCart(stagedStore.id, combinedItems);
+                                } else if (onAddToCart) {
+                                  onAddToCart(stagedMenu.id, qty, optIds);
+                                } else {
+                                  onOpenRecommendationWithCondition(
+                                    activeCondition,
+                                    stagedMenu.id
+                                  );
+                                }
+                              }}
                               className="min-h-[42px] px-3 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl cursor-pointer transition-colors"
                             >
-                              {onAddToCart ? '장바구니 담기' : '다른 메뉴 보기'}
+                              {onAddToCart
+                                ? storeExtras.length > 0
+                                  ? `장바구니 (${combinedItems.length}종)`
+                                  : '장바구니 담기'
+                                : '다른 메뉴 보기'}
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                onProceedToConfirm({
-                                  menuId: stagedMenu.id,
-                                  servings: qty,
-                                  selectedOptionIds: optIds,
-                                  couponCode: 'NONE',
-                                })
-                              }
+                              onClick={() => {
+                                if (
+                                  storeExtras.length > 0 &&
+                                  onProceedToConfirmWithItems
+                                ) {
+                                  onProceedToConfirmWithItems({
+                                    storeId: stagedStore.id,
+                                    items: combinedItems,
+                                    couponCode: 'NONE',
+                                  });
+                                } else {
+                                  onProceedToConfirm({
+                                    menuId: stagedMenu.id,
+                                    servings: qty,
+                                    selectedOptionIds: optIds,
+                                    couponCode: 'NONE',
+                                  });
+                                }
+                              }}
                               className="min-h-[42px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <Zap className="w-4 h-4" />
@@ -3698,17 +4092,22 @@ export function AiChatOrderView({
                           </span>
                         </div>
 
-                        <div className="p-3 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1 text-xs">
-                          <div className="flex items-center justify-between gap-2 font-bold text-[#1A1D1A]">
-                            <span className="truncate">
-                              {summary.menu.name} · {summary.qty}인분
-                            </span>
-                            <span className="font-mono tabular-nums shrink-0">
-                              {formatWon(
-                                summary.menuSubtotal + summary.optionsSubtotal
-                              )}
-                            </span>
-                          </div>
+                        <div className="p-3 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5 text-xs">
+                          {summary.resolvedLines.map((line, lIdx) => (
+                            <div
+                              key={`${line.menuId}-${lIdx}`}
+                              className="flex items-center justify-between gap-2 font-bold text-[#1A1D1A]"
+                            >
+                              <span className="truncate">
+                                {line.menuName} · {line.quantity}개
+                              </span>
+                              <span className="font-mono tabular-nums shrink-0">
+                                {formatWon(
+                                  line.lineSubtotal + line.optionsSubtotal
+                                )}
+                              </span>
+                            </div>
+                          ))}
                           {summary.selectedOpts.length > 0 && (
                             <p className="text-[11px] text-[#687064]">
                               옵션:{' '}
@@ -3721,6 +4120,133 @@ export function AiChatOrderView({
                             {summary.effectiveMinutes}분
                           </p>
                         </div>
+
+                        {(() => {
+                          const otherStoreMenus = (
+                            menusByStore.get(summary.store.id) ?? []
+                          ).filter(
+                            (m) =>
+                              m.id !== summary.menu.id &&
+                              !m.isSoldOut &&
+                              m.stock >= 1
+                          );
+                          if (otherStoreMenus.length === 0) return null;
+                          const curExtras = activeDraft.extraItems ?? [];
+                          return (
+                            <div className="space-y-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowCheckoutExtraMenus((prev) => !prev)
+                                }
+                                className="easy-compact text-[11px] font-bold text-[#4E6E2A] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>
+                                  {showCheckoutExtraMenus
+                                    ? '이 가게 추가 메뉴 접기'
+                                    : `${summary.store.name} 다른 메뉴 함께 추가 (${otherStoreMenus.length}개)`}
+                                </span>
+                              </button>
+                              {showCheckoutExtraMenus && (
+                                <div className="space-y-1.5 p-2 rounded-xl bg-[#FAFCF8] border border-[#E8ECE4]">
+                                  {otherStoreMenus.slice(0, 4).map((extraM) => {
+                                    const exQty =
+                                      curExtras.find(
+                                        (it) => it.menuId === extraM.id
+                                      )?.quantity ?? 0;
+                                    const updateDraftExtra = (delta: number) => {
+                                      setVoiceCheckoutDraft((prev) => {
+                                        if (!prev) return prev;
+                                        const list = prev.extraItems ?? [];
+                                        const idx = list.findIndex(
+                                          (it) => it.menuId === extraM.id
+                                        );
+                                        let nextList: CartLineItem[];
+                                        if (idx === -1) {
+                                          if (delta <= 0) return prev;
+                                          nextList = [
+                                            ...list,
+                                            {
+                                              menuId: extraM.id,
+                                              quantity: 1,
+                                              selectedOptionIds: [],
+                                            },
+                                          ];
+                                        } else {
+                                          const nq = list[idx].quantity + delta;
+                                          nextList =
+                                            nq <= 0
+                                              ? list.filter((_, i) => i !== idx)
+                                              : list.map((it, i) =>
+                                                  i === idx
+                                                    ? {
+                                                        ...it,
+                                                        quantity: Math.min(
+                                                          extraM.stock,
+                                                          nq
+                                                        ),
+                                                      }
+                                                    : it
+                                                );
+                                        }
+                                        return { ...prev, extraItems: nextList };
+                                      });
+                                    };
+                                    return (
+                                      <div
+                                        key={extraM.id}
+                                        className="flex items-center justify-between gap-2 text-xs bg-white px-2.5 py-1.5 rounded-lg border border-[#E8ECE4]"
+                                      >
+                                        <div className="min-w-0">
+                                          <p className="font-semibold text-[#1A1D1A] truncate">
+                                            {extraM.name}
+                                          </p>
+                                          <p className="text-[11px] font-mono text-[#4E6E2A]">
+                                            {formatWon(
+                                              getEffectiveMenuPrice(extraM)
+                                            )}
+                                          </p>
+                                        </div>
+                                        {exQty === 0 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => updateDraftExtra(1)}
+                                            className="easy-compact px-2 py-1 rounded bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold shrink-0 cursor-pointer"
+                                          >
+                                            + 추가
+                                          </button>
+                                        ) : (
+                                          <div className="inline-flex items-center gap-1 shrink-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => updateDraftExtra(-1)}
+                                              aria-label={`${extraM.name} 수량 감소`}
+                                              className="easy-compact w-6 h-6 rounded border border-[#D4E1C5] bg-white text-xs font-bold cursor-pointer"
+                                            >
+                                              -
+                                            </button>
+                                            <span className="w-4 text-center font-mono text-xs font-bold">
+                                              {exQty}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => updateDraftExtra(1)}
+                                              aria-label={`${extraM.name} 수량 증가`}
+                                              className="easy-compact w-6 h-6 rounded bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
+                                            >
+                                              +
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         <div className="space-y-1 text-xs">
                           <div className="flex items-center justify-between text-[#687064]">
@@ -4321,6 +4847,134 @@ export function AiChatOrderView({
                       )}
                     </div>
 
+                    {/* Same-Store Other Menus Picker inside Spotlight */}
+                    {(() => {
+                      const spotOtherMenus = (
+                        menusByStore.get(spotStore.id) ?? []
+                      ).filter(
+                        (m) =>
+                          m.id !== spotMenu.id && !m.isSoldOut && m.stock >= 1
+                      );
+                      if (spotOtherMenus.length === 0) return null;
+                      const spotExtras = (
+                        extraItemsByStore[spotStore.id] ?? []
+                      ).filter((it) => it.menuId !== spotMenu.id);
+                      return (
+                        <div className="p-3.5 rounded-2xl bg-[#FAFCF8] border border-[#DCE7CF] space-y-2.5">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="font-extrabold text-[#1A1D1A] inline-flex items-center gap-1.5">
+                              <StoreIcon className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                              {spotStore.name} 다른 메뉴 함께 추가 (
+                              {spotOtherMenus.length}개)
+                            </span>
+                            {onOpenStoreMenu && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRecommendedSpotlight(null);
+                                  onOpenStoreMenu(spotStore.id, {
+                                    highlightMenuId: spotMenu.id,
+                                    initialServings: spotServings,
+                                    initialOptionIds:
+                                      stagedOptions[spotMenu.id] ?? [],
+                                    preselectHighlight: true,
+                                  });
+                                }}
+                                className="easy-compact text-[11px] font-bold text-[#4E6E2A] hover:underline shrink-0 cursor-pointer"
+                              >
+                                가게 전체 메뉴 보기 →
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {spotOtherMenus.slice(0, 4).map((other) => {
+                              const exQty =
+                                spotExtras.find((it) => it.menuId === other.id)
+                                  ?.quantity ?? 0;
+                              return (
+                                <div
+                                  key={other.id}
+                                  className={`p-2 rounded-xl border flex items-center justify-between gap-2.5 ${
+                                    exQty > 0
+                                      ? 'bg-[#EAF1E2]/70 border-[#82B440]'
+                                      : 'bg-white border-[#E8ECE4]'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E8ECE4] shrink-0">
+                                      <FoodImage
+                                        src={other.image}
+                                        alt={other.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-[#1A1D1A] truncate">
+                                        {other.name}
+                                      </p>
+                                      <p className="text-[11px] font-mono font-semibold text-[#4E6E2A] tabular-nums">
+                                        {formatWon(getEffectiveMenuPrice(other))}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {exQty === 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        adjustStoreExtraItem(
+                                          spotStore.id,
+                                          other,
+                                          1
+                                        )
+                                      }
+                                      className="easy-compact px-2.5 py-1.5 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11px] font-bold shrink-0 cursor-pointer"
+                                    >
+                                      + 추가
+                                    </button>
+                                  ) : (
+                                    <div className="inline-flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          adjustStoreExtraItem(
+                                            spotStore.id,
+                                            other,
+                                            -1
+                                          )
+                                        }
+                                        aria-label={`${other.name} 수량 감소`}
+                                        className="easy-compact w-7 h-7 rounded-lg bg-white border border-[#D4E1C5] text-xs font-bold cursor-pointer"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="w-4 text-center font-mono text-xs font-bold text-[#3D5720]">
+                                        {exQty}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          adjustStoreExtraItem(
+                                            spotStore.id,
+                                            other,
+                                            1
+                                          )
+                                        }
+                                        aria-label={`${other.name} 수량 증가`}
+                                        className="easy-compact w-7 h-7 rounded-lg bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Real Customer Reviews (Prominent & Readable) */}
                     <div className="p-3.5 rounded-2xl bg-[#FAFCF8] border border-[#DCE7CF] space-y-2.5">
                       <div className="flex items-center justify-between text-xs">
@@ -4418,40 +5072,96 @@ export function AiChatOrderView({
                             : '켜기'}
                       </span>
                     </button>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onAddToCart) {
-                            onAddToCart(spotMenu.id, spotServings, []);
-                          } else {
-                            handleStageMenuInChat(spotMenu, spotServings);
-                          }
-                          setRecommendedSpotlight(null);
-                        }}
-                        className="min-h-[44px] px-3 py-2.5 rounded-xl border border-[#DCE7CF] bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                      >
-                        <ShoppingBag className="w-4 h-4" />
-                        장바구니 담기
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRecommendedSpotlight(null);
-                          openCheckoutDraftMessage({
-                            menuId: spotMenu.id,
-                            servings: spotServings,
-                            selectedOptionIds: stagedOptions[spotMenu.id] ?? [],
-                            paymentMethod: 'kakaopay',
-                            customerNote: defaultNote ?? '',
-                          });
-                        }}
-                        className="min-h-[44px] px-3 py-2.5 rounded-xl bg-[#3D5720] hover:bg-[#2F4418] text-white text-sm font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                      >
-                        <Zap className="w-4 h-4" />
-                        이 메뉴 바로 주문
-                      </button>
-                    </div>
+                    {(() => {
+                      const spotExtras = (
+                        extraItemsByStore[spotStore.id] ?? []
+                      ).filter((it) => it.menuId !== spotMenu.id);
+                      const spotExtrasSubtotal = spotExtras.reduce(
+                        (sum, it) => {
+                          const m = menuMap.get(it.menuId);
+                          return m
+                            ? sum + getEffectiveMenuPrice(m) * it.quantity
+                            : sum;
+                        },
+                        0
+                      );
+                      const combinedSpotTotal = totalWithFee + spotExtrasSubtotal;
+                      const combinedSpotItems: CartLineItem[] = [
+                        {
+                          menuId: spotMenu.id,
+                          quantity: spotServings,
+                          selectedOptionIds: stagedOptions[spotMenu.id] ?? [],
+                        },
+                        ...spotExtras,
+                      ];
+
+                      return (
+                        <div className="space-y-2">
+                          {spotExtras.length > 0 && (
+                            <div className="flex items-center justify-between text-xs px-1">
+                              <span className="font-semibold text-[#3D5720]">
+                                기본 + 추가 메뉴 ({combinedSpotItems.length}종)
+                              </span>
+                              <span className="font-mono font-extrabold text-[#3D5720] tabular-nums">
+                                합계 {formatWon(combinedSpotTotal)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (
+                                  spotExtras.length > 0 &&
+                                  onAddMultipleToCart
+                                ) {
+                                  onAddMultipleToCart(
+                                    spotStore.id,
+                                    combinedSpotItems
+                                  );
+                                } else if (onAddToCart) {
+                                  onAddToCart(spotMenu.id, spotServings, []);
+                                } else {
+                                  handleStageMenuInChat(spotMenu, spotServings);
+                                }
+                                setRecommendedSpotlight(null);
+                              }}
+                              className="min-h-[44px] px-3 py-2.5 rounded-xl border border-[#DCE7CF] bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <ShoppingBag className="w-4 h-4" />
+                              <span>
+                                {spotExtras.length > 0
+                                  ? `장바구니 (${combinedSpotItems.length}종)`
+                                  : '장바구니 담기'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRecommendedSpotlight(null);
+                                openCheckoutDraftMessage({
+                                  menuId: spotMenu.id,
+                                  servings: spotServings,
+                                  selectedOptionIds:
+                                    stagedOptions[spotMenu.id] ?? [],
+                                  extraItems: spotExtras,
+                                  paymentMethod: 'kakaopay',
+                                  customerNote: defaultNote ?? '',
+                                });
+                              }}
+                              className="min-h-[44px] px-3 py-2.5 rounded-xl bg-[#3D5720] hover:bg-[#2F4418] text-white text-sm font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                            >
+                              <Zap className="w-4 h-4" />
+                              <span>
+                                {spotExtras.length > 0
+                                  ? `${formatWon(combinedSpotTotal)} 바로 주문`
+                                  : '이 메뉴 바로 주문'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </motion.div>
               </motion.div>
