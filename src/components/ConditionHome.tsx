@@ -1298,30 +1298,12 @@ export function ConditionHome({
                       </span>
                       <span>·</span>
                       <span className="truncate">{card.distanceOrDong}</span>
-                      <span className="hidden sm:inline">·</span>
-                      <span className="hidden sm:inline font-bold text-[#1A1D1A] shrink-0">
-                        {card.deliveryFeeText}
-                      </span>
                     </div>
 
                     <div className="flex items-center justify-between gap-1.5 pt-0.5">
-                      <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-                        <span className="sm:hidden text-[11.5px] font-bold text-[#1A1D1A] shrink-0">
-                          {card.deliveryFeeText}
-                        </span>
-                        {card.isSameStorePrice && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-[#EAF1E2] text-[#3D5720] text-[11.5px] font-semibold truncate">
-                            매장정가
-                          </span>
-                        )}
-                        {(card.storeCoupon || card.storePromo) && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[11.5px] font-semibold truncate">
-                            {card.storeCoupon
-                              ? '쿠폰할인'
-                              : card.storePromo?.badgeText ?? '이벤트'}
-                          </span>
-                        )}
-                      </div>
+                      <span className="text-[11.5px] sm:text-[12px] font-bold text-[#1A1D1A] truncate">
+                        {card.deliveryFeeText}
+                      </span>
                       <span className="text-[11.5px] sm:text-[12px] font-semibold text-[#444D42] shrink-0 tabular-nums">
                         {formatWon(card.minMenuPrice)}~
                       </span>

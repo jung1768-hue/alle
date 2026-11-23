@@ -3,17 +3,14 @@ import {
   ArrowLeft,
   CheckCircle2,
   ChevronDown,
-  Clock,
   Flame,
   Globe,
   Heart,
   MapPin,
-  Plus,
   Search,
   ShoppingBag,
   Sparkles,
   Star,
-  Store as StoreIcon,
   Ticket,
   X,
   Zap,
@@ -755,20 +752,24 @@ export function CategoryBrowseView({
           </div>
         </div>
       ) : viewMode === 'stores' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3.5">
           {filteredStores.slice(0, visibleCount).map((store) => {
-            const availableStoreMenus = (menusByStore.get(store.id) ?? []).filter(
+            const rawAvailableMenus = (menusByStore.get(store.id) ?? []).filter(
               (m) => !m.isSoldOut && m.stock > 0
             );
+            const pricedMenus = rawAvailableMenus.filter(
+              (m) => m.pricePerPerson > 0
+            );
+            const availableStoreMenus =
+              pricedMenus.length > 0 ? pricedMenus : rawAvailableMenus;
+
             const hasClosing = availableStoreMenus.some(
               (m) => (m.closingDiscountPercent ?? 0) > 0
             );
-            const isNearby = Boolean(
-              activeLocation && isStoreDeliverableToLocation(store, activeLocation)
-            );
+            const hasPromo = promoStoreIds.has(store.id);
             const eta = store.basePrepMinutes + 8 + (store.extraPrepMinutes ?? 0);
 
-            const sortedPreviewMenus = [...availableStoreMenus].sort((a, b) => {
+            const sortedMenus = [...availableStoreMenus].sort((a, b) => {
               if (trimmedQuery) {
                 const aHit = a.name.toLowerCase().includes(trimmedQuery) ? 1 : 0;
                 const bHit = b.name.toLowerCase().includes(trimmedQuery) ? 1 : 0;
@@ -776,154 +777,97 @@ export function CategoryBrowseView({
               }
               return (a.isSideMenu ? 1 : 0) - (b.isSideMenu ? 1 : 0);
             });
-            const previewMenus = sortedPreviewMenus.slice(0, 3);
+            const mainMenu = sortedMenus[0];
+
+            const hasFreeDeliveryTier =
+              store.deliveryFee === 0 ||
+              Boolean(store.deliveryFeeTiers?.some((t) => t.deliveryFee === 0));
+            const deliveryFeeText =
+              store.deliveryFee === 0
+                ? '배달비 0원'
+                : hasFreeDeliveryTier
+                  ? '배달비 0원~'
+                  : `배달비 ${formatWon(store.deliveryFee)}`;
 
             return (
               <article
                 key={store.id}
-                className="os-card rounded-2xl overflow-hidden flex flex-col justify-between"
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  onOpenStoreMenu(
+                    store.id,
+                    mainMenu ? { highlightMenuId: mainMenu.id } : undefined
+                  )
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenStoreMenu(
+                      store.id,
+                      mainMenu ? { highlightMenuId: mainMenu.id } : undefined
+                    );
+                  }
+                }}
+                aria-label={`${store.name} 전체 메뉴 보기`}
+                className="os-card-interactive rounded-2xl p-1.5 sm:p-2 flex flex-col cursor-pointer group text-left"
               >
-                <div>
-                  {/* Store Banner */}
-                  <div className="p-4 flex items-start gap-3.5 border-b border-[#E8ECE4]/80">
-                    <button
-                      type="button"
-                      onClick={() => onOpenStoreMenu(store.id)}
-                      className="easy-compact w-20 h-20 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0 cursor-pointer"
-                      aria-label={`${store.name} 메뉴 보기`}
-                    >
-                      <FoodImage
-                        src={store.image}
-                        alt={store.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
-
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-1">
-                        {isNearby && (
-                          <span className="px-2 py-0.5 rounded-full bg-[#1A1D1A] text-white text-[10px] font-bold">
-                            내 주변
-                          </span>
-                        )}
-                        {!store.singlePriceRevoked && (
-                          <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
-                            착한가격 · 매장 동일가
-                          </span>
-                        )}
-                        <span className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-[10px] font-bold">
-                          1개도 배달
-                        </span>
-                        {promoStoreIds.has(store.id) && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
-                            이벤트·쿠폰
-                          </span>
-                        )}
-                        {hasClosing && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-bold">
-                            마감특가
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => onOpenStoreMenu(store.id)}
-                        className="easy-compact text-left w-full cursor-pointer"
-                      >
-                        <h2 className="text-base font-bold text-[#1A1D1A] truncate hover:text-[#4E6E2A]">
-                          {store.name}
-                        </h2>
-                      </button>
-
-                      <p className="text-xs text-[#687064] truncate">
-                        {store.category}
-                      </p>
-
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs tabular-nums">
-                        <span className="inline-flex items-center gap-0.5 font-bold text-[#1A1D1A]">
-                          <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
-                          {(store.rating ?? 4.9).toFixed(1)}
-                          <span className="font-normal text-[#687064] ml-0.5">
-                            ({(store.reviewCount ?? 500).toLocaleString('ko-KR')})
-                          </span>
-                        </span>
-                        <span className="text-[#687064]">·</span>
-                        <span className="inline-flex items-center gap-0.5 font-semibold text-[#3D5720]">
-                          <Clock className="w-3 h-3" />
-                          {eta}분
-                        </span>
-                        <span className="text-[#687064]">·</span>
-                        <span className="text-[#687064]">
-                          배달비{' '}
-                          {store.deliveryFee === 0
-                            ? '무료'
-                            : formatWon(store.deliveryFee)}
-                          {store.deliveryFeeTiers &&
-                            store.deliveryFeeTiers.length > 0 && (
-                              <strong className="ml-1 text-[#4E6E2A]">
-                                (구간 지원)
-                              </strong>
-                            )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Preview Menus List */}
-                  <div className="p-3.5 space-y-2 bg-[#FAFCF8]">
-                    {previewMenus.map((m) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-white border border-[#E8ECE4]"
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onOpenStoreMenu(store.id, {
-                              highlightMenuId: m.id,
-                              preselectHighlight: true,
-                            })
-                          }
-                          className="easy-compact min-w-0 flex-1 text-left cursor-pointer"
-                        >
-                          <p className="text-xs font-bold text-[#1A1D1A] truncate">
-                            {m.name}
-                          </p>
-                          <p className="text-[11px] font-mono font-bold text-[#4E6E2A] tabular-nums">
-                            {formatWon(getEffectiveMenuPrice(m))}
-                            {(m.closingDiscountPercent ?? 0) > 0 && (
-                              <span className="text-amber-700 ml-1">
-                                (-{m.closingDiscountPercent}%)
-                              </span>
-                            )}
-                          </p>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onAddToCart(m.id, 1, [])}
-                          aria-label={`${m.name} 장바구니 담기`}
-                          className="easy-compact px-2.5 py-1.5 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11px] font-bold inline-flex items-center gap-0.5 shrink-0 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>담기</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                <div className="relative h-[116px] sm:h-[144px] w-full rounded-xl overflow-hidden bg-[#F0F3EC]">
+                  <FoodImage
+                    src={mainMenu?.image ?? store.image}
+                    alt={mainMenu?.name ?? store.name}
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200"
+                  />
+                  {hasClosing ? (
+                    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-amber-600 text-white text-[11.5px] font-bold shadow-xs">
+                      마감특가
+                    </span>
+                  ) : hasPromo ? (
+                    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-[#4E6E2A] text-white text-[11.5px] font-bold shadow-xs">
+                      이벤트·쿠폰
+                    </span>
+                  ) : null}
+                  {availableStoreMenus.length > 1 && (
+                    <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/65 text-white text-[11.5px] font-semibold tabular-nums">
+                      +{availableStoreMenus.length - 1}개 메뉴
+                    </span>
+                  )}
                 </div>
 
-                <div className="px-4 pb-4 pt-1 bg-[#FAFCF8]">
-                  <button
-                    type="button"
-                    onClick={() => onOpenStoreMenu(store.id)}
-                    className="w-full min-h-[42px] px-4 py-2 rounded-2xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <StoreIcon className="w-4 h-4 shrink-0" />
-                    <span>
-                      가게 전체 메뉴 보기 ({availableStoreMenus.length}개) →
+                <div className="pt-2 px-0.5 pb-0.5 space-y-0.5 min-w-0">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <h2 className="text-[13.5px] sm:text-[14.5px] font-extrabold text-[#1A1D1A] group-hover:text-[#3D5720] transition-colors truncate">
+                      {store.name}
+                    </h2>
+                    <span className="text-[12px] font-semibold text-[#555E52] shrink-0 tabular-nums">
+                      {eta}분
                     </span>
-                  </button>
+                  </div>
+
+                  {mainMenu && (
+                    <div className="flex items-center justify-between gap-1.5">
+                      <p className="text-[12px] sm:text-[12.5px] font-semibold text-[#3D5720] truncate">
+                        {mainMenu.name}
+                      </p>
+                      <span className="text-[12px] sm:text-[12.5px] font-bold text-[#1A1D1A] shrink-0 tabular-nums">
+                        {formatWon(getEffectiveMenuPrice(mainMenu))}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1 text-[11.5px] sm:text-[12px] text-[#555E52] truncate tabular-nums">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                    <span className="font-bold text-[#1A1D1A]">
+                      {(store.rating ?? 4.9).toFixed(1)}
+                    </span>
+                    <span>
+                      ({(store.reviewCount ?? 500).toLocaleString('ko-KR')})
+                    </span>
+                    <span>·</span>
+                    <span className="truncate font-semibold text-[#1A1D1A]">
+                      {deliveryFeeText}
+                    </span>
+                  </div>
                 </div>
               </article>
             );
