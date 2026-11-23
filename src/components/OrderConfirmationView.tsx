@@ -571,7 +571,7 @@ export function OrderConfirmationView({
       )}
 
       {/* 1. Store, Multi-Menu Line Items & Delivery Context Card */}
-      <section className="os-card rounded-[28px] p-6 space-y-5">
+      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-[#4E6E2A]">
@@ -583,11 +583,11 @@ export function OrderConfirmationView({
           </div>
           <div className="flex flex-wrap items-center gap-1.5 shrink-0">
             {allSameStorePrice && (
-              <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold">
-                💚 착한가격 · 매장 동일가
+              <span className="px-2.5 py-1 rounded-full bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-semibold">
+                착한가격 · 매장 동일가
               </span>
             )}
-            <span className="px-2.5 py-1 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-xs font-bold">
+            <span className="px-2.5 py-1 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-xs font-semibold">
               1개도 배달
             </span>
           </div>
@@ -721,23 +721,23 @@ export function OrderConfirmationView({
 
         {activeStorePromos.length > 0 && (
           <div className="px-3.5 py-2.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
-            <span className="font-extrabold mr-1.5">
-              🎉 [{activeStorePromos[0].badgeText ?? '가게 이벤트'}]
+            <span className="font-bold mr-1.5">
+              [{activeStorePromos[0].badgeText ?? '가게 이벤트'}]
             </span>
-            <span className="font-bold">{activeStorePromos[0].title}</span>
+            <span className="font-semibold">{activeStorePromos[0].title}</span>
           </div>
         )}
 
         {deliveryFeeCalc.nextTierLabel && (
           <div className="px-3.5 py-2 rounded-2xl bg-[#EAF1E2] border border-[#D4E1C5] flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="font-bold text-[#3D5720]">
-              💡 {deliveryFeeCalc.nextTierLabel}
+            <span className="font-semibold text-[#3D5720]">
+              {deliveryFeeCalc.nextTierLabel}
             </span>
             {availableExtraMenus.length > 1 && (
               <button
                 type="button"
                 onClick={() => setShowAddMoreMenus(true)}
-                className="easy-compact font-extrabold text-[#4E6E2A] underline cursor-pointer"
+                className="easy-compact font-bold text-[#4E6E2A] underline cursor-pointer"
               >
                 메뉴 더 담기 →
               </button>
@@ -815,15 +815,15 @@ export function OrderConfirmationView({
                   onClick={() => setDeliveryMethod(option.id)}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer space-y-1 ${
                     active
-                      ? 'bg-[#EAF1E2] border-2 border-[#4E6E2A] shadow-2xs'
+                      ? 'bg-[#EAF1E2] border-[#4E6E2A] ring-1 ring-[#4E6E2A]'
                       : 'bg-[#F7F8F5] border-[#E8ECE4] hover:border-[#82B440]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs sm:text-sm font-extrabold text-[#1A1D1A]">
+                    <span className="text-xs sm:text-sm font-bold text-[#1A1D1A]">
                       {option.label}
                     </span>
-                    <span className="font-mono text-xs font-extrabold text-[#4E6E2A] tabular-nums shrink-0">
+                    <span className="font-mono text-xs font-bold text-[#4E6E2A] tabular-nums shrink-0">
                       {optFee === 0 ? '무료' : formatWon(optFee)}
                     </span>
                   </div>
@@ -1015,7 +1015,7 @@ export function OrderConfirmationView({
       </section>
 
       {/* 2. Nationwide Payment Selector */}
-      <section className="os-card rounded-[28px] p-6 space-y-4">
+      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-1.5">
             <CreditCard className="w-4 h-4 text-[#4E6E2A]" />
@@ -1110,7 +1110,7 @@ export function OrderConfirmationView({
       </section>
 
       {/* 3. Summary Receipt, Competitor Savings Comparison & One-Tap CTA */}
-      <section className="os-card rounded-[28px] p-6 sm:p-7 space-y-5">
+      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-5">
         {/* Auto Best Coupon Strip */}
         <div className="px-4 py-3 bg-[#EAF1E2] border border-[#DCE7CF] rounded-2xl flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-start gap-2.5 min-w-0">
@@ -1118,7 +1118,7 @@ export function OrderConfirmationView({
             <div className="min-w-0 space-y-0.5">
               <p className="text-xs font-bold text-[#3D5720]">
                 {effectiveCouponDiscount > 0
-                  ? `✨ 최대 할인 자동 적용: ${selectedCoupon.label} (-${formatWon(effectiveCouponDiscount)})`
+                  ? `최대 할인 자동 적용: ${selectedCoupon.label} (-${formatWon(effectiveCouponDiscount)})`
                   : '이전 옵션 자동 적용 완료'}
               </p>
               <p className="text-xs text-[#4C6235] leading-relaxed">
@@ -1151,7 +1151,7 @@ export function OrderConfirmationView({
               <span className="font-bold text-[#3D5720]">
                 alle로 주문하면 예상 절약액
               </span>
-              <span className="font-mono font-extrabold text-[#4E6E2A] tabular-nums">
+              <span className="font-mono font-bold text-[#4E6E2A] tabular-nums">
                 총 약 {formatWon(savings.totalSaved)} 절약!
               </span>
             </div>

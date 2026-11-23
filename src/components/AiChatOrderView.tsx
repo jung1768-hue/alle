@@ -2622,7 +2622,7 @@ export function AiChatOrderView({
           {
             id: `b-event-${Date.now() + 1}`,
             sender: 'bot',
-            text: `🎉 점주 자체 이벤트·쿠폰 또는 마감 할인이 진행 중인 가게 ${topEventMenus.length}곳을 찾았어요! 착한가격(매장 동일가)에 추가 혜택까지 받으실 수 있습니다.`,
+            text: `점주 자체 이벤트·쿠폰 또는 마감 할인이 진행 중인 가게 ${topEventMenus.length}곳을 찾았어요! 착한가격(매장 동일가)에 추가 혜택까지 받으실 수 있습니다.`,
             spokenText: evSpoken,
             matchedMenuIds: topEventMenus.map((m) => m.id),
             servings: 1,
@@ -3113,7 +3113,7 @@ export function AiChatOrderView({
   };
 
   return (
-    <div className="max-w-3xl mx-auto os-card rounded-[32px] overflow-hidden flex flex-col min-h-[76vh]">
+    <div className="max-w-3xl mx-auto os-card rounded-2xl overflow-hidden flex flex-col min-h-[76vh]">
       {/* Simple 1-Row Easy AI Header */}
       <div className="px-4 sm:px-6 py-3.5 bg-white border-b border-[#E8ECE4] flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -3126,11 +3126,11 @@ export function AiChatOrderView({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-extrabold text-[#1A1D1A] tracking-tight whitespace-nowrap">
+            <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight whitespace-nowrap">
               올레 대화 주문
             </h1>
             <p className="text-xs text-[#687064] truncate">
-              {activeLocation?.areaName ?? '전국'} · 💚 착한가격 · 1개도 배달
+              {activeLocation?.areaName ?? '전국'} · 착한가격 · 1개도 배달
             </p>
           </div>
         </div>
@@ -3355,29 +3355,32 @@ export function AiChatOrderView({
                         }}
                         className={`w-[304px] sm:w-[320px] shrink-0 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3.5 transition-all cursor-pointer ${
                           isSelectedCard
-                            ? 'bg-[#F7FAF3] border-2 border-[#4E6E2A] shadow-md ring-2 ring-[#4E6E2A]/15'
-                            : 'bg-white border border-[#E8ECE4] hover:border-[#82B440] shadow-sm'
+                            ? 'bg-[#F7FAF3] border border-[#4E6E2A] ring-1 ring-[#4E6E2A] shadow-sm'
+                            : 'bg-white border border-[#E8ECE4] hover:border-[#82B440] shadow-xs'
                         }`}
                       >
                         <div className="space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-1.5">
                             <span
-                              className={`px-2.5 py-1 rounded-full text-xs sm:text-sm font-extrabold ${
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
                                 isSelectedCard
                                   ? 'bg-[#4E6E2A] text-white'
                                   : 'bg-[#EAF1E2] text-[#3D5720]'
                               }`}
                             >
-                              ✨ {idx + 1}순위{isSelectedCard ? ' · 선택됨' : ''}
+                              <Sparkles className="w-3 h-3 shrink-0" />
+                              <span>
+                                {idx + 1}순위{isSelectedCard ? ' · 선택됨' : ''}
+                              </span>
                             </span>
                             <div className="flex items-center gap-1">
                               {isSameStore && (
-                                <span className="px-2 py-0.5 rounded-md bg-[#F7F8F5] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold">
-                                  💚 착한가격
+                                <span className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#D4E1C5] text-[#3D5720] text-xs font-semibold">
+                                  착한가격
                                 </span>
                               )}
                               {hasClosingDiscount && (
-                                <span className="px-2 py-0.5 rounded-md bg-amber-600 text-white text-xs font-bold">
+                                <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-xs font-semibold">
                                   -{item.closingDiscountPercent}%
                                 </span>
                               )}
@@ -3385,13 +3388,16 @@ export function AiChatOrderView({
                           </div>
 
                           {(storePromo || storeCoupon) && (
-                            <p className="text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 truncate">
-                              🎉 {storeCoupon ? storeCoupon.label : storePromo?.title}
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 truncate">
+                              <Ticket className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">
+                                {storeCoupon ? storeCoupon.label : storePromo?.title}
+                              </span>
                             </p>
                           )}
 
                           <div className="flex items-center gap-3.5">
-                            <div className="w-18 h-18 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
                               <FoodImage
                                 src={item.image}
                                 alt={item.name}
@@ -3400,9 +3406,9 @@ export function AiChatOrderView({
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-1.5">
-                                <div className="flex items-center gap-1.5 text-sm font-bold text-[#4E6E2A] min-w-0">
+                                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#4E6E2A] min-w-0">
                                   <span className="truncate">{store.name}</span>
-                                  <span className="inline-flex items-center gap-0.5 text-[#1A1D1A] font-bold shrink-0 tabular-nums">
+                                  <span className="inline-flex items-center gap-0.5 text-[#1A1D1A] font-semibold shrink-0 tabular-nums">
                                     <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
                                     {(store.rating ?? 4.9).toFixed(1)}
                                   </span>
@@ -3425,12 +3431,12 @@ export function AiChatOrderView({
                                   />
                                 </button>
                               </div>
-                              <div className="text-lg font-extrabold text-[#1A1D1A] truncate mt-0.5">
+                              <div className="text-base sm:text-lg font-bold text-[#1A1D1A] truncate mt-0.5">
                                 {item.name}
                               </div>
-                              <div className="text-base font-extrabold text-[#4E6E2A] tabular-nums mt-0.5">
+                              <div className="text-sm sm:text-base font-bold text-[#4E6E2A] tabular-nums mt-0.5">
                                 {formatWon(total)}{' '}
-                                <span className="font-semibold text-sm text-[#687064]">
+                                <span className="font-medium text-xs sm:text-sm text-[#687064]">
                                   · 약 {item.estimatedMinutes + (store.extraPrepMinutes ?? 0)}분
                                 </span>
                               </div>
@@ -3438,7 +3444,7 @@ export function AiChatOrderView({
                           </div>
 
                           {item.aiReason && (
-                            <p className="text-sm text-[#4B5548] leading-snug line-clamp-1">
+                            <p className="text-xs sm:text-sm text-[#4B5548] leading-snug line-clamp-1">
                               {item.aiReason}
                             </p>
                           )}
@@ -3467,7 +3473,7 @@ export function AiChatOrderView({
                                 });
                               }
                             }}
-                            className="easy-compact min-h-[44px] px-3 py-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-sm font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
+                            className="easy-compact min-h-[44px] px-3 py-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-sm font-semibold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
                           >
                             {onOpenStoreMenu && storeOtherCount > 0
                               ? `다른 메뉴 (+${storeOtherCount})`
@@ -3487,7 +3493,7 @@ export function AiChatOrderView({
                                 customerNote: defaultNote ?? '',
                               });
                             }}
-                            className="easy-compact min-h-[44px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-extrabold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
+                            className="easy-compact min-h-[44px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
                           >
                             <Zap className="w-4 h-4 shrink-0" />
                             <span>바로 주문</span>
@@ -3502,10 +3508,10 @@ export function AiChatOrderView({
               {/* Conversational In-Chat Order Staging Card */}
               {stagedMenu && stagedStore && (
                 <div className="pl-1 sm:pl-12">
-                  <div className="max-w-lg bg-white border-2 border-[#D4E1C5] rounded-3xl p-5 sm:p-6 space-y-4 shadow-sm">
+                  <div className="max-w-lg os-card rounded-2xl p-5 sm:p-6 space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-[#E8ECE4]">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-[#E8ECE4]">
                           <FoodImage
                             src={stagedMenu.image}
                             alt={stagedMenu.name}
@@ -3513,10 +3519,10 @@ export function AiChatOrderView({
                           />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-bold text-[#4E6E2A] truncate">
+                          <div className="text-xs sm:text-sm font-semibold text-[#4E6E2A] truncate">
                             {stagedStore.name}
                           </div>
-                          <div className="text-lg sm:text-xl font-extrabold text-[#1A1D1A] truncate">
+                          <div className="text-base sm:text-lg font-bold text-[#1A1D1A] truncate">
                             {stagedMenu.name}
                           </div>
                         </div>
@@ -3535,11 +3541,11 @@ export function AiChatOrderView({
                             }))
                           }
                           aria-label="수량 감소"
-                          className="w-10 h-10 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] font-extrabold text-base cursor-pointer"
+                          className="w-10 h-10 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] font-bold text-base cursor-pointer"
                         >
                           -
                         </button>
-                        <span className="w-7 text-center font-mono tabular-nums text-base font-extrabold">
+                        <span className="w-7 text-center font-mono tabular-nums text-base font-bold">
                           {stagedServings[stagedMenu.id] ?? 1}
                         </span>
                         <button
@@ -3554,7 +3560,7 @@ export function AiChatOrderView({
                             }))
                           }
                           aria-label="수량 증가"
-                          className="w-10 h-10 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] font-extrabold text-base cursor-pointer"
+                          className="w-10 h-10 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] font-bold text-base cursor-pointer"
                         >
                           +
                         </button>
@@ -3645,8 +3651,9 @@ export function AiChatOrderView({
                           {storeOtherMenus.length > 0 && (
                             <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2.5">
                               <div className="flex items-center justify-between gap-2 text-sm">
-                                <span className="font-bold text-[#1A1D1A]">
-                                  🍽️ 이 가게 다른 메뉴 추가 ({storeOtherMenus.length}개)
+                                <span className="font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
+                                  <StoreIcon className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+                                  <span>이 가게 다른 메뉴 추가 ({storeOtherMenus.length}개)</span>
                                 </span>
                                 {onOpenStoreMenu && (
                                   <button
@@ -3659,7 +3666,7 @@ export function AiChatOrderView({
                                         preselectHighlight: true,
                                       })
                                     }
-                                    className="easy-compact text-[#4E6E2A] font-extrabold hover:underline cursor-pointer"
+                                    className="easy-compact text-[#4E6E2A] font-semibold hover:underline cursor-pointer"
                                   >
                                     전체 메뉴 →
                                   </button>
@@ -3677,10 +3684,10 @@ export function AiChatOrderView({
                                       className="flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-white border border-[#E8ECE4]"
                                     >
                                       <div className="min-w-0">
-                                        <p className="text-sm font-bold text-[#1A1D1A] truncate">
+                                        <p className="text-sm font-semibold text-[#1A1D1A] truncate">
                                           {other.name}
                                         </p>
-                                        <p className="text-xs sm:text-sm font-mono font-bold text-[#4E6E2A]">
+                                        <p className="text-xs sm:text-sm font-mono font-semibold text-[#4E6E2A]">
                                           {formatWon(getEffectiveMenuPrice(other))}
                                         </p>
                                       </div>
@@ -3694,7 +3701,7 @@ export function AiChatOrderView({
                                               1
                                             )
                                           }
-                                          className="easy-compact min-h-[36px] px-3 py-1.5 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs sm:text-sm font-extrabold shrink-0 cursor-pointer"
+                                          className="easy-compact min-h-[36px] px-3 py-1.5 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs sm:text-sm font-semibold shrink-0 cursor-pointer"
                                         >
                                           + 추가
                                         </button>
@@ -3714,7 +3721,7 @@ export function AiChatOrderView({
                                           >
                                             -
                                           </button>
-                                          <span className="w-5 text-center font-mono text-sm font-extrabold">
+                                          <span className="w-5 text-center font-mono text-sm font-bold">
                                             {extraQty}
                                           </span>
                                           <button
@@ -3741,7 +3748,7 @@ export function AiChatOrderView({
                           )}
 
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm sm:text-base font-semibold text-[#555E52]">
+                            <span className="text-sm sm:text-base font-medium text-[#555E52]">
                               배달비 포함 예상 금액
                               {storeExtras.length > 0 && (
                                 <strong className="ml-1 text-[#3D5720]">
@@ -3754,7 +3761,7 @@ export function AiChatOrderView({
                                 </strong>
                               )}
                             </span>
-                            <span className="text-xl sm:text-2xl font-extrabold font-mono tabular-nums text-[#4E6E2A]">
+                            <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-[#4E6E2A]">
                               {formatWon(estTotal)}
                             </span>
                           </div>
@@ -3773,7 +3780,7 @@ export function AiChatOrderView({
                                   );
                                 }
                               }}
-                              className="min-h-[48px] px-3.5 py-2.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer transition-colors"
+                              className="min-h-[48px] px-3.5 py-2.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm sm:text-base font-semibold rounded-xl cursor-pointer transition-colors"
                             >
                               {onAddToCart
                                 ? storeExtras.length > 0
@@ -3802,7 +3809,7 @@ export function AiChatOrderView({
                                   });
                                 }
                               }}
-                              className="min-h-[48px] px-3.5 py-2.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm sm:text-base font-extrabold rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                              className="min-h-[48px] px-3.5 py-2.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm sm:text-base font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <Zap className="w-4 h-4" />
                               <span>바로 결제하기</span>
@@ -3829,7 +3836,7 @@ export function AiChatOrderView({
                 return (
                   <div className="pl-1 sm:pl-12">
                     {isLiveCard ? (
-                      <div className="max-w-md bg-white border-2 border-[#4E6E2A] rounded-2xl p-4 space-y-3 shadow-md">
+                      <div className="max-w-md bg-white border border-[#4E6E2A] ring-1 ring-[#4E6E2A]/20 rounded-2xl p-4 space-y-3 shadow-sm">
                         <div className="flex items-center justify-between gap-2">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
                             <CreditCard className="w-3.5 h-3.5" />
@@ -4022,7 +4029,7 @@ export function AiChatOrderView({
                                         : 'bg-white border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
                                     }`}
                                   >
-                                    <div className="text-[11px] font-extrabold truncate">
+                                    <div className="text-[11px] font-bold truncate">
                                       {opt.shortLabel}
                                     </div>
                                     <div className="text-[10px] opacity-80 truncate">
@@ -4045,8 +4052,8 @@ export function AiChatOrderView({
                             </span>
                           </div>
                           {summary.deliveryFeeCalc.nextTierLabel && (
-                            <p className="text-[11px] font-bold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg">
-                              💡 {summary.deliveryFeeCalc.nextTierLabel}
+                            <p className="text-[11px] font-semibold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg">
+                              {summary.deliveryFeeCalc.nextTierLabel}
                             </p>
                           )}
                           {summary.bestCoupon && summary.couponDiscount > 0 && (
@@ -4109,7 +4116,7 @@ export function AiChatOrderView({
                           <span className="text-xs font-bold text-[#1A1D1A]">
                             최종 결제 금액
                           </span>
-                          <span className="text-lg font-extrabold font-mono tabular-nums text-[#4E6E2A]">
+                          <span className="text-lg font-bold font-mono tabular-nums text-[#4E6E2A]">
                             {formatWon(summary.finalTotal)}
                           </span>
                         </div>
@@ -4254,10 +4261,10 @@ export function AiChatOrderView({
             e.preventDefault();
             runChatQuery(input);
           }}
-          className={`min-w-0 w-full p-1.5 rounded-2xl bg-[#F7F8F5] border-2 transition-colors flex items-center gap-2 ${
+          className={`min-w-0 w-full p-1.5 rounded-2xl bg-[#F7F8F5] border transition-colors flex items-center gap-2 ${
             isListening
-              ? 'border-red-400'
-              : 'border-[#D4E1C5] focus-within:border-[#4E6E2A]'
+              ? 'border-red-400 ring-1 ring-red-400/30'
+              : 'border-[#D4E1C5] focus-within:border-[#4E6E2A] focus-within:ring-1 focus-within:ring-[#4E6E2A]/20'
           }`}
         >
           <button
@@ -4484,7 +4491,7 @@ export function AiChatOrderView({
                           {(spotStore.rating ?? 4.9).toFixed(1)}
                         </span>
                       </div>
-                      <h2 className="text-lg sm:text-xl font-extrabold text-[#1A1D1A] leading-snug">
+                      <h2 className="text-lg sm:text-xl font-bold text-[#1A1D1A] leading-snug">
                         {spotMenu.name}
                       </h2>
                     </div>
@@ -4499,7 +4506,7 @@ export function AiChatOrderView({
                               ? '무료'
                               : formatWon(spotStore.deliveryFee)}
                           </div>
-                          <div className="text-base font-extrabold text-[#3D5720] tabular-nums mt-0.5">
+                          <div className="text-base font-bold text-[#3D5720] tabular-nums mt-0.5">
                             {spotServings}인분 합계 {formatWon(totalWithFee)}
                           </div>
                         </div>
@@ -4551,7 +4558,7 @@ export function AiChatOrderView({
                       return (
                         <div className="p-3.5 rounded-2xl bg-[#FAFCF8] border border-[#DCE7CF] space-y-2.5">
                           <div className="flex items-center justify-between gap-2 text-xs">
-                            <span className="font-extrabold text-[#1A1D1A] inline-flex items-center gap-1.5">
+                            <span className="font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
                               <StoreIcon className="w-3.5 h-3.5 text-[#4E6E2A]" />
                               {spotStore.name} 다른 메뉴 함께 추가 (
                               {spotOtherMenus.length}개)
@@ -4667,7 +4674,7 @@ export function AiChatOrderView({
                     {/* Real Customer Reviews (Prominent & Readable) */}
                     <div className="p-3.5 rounded-2xl bg-[#FAFCF8] border border-[#DCE7CF] space-y-2.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-extrabold text-[#1A1D1A] inline-flex items-center gap-1.5">
+                        <span className="font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
                           <MessageSquare className="w-3.5 h-3.5 text-[#4E6E2A]" />
                           실제 고객 리뷰 ({spotReviews.length}건)
                         </span>
@@ -4791,7 +4798,7 @@ export function AiChatOrderView({
                               <span className="font-semibold text-[#3D5720]">
                                 기본 + 추가 메뉴 ({combinedSpotItems.length}종)
                               </span>
-                              <span className="font-mono font-extrabold text-[#3D5720] tabular-nums">
+                              <span className="font-mono font-bold text-[#3D5720] tabular-nums">
                                 합계 {formatWon(combinedSpotTotal)}
                               </span>
                             </div>
@@ -4815,7 +4822,7 @@ export function AiChatOrderView({
                                 }
                                 setRecommendedSpotlight(null);
                               }}
-                              className="min-h-[44px] px-3 py-2.5 rounded-xl border border-[#DCE7CF] bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                              className="min-h-[44px] px-3 py-2.5 rounded-xl border border-[#DCE7CF] bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <ShoppingBag className="w-4 h-4" />
                               <span>
@@ -4838,7 +4845,7 @@ export function AiChatOrderView({
                                   customerNote: defaultNote ?? '',
                                 });
                               }}
-                              className="min-h-[44px] px-3 py-2.5 rounded-xl bg-[#3D5720] hover:bg-[#2F4418] text-white text-sm font-extrabold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                              className="min-h-[44px] px-3 py-2.5 rounded-xl bg-[#3D5720] hover:bg-[#2F4418] text-white text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <Zap className="w-4 h-4" />
                               <span>

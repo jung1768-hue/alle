@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  CheckCircle2,
   ChevronDown,
   Clock,
+  Flame,
+  Globe,
   Heart,
   MapPin,
   Plus,
@@ -11,6 +14,7 @@ import {
   Sparkles,
   Star,
   Store as StoreIcon,
+  Ticket,
   X,
   Zap,
 } from 'lucide-react';
@@ -420,7 +424,7 @@ export function CategoryBrowseView({
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       {/* Top Bar & Search Header */}
-      <section className="os-card rounded-3xl p-4 sm:p-6 space-y-4">
+      <section className="os-card rounded-2xl p-4 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <button
@@ -505,7 +509,7 @@ export function CategoryBrowseView({
       {/* Classic Platform Category Icon Grid */}
       <section aria-label="배달 카테고리 선택" className="space-y-2.5">
         <div className="flex items-center justify-between px-1">
-          <h1 className="text-base sm:text-lg font-extrabold text-[#1A1D1A]">
+          <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
             카테고리별 가게 찾기
           </h1>
           <span className="text-xs text-[#687064]">
@@ -525,7 +529,7 @@ export function CategoryBrowseView({
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`p-2.5 rounded-2xl border flex flex-col items-center justify-center gap-1 text-center cursor-pointer transition-all ${
                   active
-                    ? 'bg-[#EAF1E2] border-2 border-[#4E6E2A] shadow-xs'
+                    ? 'bg-[#EAF1E2] border-[#4E6E2A] ring-1 ring-[#4E6E2A]'
                     : 'bg-white border-[#E8ECE4] hover:border-[#82B440]'
                 }`}
               >
@@ -556,24 +560,26 @@ export function CategoryBrowseView({
             <button
               type="button"
               onClick={() => setNearbyOnly(true)}
-              className={`easy-compact px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+              className={`easy-compact px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
                 nearbyOnly
                   ? 'bg-[#4E6E2A] text-white'
                   : 'text-[#555E52] hover:text-[#1A1D1A]'
               }`}
             >
-              📍 내 주변 ({nearbyOpenStores.length})
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span>내 주변 ({nearbyOpenStores.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setNearbyOnly(false)}
-              className={`easy-compact px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+              className={`easy-compact px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
                 !nearbyOnly
                   ? 'bg-[#4E6E2A] text-white'
                   : 'text-[#555E52] hover:text-[#1A1D1A]'
               }`}
             >
-              🗺️ 전국 전체 ({openStores.length})
+              <Globe className="w-3.5 h-3.5 shrink-0" />
+              <span>전국 전체 ({openStores.length})</span>
             </button>
           </div>
 
@@ -634,35 +640,38 @@ export function CategoryBrowseView({
           <button
             type="button"
             onClick={() => setOnlyClosingSale((p) => !p)}
-            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold cursor-pointer transition-colors ${
+            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
               onlyClosingSale
                 ? 'bg-amber-600 border-amber-600 text-white'
                 : 'bg-white border-[#E8ECE4] text-[#434B40]'
             }`}
           >
-            🔥 마감특가
+            <Flame className="w-3.5 h-3.5 shrink-0" />
+            <span>마감특가</span>
           </button>
           <button
             type="button"
             onClick={() => setOnlySameStorePrice((p) => !p)}
-            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold cursor-pointer transition-colors ${
+            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
               onlySameStorePrice
                 ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
                 : 'bg-white border-[#E8ECE4] text-[#434B40]'
             }`}
           >
-            💚 착한가격
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span>착한가격</span>
           </button>
           <button
             type="button"
             onClick={() => setOnlyWithPromoOrCoupon((p) => !p)}
-            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold cursor-pointer transition-colors ${
+            className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
               onlyWithPromoOrCoupon
                 ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
                 : 'bg-white border-[#E8ECE4] text-[#434B40]'
             }`}
           >
-            🎉 가게 이벤트·쿠폰
+            <Ticket className="w-3.5 h-3.5 shrink-0" />
+            <span>가게 이벤트·쿠폰</span>
           </button>
           <button
             type="button"
@@ -710,7 +719,7 @@ export function CategoryBrowseView({
 
       {/* Empty State */}
       {totalResultCount === 0 ? (
-        <div className="bg-white border border-[#E8ECE4] rounded-3xl p-8 text-center space-y-4">
+        <div className="os-card rounded-2xl p-8 text-center space-y-4">
           <p className="text-base font-bold text-[#1A1D1A]">
             조건에 맞는 {viewMode === 'stores' ? '가게' : '메뉴'}가 아직 없어요
           </p>
@@ -772,7 +781,7 @@ export function CategoryBrowseView({
             return (
               <article
                 key={store.id}
-                className="os-card rounded-3xl overflow-hidden flex flex-col justify-between"
+                className="os-card rounded-2xl overflow-hidden flex flex-col justify-between"
               >
                 <div>
                   {/* Store Banner */}
@@ -799,7 +808,7 @@ export function CategoryBrowseView({
                         )}
                         {!store.singlePriceRevoked && (
                           <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
-                            💚 착한가격 · 매장 동일가
+                            착한가격 · 매장 동일가
                           </span>
                         )}
                         <span className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-[10px] font-bold">
@@ -807,7 +816,7 @@ export function CategoryBrowseView({
                         </span>
                         {promoStoreIds.has(store.id) && (
                           <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
-                            🎉 이벤트·쿠폰
+                            이벤트·쿠폰
                           </span>
                         )}
                         {hasClosing && (
@@ -822,7 +831,7 @@ export function CategoryBrowseView({
                         onClick={() => onOpenStoreMenu(store.id)}
                         className="easy-compact text-left w-full cursor-pointer"
                       >
-                        <h2 className="text-base font-extrabold text-[#1A1D1A] truncate hover:text-[#4E6E2A]">
+                        <h2 className="text-base font-bold text-[#1A1D1A] truncate hover:text-[#4E6E2A]">
                           {store.name}
                         </h2>
                       </button>
@@ -935,7 +944,7 @@ export function CategoryBrowseView({
             return (
               <article
                 key={m.id}
-                className="os-card rounded-3xl overflow-hidden flex flex-col justify-between"
+                className="os-card rounded-2xl overflow-hidden flex flex-col justify-between"
               >
                 <div>
                   <div className="relative aspect-4/3 bg-[#F0F3EC]">
@@ -981,7 +990,7 @@ export function CategoryBrowseView({
                       {m.name}
                     </h3>
                     <div className="flex items-center justify-between text-xs tabular-nums">
-                      <span className="font-mono font-extrabold text-[#1A1D1A] text-sm">
+                      <span className="font-mono font-bold text-[#1A1D1A] text-sm">
                         {formatWon(effectivePrice)}
                       </span>
                       <span className="text-[#687064]">

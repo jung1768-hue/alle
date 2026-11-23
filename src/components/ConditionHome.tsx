@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Bike,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  LayoutGrid,
+  MapPin,
   Megaphone,
   Mic,
   MicOff,
   Search,
-  Sparkles,
   Ticket,
   Zap,
 } from 'lucide-react';
@@ -396,36 +401,38 @@ export function ConditionHome({
     : null;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Core Value Strip + Voice + Manual Search + Category Grid */}
-      <section className="bg-[#EAF1E2] border-2 border-[#82B440] rounded-3xl p-5 sm:p-6 space-y-4 shadow-sm">
+    <div className="max-w-3xl mx-auto space-y-7">
+      {/* Hero: Value Strip + Voice CTA + Manual Search */}
+      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-extrabold text-[#3D5720]">
-            💚 수수료 0% 착한가격 · 최소주문 없음 · 1개도 배달
+          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#3D5720]">
+            <CheckCircle2 className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+            <span>수수료 0% · 매장 동일가 · 최소주문 없음</span>
           </span>
-          <span className="px-2.5 py-1 rounded-full bg-white border border-[#D4E1C5] text-xs font-bold text-[#3D5720]">
-            {activeLocation?.areaName ?? '대구 북구 산격동'}
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-xs font-medium text-[#555E52]">
+            <MapPin className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+            <span>{activeLocation?.areaName ?? '대구 북구 산격동'}</span>
           </span>
         </div>
 
         <button
           type="button"
           onClick={handleVoiceTrigger}
-          className={`w-full min-h-[78px] px-5 py-4 rounded-3xl font-extrabold text-lg sm:text-xl flex items-center justify-center gap-3 shadow-md transition-colors cursor-pointer ${
+          className={`w-full min-h-[60px] px-5 py-3.5 rounded-xl font-semibold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-sm transition-colors cursor-pointer ${
             isListening
               ? 'bg-red-600 text-white'
               : 'bg-[#4E6E2A] hover:bg-[#3F5A21] text-white'
           }`}
         >
           {isListening ? (
-            <MicOff className="w-7 h-7 shrink-0" />
+            <MicOff className="w-5 h-5 shrink-0" />
           ) : (
-            <Mic className="w-7 h-7 shrink-0" />
+            <Mic className="w-5 h-5 shrink-0" />
           )}
           <span>
             {isListening
               ? '말씀하세요... 듣고 있어요 (누르면 중지)'
-              : '🎙️ 누르고 먹고 싶은 음식을 말하세요'}
+              : '누르고 먹고 싶은 음식을 말하세요'}
           </span>
         </button>
 
@@ -442,27 +449,27 @@ export function ConditionHome({
           className="flex gap-2"
         >
           <div className="relative flex-1 flex items-center">
-            <Search className="w-4 h-4 text-[#4E6E2A] absolute left-4 pointer-events-none" />
+            <Search className="w-4 h-4 text-[#4E6E2A] absolute left-3.5 pointer-events-none" />
             <input
               type="text"
               value={easySearchQuery}
               onChange={(e) => setEasySearchQuery(e.target.value)}
               placeholder="가게명·메뉴명 직접 검색 (예: 국밥, 치킨)"
-              className="w-full min-h-[50px] pl-10 pr-4 bg-white border border-[#D4E1C5] rounded-2xl text-base text-[#1A1D1A] placeholder:text-[#687064]"
+              className="w-full min-h-[46px] pl-10 pr-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-sm sm:text-base text-[#1A1D1A] placeholder:text-[#687064]"
             />
           </div>
           <button
             type="submit"
-            className="min-h-[50px] px-5 rounded-2xl bg-[#1A1D1A] hover:bg-[#2F352F] text-white text-base font-extrabold whitespace-nowrap cursor-pointer shrink-0"
+            className="min-h-[46px] px-5 rounded-xl bg-[#1A1D1A] hover:bg-[#2F352F] text-white text-sm sm:text-base font-semibold whitespace-nowrap cursor-pointer shrink-0 transition-colors"
           >
             검색
           </button>
         </form>
 
         {showVoiceFallback && (
-          <div className="p-4 bg-white border border-[#D4E1C5] rounded-2xl space-y-2.5">
-            <p className="text-sm font-bold text-[#1A1D1A]">
-              마이크 대신 아래 글자를 눌러도 올레가 바로 찾아드려요
+          <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl space-y-2.5">
+            <p className="text-xs sm:text-sm font-semibold text-[#1A1D1A]">
+              마이크 대신 아래 문장을 눌러도 올레가 바로 찾아드려요
             </p>
             <div className="grid grid-cols-1 gap-2">
               {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
@@ -473,7 +480,7 @@ export function ConditionHome({
                     setShowVoiceFallback(false);
                     onOpenAiChat(sample.text);
                   }}
-                  className="w-full px-4 py-3 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] rounded-2xl text-left text-base font-bold text-[#1A1D1A] cursor-pointer"
+                  className="w-full px-4 py-2.5 bg-white hover:bg-[#EAF1E2] border border-[#E8ECE4] rounded-xl text-left text-sm font-medium text-[#1A1D1A] cursor-pointer transition-colors"
                 >
                   “{sample.text}”
                 </button>
@@ -481,25 +488,29 @@ export function ConditionHome({
             </div>
           </div>
         )}
+      </section>
 
-        {/* Classic Platform Category Grid */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-0.5">
-            <span className="text-sm font-extrabold text-[#3D5720]">
-              카테고리로 직접 골라 주문하기
-            </span>
-            {onOpenBrowse && (
-              <button
-                type="button"
-                onClick={() => onOpenBrowse({ category: 'all' })}
-                className="easy-compact text-xs font-bold text-[#3D5720] underline underline-offset-2 cursor-pointer"
-              >
-                전체 보기 →
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-            {EASY_GRID_CATEGORIES.map((cat) => (
+      {/* Separated Category Grid */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between px-0.5">
+          <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
+            카테고리
+          </h2>
+          {onOpenBrowse && (
+            <button
+              type="button"
+              onClick={() => onOpenBrowse({ category: 'all' })}
+              className="easy-compact inline-flex items-center gap-0.5 text-xs sm:text-sm font-semibold text-[#4E6E2A] hover:text-[#3D5720] cursor-pointer"
+            >
+              <span>전체 보기</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          {EASY_GRID_CATEGORIES.map((cat) => {
+            const isSelected = !onOpenBrowse && activeCategoryChip === cat.id;
+            return (
               <button
                 key={cat.id}
                 type="button"
@@ -512,13 +523,21 @@ export function ConditionHome({
                     );
                   }
                 }}
-                className="min-h-[68px] px-3 py-2.5 rounded-2xl border-2 bg-white border-[#D4E1C5] hover:border-[#4E6E2A] hover:bg-[#F7F8F5] text-[#1A1D1A] text-sm sm:text-base font-extrabold flex items-center sm:flex-col justify-center gap-2 sm:gap-1 cursor-pointer transition-colors"
+                className={`os-card-interactive min-h-[64px] px-3 py-2.5 rounded-xl text-sm font-semibold flex items-center sm:flex-col justify-center gap-2 sm:gap-1.5 cursor-pointer ${
+                  isSelected
+                    ? '!border-[#4E6E2A] !bg-[#EAF1E2]/70 text-[#3D5720]'
+                    : 'text-[#1A1D1A]'
+                }`}
               >
-                <span className="text-2xl leading-none">{cat.emoji}</span>
-                <span>{cat.label}</span>
+                {cat.id === 'all' ? (
+                  <LayoutGrid className="w-5 h-5 text-[#4E6E2A] shrink-0" />
+                ) : (
+                  <span className="text-xl leading-none">{cat.emoji}</span>
+                )}
+                <span className="truncate">{cat.label}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </section>
 
@@ -527,37 +546,43 @@ export function ConditionHome({
         <button
           type="button"
           onClick={onOpenB2BMeal}
-          className="min-h-[76px] w-full px-5 py-4 rounded-2xl bg-white hover:bg-[#EAF1E2] text-[#1A1D1A] border-2 border-[#D4E1C5] hover:border-[#4E6E2A] shadow-sm flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
+          className="os-card-interactive min-h-[72px] w-full p-4 rounded-2xl flex items-center justify-between gap-3 text-left cursor-pointer"
         >
-          <div className="min-w-0">
-            <div className="text-base sm:text-lg font-extrabold truncate">
-              🏢 B2B 기업 단체 선주문
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#EAF1E2] text-[#4E6E2A] flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5" />
             </div>
-            <div className="text-xs sm:text-sm text-[#555E52] mt-0.5 truncate">
-              원하는 시간 예약 · 카드/계좌 즉시 결제 · 거래명세표
+            <div className="min-w-0">
+              <div className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
+                B2B 기업 단체 선주문
+              </div>
+              <div className="text-xs text-[#687064] mt-0.5 truncate">
+                원하는 시간 예약 · 카드/계좌 결제 · 거래명세표
+              </div>
             </div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] border border-[#82B440]/60 text-[#3D5720] text-xs sm:text-sm font-extrabold shrink-0 whitespace-nowrap">
-            바로 주문 →
-          </span>
+          <ChevronRight className="w-4 h-4 text-[#687064] shrink-0" />
         </button>
 
         <button
           type="button"
           onClick={onOpenErrand}
-          className="min-h-[76px] w-full px-5 py-4 rounded-2xl bg-white hover:bg-[#EAF1E2] text-[#1A1D1A] border-2 border-[#D4E1C5] hover:border-[#4E6E2A] shadow-sm flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
+          className="os-card-interactive min-h-[72px] w-full p-4 rounded-2xl flex items-center justify-between gap-3 text-left cursor-pointer"
         >
-          <div className="min-w-0">
-            <div className="text-base sm:text-lg font-extrabold truncate">
-              🛵 생활 심부름
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#EAF1E2] text-[#4E6E2A] flex items-center justify-center shrink-0">
+              <Bike className="w-5 h-5" />
             </div>
-            <div className="text-xs sm:text-sm text-[#555E52] mt-0.5 truncate">
-              동네 장보기 · 세탁물 · 픽업 대행 (매칭 100원)
+            <div className="min-w-0">
+              <div className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
+                생활 심부름
+              </div>
+              <div className="text-xs text-[#687064] mt-0.5 truncate">
+                동네 장보기 · 세탁물 · 픽업 대행 (매칭 100원)
+              </div>
             </div>
           </div>
-          <span className="px-3 py-1.5 rounded-xl bg-[#EAF1E2] border border-[#82B440]/60 text-[#3D5720] text-xs sm:text-sm font-extrabold shrink-0 whitespace-nowrap">
-            요청하기 →
-          </span>
+          <ChevronRight className="w-4 h-4 text-[#687064] shrink-0" />
         </button>
       </section>
 
@@ -565,17 +590,18 @@ export function ConditionHome({
       {featuredStoreEvents.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-extrabold text-[#1A1D1A] inline-flex items-center gap-1.5">
-              <Megaphone className="w-5 h-5 text-[#4E6E2A]" />
-              <span>🎉 우리 동네 가게 이벤트 · 쿠폰</span>
+            <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A] inline-flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+              <span>우리 동네 가게 이벤트 · 쿠폰</span>
             </h2>
             {onOpenBrowse && (
               <button
                 type="button"
                 onClick={() => onOpenBrowse({ category: 'all' })}
-                className="easy-compact text-xs font-bold text-[#4E6E2A] underline underline-offset-2 cursor-pointer"
+                className="easy-compact inline-flex items-center gap-0.5 text-xs sm:text-sm font-semibold text-[#4E6E2A] hover:text-[#3D5720] cursor-pointer"
               >
-                더 보기
+                <span>더 보기</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -585,28 +611,29 @@ export function ConditionHome({
                 key={store.id}
                 type="button"
                 onClick={() => onOpenStoreMenu?.(store.id)}
-                className="p-4 rounded-2xl bg-white hover:bg-[#FAFCF8] border-2 border-[#D4E1C5] hover:border-[#4E6E2A] text-left space-y-2 transition-colors cursor-pointer shadow-2xs"
+                className="os-card-interactive p-4 rounded-2xl text-left space-y-2 cursor-pointer"
               >
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full bg-[#4E6E2A] text-white text-xs font-bold">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#4E6E2A] text-white text-xs font-semibold">
                     {promo?.badgeText ?? '가게 쿠폰'}
                   </span>
                   {isNearby && (
-                    <span className="text-xs font-bold text-[#3D5720]">
-                      📍 내 주변 배달 가능
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[#3D5720]">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span>내 주변 배달 가능</span>
                     </span>
                   )}
                 </div>
-                <p className="text-sm font-extrabold text-[#4E6E2A] truncate">
+                <p className="text-xs sm:text-sm font-semibold text-[#4E6E2A] truncate">
                   {store.name}
                 </p>
                 {promo && (
-                  <p className="text-base font-extrabold text-[#1A1D1A] leading-snug line-clamp-1">
+                  <p className="text-sm sm:text-base font-bold text-[#1A1D1A] leading-snug line-clamp-1">
                     {promo.title}
                   </p>
                 )}
                 {coupon && (
-                  <p className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
+                  <p className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-medium">
                     <Ticket className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{coupon.label}</span>
                   </p>
@@ -619,18 +646,15 @@ export function ConditionHome({
 
       {/* Quick Reorder Card */}
       {quickReorderCandidate && quickReorderFeeInfo && (
-        <section className="bg-white border-2 border-[#4E6E2A] rounded-3xl p-5 space-y-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-[#4E6E2A]">
+        <section className="os-card rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2 text-xs sm:text-sm font-semibold text-[#4E6E2A]">
             <span className="inline-flex items-center gap-1.5">
-              <Zap className="w-5 h-5 fill-[#82B440]" />
+              <Zap className="w-4 h-4 fill-[#82B440] text-[#4E6E2A]" />
               <span>자주 시키던 메뉴 바로 시키기</span>
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-extrabold">
-              💚 착한가격 · 1개도 배달
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
               <FoodImage
                 src={quickReorderCandidate.menu.image}
                 alt={quickReorderCandidate.menu.name}
@@ -638,13 +662,13 @@ export function ConditionHome({
               />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-[#4E6E2A] truncate">
+              <p className="text-xs sm:text-sm font-medium text-[#4E6E2A] truncate">
                 {quickReorderCandidate.store.name}
               </p>
-              <p className="text-lg font-extrabold text-[#1A1D1A] truncate">
+              <p className="text-base sm:text-lg font-bold text-[#1A1D1A] truncate">
                 {quickReorderCandidate.menu.name}
               </p>
-              <p className="text-base font-bold text-[#1A1D1A] mt-1 tabular-nums">
+              <p className="text-sm sm:text-base font-bold text-[#1A1D1A] mt-0.5 tabular-nums">
                 {quickReorderCandidate.servings}인분 · 배달비 포함{' '}
                 {formatWon(
                   quickReorderSubtotal + quickReorderFeeInfo.finalDeliveryFee
@@ -663,9 +687,10 @@ export function ConditionHome({
                 customerNote: quickReorderCandidate.customerNote,
               })
             }
-            className="w-full min-h-[56px] px-5 py-3 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-lg font-extrabold rounded-2xl cursor-pointer"
+            className="w-full min-h-[48px] px-5 py-3 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm sm:text-base font-semibold rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
-            ⚡ 지난번 그대로 바로 주문하기
+            <Zap className="w-4 h-4" />
+            <span>지난번 그대로 바로 주문하기</span>
           </button>
         </section>
       )}
@@ -673,21 +698,22 @@ export function ConditionHome({
       {/* Nearby Affordable-Price Stores */}
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-xl font-extrabold text-[#1A1D1A]">
+          <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
             지금 바로 배달되는 착한가격 맛집
           </h2>
           {onOpenBrowse && (
             <button
               type="button"
               onClick={() => onOpenBrowse({ category: 'all' })}
-              className="easy-compact px-3.5 py-1.5 rounded-xl bg-[#EAF1E2] text-sm font-bold text-[#3D5720] cursor-pointer shrink-0"
+              className="easy-compact inline-flex items-center gap-0.5 text-xs sm:text-sm font-semibold text-[#4E6E2A] hover:text-[#3D5720] cursor-pointer shrink-0"
             >
-              더 찾아보기 →
+              <span>더 찾아보기</span>
+              <ChevronRight className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {easyPicks.map((item) => {
             const storeMenuCount = (
               menusByStore.get(item.store.id) ?? []
@@ -697,69 +723,63 @@ export function ConditionHome({
             const hasTiers = Boolean(
               item.store.deliveryFeeTiers && item.store.deliveryFeeTiers.length > 0
             );
+            const primaryBadgeLabel = item.isSameStorePrice
+              ? '매장 동일가'
+              : hasTiers
+                ? '금액별 배달비 지원'
+                : '1개도 배달';
 
             return (
               <article
                 key={item.menu.id}
-                className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-sm"
+                className="os-card rounded-2xl p-4 sm:p-5 space-y-3.5"
               >
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {item.isSameStorePrice && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-extrabold">
-                      💚 착한가격 · 매장 동일가
-                    </span>
-                  )}
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-[#555E52] text-xs font-bold">
-                    1개도 배달
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-semibold">
+                    {primaryBadgeLabel}
                   </span>
-                  {hasTiers && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#F0F7E8] text-[#4E6E2A] text-xs font-bold">
-                      금액별 배달비 지원
-                    </span>
-                  )}
                   {(storePromo || storeCoupon) && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-extrabold">
-                      🎉 {storeCoupon ? '쿠폰 할인' : storePromo?.badgeText ?? '이벤트'}
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200/80 text-amber-900 text-xs font-semibold">
+                      {storeCoupon ? '쿠폰 할인' : storePromo?.badgeText ?? '이벤트'}
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setDetailMenuId(item.menu.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setDetailMenuId(item.menu.id);
+                    }
+                  }}
+                  aria-label={`${item.menu.name} 상세 및 리뷰 보기`}
+                  className="flex items-center gap-4 cursor-pointer group"
+                >
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
                     <FoodImage
                       src={item.menu.image}
                       alt={item.menu.name}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm font-bold text-[#4E6E2A] truncate">
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-xs sm:text-sm font-medium text-[#4E6E2A] truncate">
                       {item.store.name} · 약 {item.effectiveMinutes}분
                     </p>
-                    <h3 className="text-lg font-extrabold text-[#1A1D1A] truncate">
+                    <h3 className="text-base sm:text-lg font-bold text-[#1A1D1A] group-hover:text-[#3D5720] transition-colors truncate">
                       {item.menu.name}
                     </h3>
-                    <p className="text-base font-extrabold text-[#1A1D1A] tabular-nums">
+                    <p className="text-sm sm:text-base font-bold text-[#1A1D1A] tabular-nums">
                       배달비 포함 {formatWon(item.estimatedTotal)}
                     </p>
                   </div>
                 </div>
 
-                <div
-                  className={`grid gap-2.5 ${
-                    onOpenStoreMenu && storeMenuCount > 1
-                      ? 'grid-cols-3'
-                      : 'grid-cols-2'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setDetailMenuId(item.menu.id)}
-                    className="min-h-[52px] px-2 bg-white hover:bg-[#F7F8F5] border-2 border-[#E8ECE4] text-[#1A1D1A] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer"
-                  >
-                    상세 · 리뷰
-                  </button>
-                  {onOpenStoreMenu && storeMenuCount > 1 && (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {onOpenStoreMenu && storeMenuCount > 1 ? (
                     <button
                       type="button"
                       onClick={() =>
@@ -769,9 +789,17 @@ export function ConditionHome({
                           preselectHighlight: true,
                         })
                       }
-                      className="min-h-[52px] px-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] border-2 border-[#D4E1C5] text-[#3D5720] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer"
+                      className="min-h-[44px] px-3 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-sm font-semibold rounded-xl cursor-pointer transition-colors"
                     >
-                      가게 메뉴
+                      가게 메뉴 보기
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDetailMenuId(item.menu.id)}
+                      className="min-h-[44px] px-3 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#1A1D1A] text-sm font-semibold rounded-xl cursor-pointer transition-colors"
+                    >
+                      상세 · 리뷰
                     </button>
                   )}
                   <button
@@ -782,7 +810,7 @@ export function ConditionHome({
                         servings: item.servings,
                       })
                     }
-                    className="min-h-[52px] px-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border-2 border-[#4E6E2A] text-[#3D5720] text-sm sm:text-base font-extrabold rounded-2xl cursor-pointer"
+                    className="min-h-[44px] px-3 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold rounded-xl cursor-pointer transition-colors"
                   >
                     바로 시키기
                   </button>
@@ -796,9 +824,10 @@ export function ConditionHome({
           <button
             type="button"
             onClick={() => onOpenBrowse({ category: 'all' })}
-            className="w-full min-h-[54px] px-5 py-3 bg-white hover:bg-[#EAF1E2] border-2 border-[#82B440] text-[#3D5720] text-base font-extrabold rounded-2xl cursor-pointer transition-colors"
+            className="w-full min-h-[48px] px-5 py-3 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-sm sm:text-base font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
           >
-            🍽️ 전체 카테고리 · 맛집 더 찾아보기 →
+            <span>전체 카테고리 · 맛집 더 찾아보기</span>
+            <ChevronRight className="w-4 h-4" />
           </button>
         )}
       </section>

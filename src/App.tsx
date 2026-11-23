@@ -2337,6 +2337,15 @@ export default function App() {
     (o) => o.status === OrderStatus.COOKING || o.status === OrderStatus.PICKUP
   ).length;
 
+  const showFloatingCartBar =
+    role === DemoRole.CONSUMER &&
+    Boolean(cart && cartStore && cartSummary.totalCount > 0) &&
+    (step === ConsumerStep.HOME ||
+      step === ConsumerStep.BROWSE ||
+      step === ConsumerStep.AI_CHAT ||
+      step === ConsumerStep.RECOMMEND ||
+      step === ConsumerStep.WISHLIST);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F7F8F5] text-[#1A1D1A] alle-easy-mode">
       {/* Contextual Role Strip (Only visible in Owner / Partner mode) */}
@@ -2604,7 +2613,7 @@ export default function App() {
               {deliveryNotifications.some((n) => !n.read) ? (
                 <span
                   aria-label={`읽지 않은 배달 알림 ${deliveryNotifications.filter((n) => !n.read).length}건`}
-                  className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#D9381E] text-white text-[10px] font-extrabold leading-none flex items-center justify-center ring-2 ring-white"
+                  className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#D9381E] text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-white"
                 >
                   {deliveryNotifications.filter((n) => !n.read).length}
                 </span>
@@ -2707,7 +2716,7 @@ export default function App() {
                     className="w-full text-left p-2.5 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] transition-colors cursor-pointer"
                   >
                     <p className="font-semibold text-[#1A1D1A]">
-                      🏢 B2B 기업 단체 예약 · 거래명세표 확인
+                      B2B 기업 단체 예약 · 거래명세표 확인
                     </p>
                     <p className="text-[#687064] mt-0.5">
                       원하는 도착 시간 예약과 법인 카드·계좌 즉시 결제를 바로 이용하세요.
@@ -2740,7 +2749,7 @@ export default function App() {
               <Navigation className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-extrabold text-[#DCE7CF] truncate">
+              <p className="text-xs font-bold text-[#DCE7CF] truncate">
                 {activeDeliveryAlert.title}
               </p>
               <p className="text-xs text-white/90 mt-0.5 leading-snug">
@@ -2777,7 +2786,9 @@ export default function App() {
       {toastMessage && (
         <div
           role="status"
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-[92vw] px-4 py-2.5 bg-[#1A1D1A] text-white text-xs sm:text-sm font-medium rounded-2xl shadow-[0_12px_32px_rgba(26,29,26,0.22)] border border-white/10"
+          className={`fixed ${
+            showFloatingCartBar ? 'bottom-[142px]' : 'bottom-20'
+          } left-1/2 -translate-x-1/2 z-50 max-w-[92vw] px-4 py-2.5 bg-[#1A1D1A] text-white text-xs sm:text-sm font-medium rounded-2xl shadow-[0_12px_32px_rgba(26,29,26,0.22)] border border-white/10 transition-[bottom] duration-150`}
         >
           {toastMessage}
         </div>
@@ -3102,15 +3113,7 @@ export default function App() {
       </footer>
 
       {/* Floating Cart Bar (same-store multi-item cart) */}
-      {role === DemoRole.CONSUMER &&
-        cart &&
-        cartStore &&
-        cartSummary.totalCount > 0 &&
-        (step === ConsumerStep.HOME ||
-          step === ConsumerStep.BROWSE ||
-          step === ConsumerStep.AI_CHAT ||
-          step === ConsumerStep.RECOMMEND ||
-          step === ConsumerStep.WISHLIST) && (
+      {showFloatingCartBar && cart && cartStore && (
           <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-xl">
             <div className="rounded-2xl bg-[#1A1D1A] text-white border border-[#4E6E2A]/60 shadow-[0_14px_34px_rgba(26,29,26,0.28)] px-3.5 py-2.5 flex items-center justify-between gap-2.5">
               <div className="min-w-0 flex items-center gap-2.5">

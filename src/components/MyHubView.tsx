@@ -119,7 +119,7 @@ export function MyHubView({
       {/* Monthly Food Expense Savings Report Card */}
       <section
         aria-label="이번 달 alle로 아낀 외식비"
-        className="bg-[#EAF1E2] border border-[#82B440]/50 rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(78,110,42,0.06)]"
+        className="bg-[#EAF1E2] border border-[#82B440]/50 rounded-2xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(78,110,42,0.06)]"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
@@ -127,7 +127,7 @@ export function MyHubView({
               <TrendingDown className="w-4 h-4 text-[#4E6E2A]" />
               <span>이번 달 alle로 아낀 외식비</span>
             </div>
-            <div className="os-kpi text-3xl sm:text-4xl font-extrabold text-[#4E6E2A]">
+            <div className="os-kpi text-3xl sm:text-4xl font-bold text-[#4E6E2A]">
               +{formatWon(savingsSummary.totalSaved)} 절약
             </div>
             <p className="text-xs text-[#3D5720]">
@@ -160,7 +160,7 @@ export function MyHubView({
       </section>
 
       {/* Encrypted Alias Profile & allePay Wallet */}
-      <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]">
+      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-xs font-semibold text-[#687064] flex items-center gap-1.5">
@@ -209,7 +209,7 @@ export function MyHubView({
       {/* Zero-Click Routine */}
       <section
         aria-label="나의 Zero-Click 단골 루틴"
-        className="bg-white border border-[#D4E1C5] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]"
+        className="os-card rounded-2xl p-5 sm:p-6 space-y-4"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
@@ -313,7 +313,7 @@ export function MyHubView({
       </section>
 
       {/* O2O Stamps & Coupons */}
-      <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(26,29,26,0.03)]">
+      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-1.5">
@@ -388,7 +388,7 @@ export function MyHubView({
       </section>
 
       {/* Saved Preferences Shortcut */}
-      <section className="bg-white border border-[#E8ECE4] rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <section className="os-card rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="text-xs sm:text-sm text-[#555E52]">
           <div className="font-bold text-[#1A1D1A]">저장된 내 취향 설정</div>
           <p className="mt-1 tabular-nums">
@@ -408,7 +408,7 @@ export function MyHubView({
       </section>
 
       {/* Collapsible Operator / Demo Settings (Separated from Consumer Flow) */}
-      <section className="bg-white border border-[#E8ECE4] rounded-3xl overflow-hidden shadow-[0_2px_10px_rgba(26,29,26,0.02)]">
+      <section className="os-card rounded-2xl overflow-hidden">
         <button
           type="button"
           onClick={() => setShowOperatorSettings((prev) => !prev)}
@@ -493,7 +493,7 @@ export function MyHubView({
           aria-modal="true"
           aria-labelledby="topup-confirm-title"
         >
-          <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] p-6 space-y-4 shadow-2xl">
+          <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl border border-[#E8ECE4] p-6 space-y-4 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-[#4E6E2A]">

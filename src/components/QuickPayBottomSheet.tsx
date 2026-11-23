@@ -287,7 +287,7 @@ export function QuickPayBottomSheet({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl border border-[#E8ECE4] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
       >
         {/* Header */}
         <div className="px-5 py-4 border-b border-[#E8ECE4] flex items-center justify-between gap-3">
@@ -318,7 +318,7 @@ export function QuickPayBottomSheet({
           {/* Item & Address Summary */}
           <div className="p-4 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-3">
             <div className="flex items-center gap-3.5">
-              <div className="w-15 h-15 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+              <div className="w-16 h-16 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
                 <FoodImage
                   src={leadItem.menu.image}
                   alt={leadItem.menu.name}
@@ -367,7 +367,7 @@ export function QuickPayBottomSheet({
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-[#1A1D1A]">배송 방식</span>
               <span className="text-[#4E6E2A] font-semibold">
-                💚 착한가격 · 최소주문 없음
+                착한가격 · 최소주문 없음
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -385,11 +385,11 @@ export function QuickPayBottomSheet({
                     onClick={() => setDeliveryMethod(opt.id)}
                     className={`easy-compact p-2 rounded-xl border text-center cursor-pointer transition-colors ${
                       active
-                        ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                        ? 'bg-[#EAF1E2] border-[#4E6E2A] ring-1 ring-[#4E6E2A] text-[#3D5720]'
                         : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40]'
                     }`}
                   >
-                    <div className="text-xs font-extrabold truncate">
+                    <div className="text-xs font-bold truncate">
                       {opt.shortLabel}
                     </div>
                     <div className="text-[11px] font-mono font-bold text-[#4E6E2A]">
@@ -400,8 +400,8 @@ export function QuickPayBottomSheet({
               })}
             </div>
             {computed.deliveryFeeCalc.nextTierLabel && (
-              <p className="text-[11px] font-bold text-[#4E6E2A]">
-                💡 {computed.deliveryFeeCalc.nextTierLabel}
+              <p className="text-[11px] font-semibold text-[#4E6E2A]">
+                {computed.deliveryFeeCalc.nextTierLabel}
               </p>
             )}
           </div>
@@ -415,7 +415,7 @@ export function QuickPayBottomSheet({
                   타 배달앱 예상가({formatWon(computed.savings.competitorEstimatedTotal + computed.optionsSubtotal)}) 대비
                 </span>
               </span>
-              <strong className="font-mono text-sm font-extrabold text-[#4E6E2A]">
+              <strong className="font-mono text-sm font-bold text-[#4E6E2A]">
                 약 {formatWon(computed.savings.totalSaved)} 절약
               </strong>
             </div>
@@ -440,7 +440,7 @@ export function QuickPayBottomSheet({
                 <CreditCard className="w-3.5 h-3.5 text-[#4E6E2A]" />
                 <span>결제 수단</span>
               </span>
-              <span className="text-[#687064]">💚 착한가격 · 중개수수료 0원</span>
+              <span className="text-[#687064]">착한가격 · 중개수수료 0원</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {paymentOptions.slice(0, 5).map((opt) => {
