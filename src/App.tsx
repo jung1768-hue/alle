@@ -2463,7 +2463,7 @@ export default function App() {
                       type="button"
                       onClick={() => setShowDemoSwitcher(false)}
                       aria-label="시연 퀵 스위처 닫기"
-                      className="p-1 text-[#919A8D] hover:text-white rounded-lg cursor-pointer"
+                      className="p-1 text-[#C8D0C4] hover:text-white rounded-lg cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -2787,7 +2787,7 @@ export default function App() {
         <div
           role="status"
           className={`fixed ${
-            showFloatingCartBar ? 'bottom-[142px]' : 'bottom-20'
+            showFloatingCartBar ? 'bottom-[146px]' : 'bottom-20'
           } left-1/2 -translate-x-1/2 z-50 max-w-[92vw] px-4 py-2.5 bg-[#1A1D1A] text-white text-xs sm:text-sm font-medium rounded-2xl shadow-[0_12px_32px_rgba(26,29,26,0.22)] border border-white/10 transition-[bottom] duration-150`}
         >
           {toastMessage}
@@ -3114,7 +3114,7 @@ export default function App() {
 
       {/* Floating Cart Bar (same-store multi-item cart) */}
       {showFloatingCartBar && cart && cartStore && (
-          <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-xl">
+          <div className="fixed bottom-[76px] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-xl">
             <div className="rounded-2xl bg-[#1A1D1A] text-white border border-[#4E6E2A]/60 shadow-[0_14px_34px_rgba(26,29,26,0.28)] px-3.5 py-2.5 flex items-center justify-between gap-2.5">
               <div className="min-w-0 flex items-center gap-2.5">
                 <div className="relative w-9 h-9 rounded-xl bg-[#4E6E2A] text-white flex items-center justify-center shrink-0">
@@ -3171,7 +3171,7 @@ export default function App() {
       {/* Bottom Navigation Bar: 홈 / AI 주문 / 주문내역 / 찜 / MY */}
       <nav
         aria-label="하단 탭 네비게이션"
-        className="fixed bottom-0 left-0 right-0 z-40 h-16 bg-[#FFFFFF] border-t border-[#E8ECE4]"
+        className="fixed bottom-0 left-0 right-0 z-40 h-[68px] bg-[#FFFFFF] border-t border-[#E8ECE4]"
       >
         <div className="max-w-5xl mx-auto h-full grid grid-cols-5 items-center px-2">
           <button
@@ -3182,8 +3182,8 @@ export default function App() {
             }}
             className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.HOME
-                ? 'text-[#4E6E2A] font-semibold'
-                : 'text-[#687064] hover:text-[#1A1D1A]'
+                ? 'text-[#3B551F] font-bold'
+                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
             }`}
           >
             <Home
@@ -3192,7 +3192,7 @@ export default function App() {
                 role === DemoRole.CONSUMER && step === ConsumerStep.HOME ? 2.2 : 1.75
               }
             />
-            <span className="text-[11px] leading-none">홈</span>
+            <span className="text-xs leading-none">홈</span>
           </button>
 
           <button
@@ -3207,8 +3207,8 @@ export default function App() {
               (step === ConsumerStep.AI_CHAT ||
                 step === ConsumerStep.RECOMMEND ||
                 step === ConsumerStep.CONFIRM)
-                ? 'text-[#4E6E2A] font-semibold'
-                : 'text-[#687064] hover:text-[#1A1D1A]'
+                ? 'text-[#3B551F] font-bold'
+                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
             }`}
           >
             <Sparkles
@@ -3222,7 +3222,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">올레 주문</span>
+            <span className="text-xs leading-none">올레 주문</span>
           </button>
 
           <button
@@ -3233,8 +3233,8 @@ export default function App() {
             }}
             className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.STATUS
-                ? 'text-[#4E6E2A] font-semibold'
-                : 'text-[#687064] hover:text-[#1A1D1A]'
+                ? 'text-[#3B551F] font-bold'
+                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
             }`}
           >
             <ClipboardList
@@ -3245,7 +3245,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">주문내역</span>
+            <span className="text-xs leading-none">주문내역</span>
           </button>
 
           <button
@@ -3256,8 +3256,8 @@ export default function App() {
             }}
             className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.WISHLIST
-                ? 'text-[#4E6E2A] font-semibold'
-                : 'text-[#687064] hover:text-[#1A1D1A]'
+                ? 'text-[#3B551F] font-bold'
+                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
             }`}
           >
             <Heart
@@ -3268,7 +3268,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">찜</span>
+            <span className="text-xs leading-none">찜</span>
           </button>
 
           <button
@@ -3279,8 +3279,8 @@ export default function App() {
             }}
             className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.MY
-                ? 'text-[#4E6E2A] font-semibold'
-                : 'text-[#687064] hover:text-[#1A1D1A]'
+                ? 'text-[#3B551F] font-bold'
+                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
             }`}
           >
             <User
@@ -3291,7 +3291,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-[11px] leading-none">MY</span>
+            <span className="text-xs leading-none">MY</span>
           </button>
         </div>
       </nav>

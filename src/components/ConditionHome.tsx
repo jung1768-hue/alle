@@ -418,7 +418,7 @@ export function ConditionHome({
         <button
           type="button"
           onClick={handleVoiceTrigger}
-          className={`w-full min-h-[60px] px-5 py-3.5 rounded-xl font-semibold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-sm transition-colors cursor-pointer ${
+          className={`w-full min-h-[60px] px-5 py-3.5 rounded-xl font-bold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-sm transition-colors cursor-pointer ${
             isListening
               ? 'bg-red-600 text-white'
               : 'bg-[#4E6E2A] hover:bg-[#3F5A21] text-white'
@@ -455,7 +455,7 @@ export function ConditionHome({
               value={easySearchQuery}
               onChange={(e) => setEasySearchQuery(e.target.value)}
               placeholder="가게명·메뉴명 직접 검색 (예: 국밥, 치킨)"
-              className="w-full min-h-[46px] pl-10 pr-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-sm sm:text-base text-[#1A1D1A] placeholder:text-[#687064]"
+              className="w-full min-h-[46px] pl-10 pr-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-sm sm:text-base text-[#1A1D1A] placeholder:text-[#4A5348]"
             />
           </div>
           <button
@@ -523,7 +523,7 @@ export function ConditionHome({
                     );
                   }
                 }}
-                className={`os-card-interactive min-h-[64px] px-3 py-2.5 rounded-xl text-sm font-semibold flex items-center sm:flex-col justify-center gap-2 sm:gap-1.5 cursor-pointer ${
+                className={`os-card-interactive min-h-[64px] px-3 py-2.5 rounded-xl text-sm sm:text-base font-bold flex items-center sm:flex-col justify-center gap-2 sm:gap-1.5 cursor-pointer ${
                   isSelected
                     ? '!border-[#4E6E2A] !bg-[#EAF1E2]/70 text-[#3D5720]'
                     : 'text-[#1A1D1A]'
@@ -556,12 +556,12 @@ export function ConditionHome({
               <div className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
                 B2B 기업 단체 선주문
               </div>
-              <div className="text-xs text-[#687064] mt-0.5 truncate">
+              <div className="text-xs text-[#444D42] mt-0.5 truncate">
                 원하는 시간 예약 · 카드/계좌 결제 · 거래명세표
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-[#687064] shrink-0" />
+          <ChevronRight className="w-4 h-4 text-[#444D42] shrink-0" />
         </button>
 
         <button
@@ -577,12 +577,12 @@ export function ConditionHome({
               <div className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
                 생활 심부름
               </div>
-              <div className="text-xs text-[#687064] mt-0.5 truncate">
+              <div className="text-xs text-[#444D42] mt-0.5 truncate">
                 동네 장보기 · 세탁물 · 픽업 대행 (매칭 100원)
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-[#687064] shrink-0" />
+          <ChevronRight className="w-4 h-4 text-[#444D42] shrink-0" />
         </button>
       </section>
 
@@ -665,10 +665,10 @@ export function ConditionHome({
               <p className="text-xs sm:text-sm font-medium text-[#4E6E2A] truncate">
                 {quickReorderCandidate.store.name}
               </p>
-              <p className="text-base sm:text-lg font-bold text-[#1A1D1A] truncate">
+              <p className="text-lg font-bold text-[#1A1D1A] truncate">
                 {quickReorderCandidate.menu.name}
               </p>
-              <p className="text-sm sm:text-base font-bold text-[#1A1D1A] mt-0.5 tabular-nums">
+              <p className="text-base sm:text-lg font-bold text-[#1A1D1A] mt-0.5 tabular-nums">
                 {quickReorderCandidate.servings}인분 · 배달비 포함{' '}
                 {formatWon(
                   quickReorderSubtotal + quickReorderFeeInfo.finalDeliveryFee
@@ -769,10 +769,10 @@ export function ConditionHome({
                     <p className="text-xs sm:text-sm font-medium text-[#4E6E2A] truncate">
                       {item.store.name} · 약 {item.effectiveMinutes}분
                     </p>
-                    <h3 className="text-base sm:text-lg font-bold text-[#1A1D1A] group-hover:text-[#3D5720] transition-colors truncate">
+                    <h3 className="text-lg font-bold text-[#1A1D1A] group-hover:text-[#3D5720] transition-colors truncate">
                       {item.menu.name}
                     </h3>
-                    <p className="text-sm sm:text-base font-bold text-[#1A1D1A] tabular-nums">
+                    <p className="text-base sm:text-lg font-bold text-[#1A1D1A] tabular-nums">
                       배달비 포함 {formatWon(item.estimatedTotal)}
                     </p>
                   </div>

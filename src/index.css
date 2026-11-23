@@ -77,9 +77,9 @@
   }
 
   html {
-    font-size: 16px;
+    font-size: 17px;
     background-color: #F7F8F5;
-    color: #1A1D1A;
+    color: #111411;
     letter-spacing: -0.01em;
     overflow-x: clip;
     -webkit-font-smoothing: antialiased;
@@ -89,7 +89,13 @@
 
   body {
     overflow-x: clip;
-    font-weight: 400;
+    font-weight: 500;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #4A5348;
+    opacity: 1;
   }
 
   @media (max-width: 639px) {
@@ -191,4 +197,68 @@
 .alle-easy-mode h2 {
   font-size: 1.25rem;
   line-height: 1.35;
+}
+
+.alle-easy-mode .text-\[10px\],
+.alle-easy-mode .text-\[10\.5px\],
+.alle-easy-mode .text-\[11px\] {
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.alle-easy-mode .text-xs {
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.alle-easy-mode .text-sm {
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+@media (min-width: 640px) {
+  .alle-easy-mode .sm\:text-xs {
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+
+  .alle-easy-mode .sm\:text-sm {
+    font-size: 0.94rem;
+    line-height: 1.5;
+  }
+
+  .alle-easy-mode .sm\:text-base {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .alle-easy-mode .sm\:text-lg {
+    font-size: 1.125rem;
+    line-height: 1.55;
+  }
+
+  .alle-easy-mode .sm\:text-xl {
+    font-size: 1.25rem;
+    line-height: 1.4;
+  }
+}
+
+@layer utilities {
+  .text-\[\#1A1D1A\] {
+    color: #111411;
+  }
+
+  .text-\[\#555E52\],
+  .text-\[\#434B40\] {
+    color: #2B3229;
+  }
+
+  .text-\[\#687064\],
+  .text-\[\#919A8D\] {
+    color: #444D42;
+  }
+
+  .text-\[\#4E6E2A\] {
+    color: #3B551F;
+  }
 }
