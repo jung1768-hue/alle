@@ -910,8 +910,21 @@ export function AiChatOrderView({
     return null;
   }, [messages]);
 
+  const latestBotMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === 'bot') return messages[i];
+    }
+    return null;
+  }, [messages]);
+
+  const latestBotMessageId = latestBotMessage?.id ?? null;
+  const latestBotHasMatchedMenus = Boolean(
+    latestBotMessage?.matchedMenuIds &&
+      latestBotMessage.matchedMenuIds.length > 0
+  );
+
   useEffect(() => {
-    if (voiceCheckoutDraft || isListening) {
+    if (voiceCheckoutDraft || (isListening && !latestBotHasMatchedMenus)) {
       bottomAnchorRef.current?.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
@@ -924,7 +937,13 @@ export function AiChatOrderView({
         block: 'start',
       });
     }
-  }, [messages.length, lastUserMessageId, isListening, voiceCheckoutDraft]);
+  }, [
+    messages.length,
+    lastUserMessageId,
+    isListening,
+    voiceCheckoutDraft,
+    latestBotHasMatchedMenus,
+  ]);
 
   const selectRecommendedMenuForMessage = (
     msgId: string,
@@ -3112,6 +3131,78 @@ export function AiChatOrderView({
     startListening();
   };
 
+  const renderVoiceStatusBar = (placement: 'under_results' | 'bottom') => {
+    if (isSpeaking) {
+      return (
+        <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
+            <span className="truncate">
+              바로가 설명 중 · 끝나면 마이크가 자동으로 켜져요
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={handleInterruptToListen}
+            className="easy-compact px-3 py-1.5 rounded-xl bg-white border border-[#D4E1C5] text-[#1A1D1A] text-[12px] font-bold hover:bg-[#F7F8F5] cursor-pointer shrink-0"
+          >
+            정지하고 말하기
+          </button>
+        </div>
+      );
+    }
+
+    if (isListening) {
+      return (
+        <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-bold rounded-2xl">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+              <Mic className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                마이크가 자동으로 켜져 있어요 · 말씀해 주세요
+              </span>
+            </div>
+            {interimTranscript && (
+              <p className="text-[12px] font-medium text-red-900 truncate pl-5">
+                “{interimTranscript}”
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleMicToggle}
+            className="easy-compact px-3 py-1.5 rounded-xl bg-white border border-red-200 text-red-700 text-[12px] font-bold hover:bg-red-100/60 cursor-pointer shrink-0"
+          >
+            끄기
+          </button>
+        </div>
+      );
+    }
+
+    if (placement === 'under_results' && !isAnalyzing) {
+      return (
+        <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-white border border-[#DCE7CF] text-[#444D42] text-xs font-semibold rounded-2xl">
+          <span className="inline-flex items-center gap-2 min-w-0">
+            <Mic className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+            <span className="truncate">
+              대답하거나 메뉴를 고르려면 말씀해 주세요
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={handleMicToggle}
+            className="easy-compact px-3 py-1.5 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[12px] font-bold cursor-pointer shrink-0"
+          >
+            마이크 켜기
+          </button>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="max-w-3xl mx-auto os-card rounded-2xl overflow-hidden flex flex-col min-h-[76vh]">
       {/* Simple 1-Row Easy AI Header */}
@@ -3502,6 +3593,12 @@ export function AiChatOrderView({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {msg.id === latestBotMessageId && matchedMenus.length > 0 && (
+                <div className="pl-1 sm:pl-12">
+                  {renderVoiceStatusBar('under_results')}
                 </div>
               )}
 
@@ -4177,37 +4274,7 @@ export function AiChatOrderView({
           </div>
         )}
 
-        {isSpeaking && (
-          <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
-            <span className="inline-flex items-center gap-2">
-              <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>바로가 말씀드리고 있어요 · 다 말하면 마이크가 켜져요</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleInterruptToListen}
-              className="px-2.5 py-1 rounded-lg bg-white border border-[#D4E1C5] text-[#1A1D1A] text-[11px] font-bold hover:bg-[#F7F8F5] cursor-pointer shrink-0"
-            >
-              말 끊고 내가 말하기
-            </button>
-          </div>
-        )}
-
-        {isListening && (
-          <div className="flex justify-end">
-            <div className="max-w-[85%] px-4 py-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-bold rounded-2xl space-y-1">
-              <div className="flex items-center gap-2">
-                <Mic className="w-4 h-4 animate-pulse shrink-0" />
-                <span>상시 듣기 ON · 말씀해 주세요</span>
-              </div>
-              {interimTranscript && (
-                <p className="text-[11px] font-medium text-red-900">
-                  “{interimTranscript}”
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        {!latestBotHasMatchedMenus && renderVoiceStatusBar('bottom')}
 
         {showVoiceTips && (
           <div className="bg-white border border-[#D4E1C5] rounded-2xl p-4 space-y-2">
@@ -4762,7 +4829,7 @@ export function AiChatOrderView({
                       </span>
                       <span className="shrink-0 text-[10px] underline">
                         {isSpeaking
-                          ? '말 끊고 말하기'
+                          ? '정지하고 말하기'
                           : isListening
                             ? '끄기'
                             : '켜기'}

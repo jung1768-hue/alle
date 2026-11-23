@@ -32,131 +32,146 @@ export function AlleBotIllustration({ size = 'md' }: { size?: 'sm' | 'md' }) {
       aria-hidden="true"
       className={`${dimensions} shrink-0`}
     >
-      {/* Cute bamboo leaf sprout on top (alle sage-green accent) */}
+      {/* Soft warm ground shadow */}
+      <ellipse cx="50" cy="91.5" rx="22" ry="3.6" fill="#E9DFD1" />
+
+      {/* Stubby golden-yellow feet */}
       <path
-        d="M50 22C50 15 47 11 42 9"
-        stroke="#4E6E2A"
-        strokeWidth="2.6"
-        strokeLinecap="round"
+        d="M36 82.5C36 81 44.5 81 44.5 83.5V88.5C44.5 90.2 42.5 91 39.8 91C37.2 91 35.8 90 35.8 88.2L36 82.5Z"
+        fill="#FFC119"
       />
       <path
-        d="M50 18C53 11 61 9 65 13C62 18 55 20 50 18Z"
-        fill="#82B440"
-        stroke="#4E6E2A"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
+        d="M36 88.2C36 90 37.5 91 39.8 91C42.5 91 44.5 90.2 44.5 88.5V87.3C43 88.6 37.8 88.8 36 88.2Z"
+        fill="#F2A400"
       />
       <path
-        d="M47 14C42 10 35 12 34 17C38 19 44 18 47 14Z"
-        fill="#9AD052"
-        stroke="#4E6E2A"
+        d="M55.5 82.5C55.5 81 64 81 64 83.5V88.2C64 90 62.6 91 60 91C57.3 91 55.3 90.2 55.3 88.5L55.5 82.5Z"
+        fill="#FFC119"
+      />
+      <path
+        d="M55.3 88.5C55.3 90.2 57.3 91 60 91C62.6 91 64 90 64 88.2V87.3C62.2 88.7 57 88.7 55.3 88.5Z"
+        fill="#F2A400"
+      />
+
+      {/* Tall creamy ears rising behind cap */}
+      <ellipse
+        cx="47.5"
+        cy="19"
+        rx="8.2"
+        ry="15"
+        transform="rotate(-5 47.5 19)"
+        fill="#FFF2E0"
+        stroke="#EAD8C0"
+        strokeWidth="1.2"
+      />
+      <ellipse
+        cx="60.5"
+        cy="21"
+        rx="7.8"
+        ry="14.5"
+        transform="rotate(24 60.5 21)"
+        fill="#FFF2E0"
+        stroke="#EAD8C0"
+        strokeWidth="1.2"
+      />
+
+      {/* Left & right tucked cream wings */}
+      <path
+        d="M21.5 60C16 61.5 14 69 18 73.5C20.5 76.2 24.5 74.5 25.5 70.5"
+        fill="#FFF1DE"
+        stroke="#E2CEB4"
         strokeWidth="1.4"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
-
-      {/* Fluffy round baby panda ears */}
-      <circle cx="25" cy="29" r="12.5" fill="#232823" />
-      <circle cx="25" cy="29" r="6" fill="#3B423B" opacity="0.65" />
-      <circle cx="75" cy="29" r="12.5" fill="#232823" />
-      <circle cx="75" cy="29" r="6" fill="#3B423B" opacity="0.65" />
-
-      {/* Chubby baby panda head */}
-      <ellipse
-        cx="50"
-        cy="54"
-        rx="34"
-        ry="30"
-        fill="#FFFFFF"
-        stroke="#DCE7CF"
-        strokeWidth="2.2"
-      />
-      {/* Subtle warm chin shading */}
       <path
-        d="M22 62C27 76 38 82 50 82C62 82 73 76 78 62C72 72 62 77 50 77C38 77 28 72 22 62Z"
-        fill="#F2F6EE"
-      />
-
-      {/* Soft tilted panda eye patches */}
-      <ellipse
-        cx="35.5"
-        cy="51.5"
-        rx="9.5"
-        ry="11.2"
-        transform="rotate(-16 35.5 51.5)"
-        fill="#232823"
-      />
-      <ellipse
-        cx="64.5"
-        cy="51.5"
-        rx="9.5"
-        ry="11.2"
-        transform="rotate(16 64.5 51.5)"
-        fill="#232823"
-      />
-
-      {/* Big sparkly friendly baby eyes */}
-      <circle cx="36.2" cy="50.5" r="4.2" fill="#111411" />
-      <circle cx="34.6" cy="48.6" r="2.1" fill="#FFFFFF" />
-      <circle cx="38.2" cy="52.6" r="1" fill="#FFFFFF" />
-
-      <circle cx="63.8" cy="50.5" r="4.2" fill="#111411" />
-      <circle cx="62.2" cy="48.6" r="2.1" fill="#FFFFFF" />
-      <circle cx="65.8" cy="52.6" r="1" fill="#FFFFFF" />
-
-      {/* Rosy blushing cheeks */}
-      <ellipse cx="24.5" cy="61" rx="5.2" ry="3.2" fill="#FF9AA8" opacity="0.65" />
-      <ellipse cx="75.5" cy="61" rx="5.2" ry="3.2" fill="#FF9AA8" opacity="0.65" />
-
-      {/* Cute rounded button nose */}
-      <path
-        d="M46 57.5C46 55.6 47.8 54.8 50 54.8C52.2 54.8 54 55.6 54 57.5C54 59.3 51.8 61 50 61C48.2 61 46 59.3 46 57.5Z"
-        fill="#232823"
-      />
-
-      {/* Sweet baby panda ':3' smile */}
-      <path
-        d="M50 61V63.2M43.5 64.5C45.3 67.2 48.5 67 50 64C51.5 67 54.7 67.2 56.5 64.5"
-        stroke="#232823"
-        strokeWidth="2.3"
+        d="M78.5 60C84 61.5 86 69 82 73.5C79.5 76.2 75.5 74.5 74.5 70.5"
+        fill="#FFF1DE"
+        stroke="#E2CEB4"
+        strokeWidth="1.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
 
-      {/* Cute little waving/peeking baby paws at bottom */}
-      <ellipse
-        cx="28"
-        cy="82"
-        rx="8.5"
-        ry="6.5"
-        transform="rotate(-14 28 82)"
-        fill="#232823"
+      {/* Plump creamy-white pear-shaped body */}
+      <path
+        d="M50 32C66.5 32 79 44.5 79 62.5C79 77.5 67.5 85.8 50 85.8C32.5 85.8 21 77.5 21 62.5C21 44.5 33.5 32 50 32Z"
+        fill="#FFF6E9"
+        stroke="#E6D7C3"
+        strokeWidth="1.5"
       />
-      <ellipse
-        cx="28"
-        cy="82.5"
-        rx="3.4"
-        ry="2.4"
-        transform="rotate(-14 28 82.5)"
-        fill="#FFB3BD"
-        opacity="0.85"
+      {/* Soft warm lower belly shade */}
+      <path
+        d="M22.5 66.5C25.5 78.5 36.2 84.8 50 84.8C63.8 84.8 74.5 78.5 77.5 66.5C72 75.2 62.2 80 50 80C37.8 80 28 75.2 22.5 66.5Z"
+        fill="#F4E5D2"
       />
-      <ellipse
-        cx="72"
-        cy="82"
-        rx="8.5"
-        ry="6.5"
-        transform="rotate(14 72 82)"
-        fill="#232823"
+
+      {/* Large white circular eye patches */}
+      <circle
+        cx="41.5"
+        cy="56"
+        r="10.2"
+        fill="#FFFFFF"
+        stroke="#EFE3D4"
+        strokeWidth="1"
       />
-      <ellipse
-        cx="72"
-        cy="82.5"
-        rx="3.4"
-        ry="2.4"
-        transform="rotate(14 72 82.5)"
-        fill="#FFB3BD"
-        opacity="0.85"
+      <circle
+        cx="59"
+        cy="56"
+        r="10.2"
+        fill="#FFFFFF"
+        stroke="#EFE3D4"
+        strokeWidth="1"
       />
+
+      {/* Dark forest-green friendly eyes */}
+      <ellipse cx="44" cy="56.2" rx="4.4" ry="5.1" fill="#0E3A22" />
+      <circle cx="42.4" cy="54.2" r="1.45" fill="#FFFFFF" opacity="0.92" />
+
+      <ellipse cx="56.5" cy="56.2" rx="4.4" ry="5.1" fill="#0E3A22" />
+      <circle cx="54.9" cy="54.2" r="1.45" fill="#FFFFFF" opacity="0.92" />
+
+      {/* Golden-yellow rounded beak between the eyes */}
+      <path
+        d="M46 58.2C46 56.2 48.2 55 50.2 55C52.2 55 54.4 56.2 54.4 58.2C54.4 60.5 51.8 64.2 50.2 64.2C48.6 64.2 46 60.5 46 58.2Z"
+        fill="#FFC119"
+      />
+      <path
+        d="M46.6 59.5C47.7 61.7 49.2 64.2 50.2 64.2C51.2 64.2 52.7 61.7 53.8 59.5C52.4 60.6 51.2 61.1 50.2 61.1C49.2 61.1 48 60.6 46.6 59.5Z"
+        fill="#F2A400"
+      />
+
+      {/* Tilted vibrant green cap */}
+      <g transform="rotate(6 52 34)">
+        {/* Cap crown */}
+        <path
+          d="M27.5 39.5C29.5 26 40 19.5 52.5 19.5C65.5 19.5 74.5 27 75.5 40C75.7 42 74 43.2 71.5 42.6C60.5 39.8 44 39.4 29 41.2C27.8 41.4 27.3 40.6 27.5 39.5Z"
+          fill="#238A35"
+        />
+        {/* Subtle cap crown highlight */}
+        <path
+          d="M34 31C38 24.5 45 21.5 53 21.5C60.5 21.5 66.5 24 70 29"
+          stroke="#2FA344"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          opacity="0.65"
+        />
+        {/* Left-extending curved visor brim */}
+        <path
+          d="M29 38.5C22.5 39 17.2 42 16.5 45.2C16.1 47 18.2 48.2 21.8 47.4C27.5 46.1 34.5 43.4 42.5 41.6C44.5 41.1 45 39.2 42.8 38.6C38 37.5 33 38.2 29 38.5Z"
+          fill="#1B6E2A"
+        />
+        {/* Clean white lowercase 'a' emblem */}
+        <g transform="translate(52.5 31.2)">
+          <circle cx="0" cy="0" r="4.1" stroke="#FFFFFF" strokeWidth="2.8" />
+          <path
+            d="M4.1 -3.8V3.9"
+            stroke="#FFFFFF"
+            strokeWidth="2.8"
+            strokeLinecap="round"
+          />
+        </g>
+      </g>
     </svg>
   );
 }
