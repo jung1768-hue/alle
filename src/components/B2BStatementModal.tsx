@@ -127,7 +127,7 @@ export function B2BStatementModal({
     <div class="grid">
       <div class="box">
         <div class="box-title">공급자 (플랫폼 · 판매처)</div>
-        <div>상호: (주)바로 (baro) · 판매매장: ${escapeHtml(order.storeName)}</div>
+        <div>상호: (주)바로 (Baro) · 판매매장: ${escapeHtml(order.storeName)}</div>
         <div>사업자등록번호: 504-86-01928</div>
         <div>중개수수료 정책: 음식값 중개수수료 0% (착한가격)</div>
       </div>
@@ -247,7 +247,7 @@ export function B2BStatementModal({
                 공급자 (플랫폼 · 판매처)
               </div>
               <p className="font-bold text-[#1A1D1A]">
-                (주)바로 (baro) · {order.storeName}
+                (주)바로 (Baro) · {order.storeName}
               </p>
               <p className="text-[#555E52] font-mono">
                 사업자번호: 504-86-01928

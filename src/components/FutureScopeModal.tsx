@@ -19,7 +19,7 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 id="future-scope-title" className="text-lg font-bold text-[#1A1D1A]">
-              baro · 바른 가격, 바로 오는 우리 동네
+              Baro · 바른 가격, 바로 오는 우리 동네
             </h2>
             <p className="text-xs font-medium text-[#687064] mt-0.5">
               검색에서 제안으로, 일회성에서 반복으로 · 중개수수료 0% · 개인정보 안심 보호

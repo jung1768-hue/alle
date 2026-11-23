@@ -272,7 +272,7 @@ export function OrderStatusView({
         confidencePercent: Math.min(99, 94 + photoConfidenceBoost),
         processedSeconds: 2.1,
         summary: `주문 영수증 품목 리스트와 수령 구성품 대조 결과 일부 품목 누락이 감지되었습니다.${photoSuffix}`,
-        customerAction: '누락 품목 즉시 부분 환불 + 1,000원 baro 캐시',
+        customerAction: '누락 품목 즉시 부분 환불 + 1,000원 Baro 캐시',
         ownerAction: '누락 품목 금액만 에스크로 자동 차감',
         courierAction: '배달비 100% 정상 지급',
       };

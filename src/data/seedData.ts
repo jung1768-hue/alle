@@ -2083,7 +2083,7 @@ export const INITIAL_MENUS: MenuItem[] = enrichStoresWithCompanionMenus(
 export const INITIAL_OWNER_PROFIT_COMPARISON: OwnerProfitComparison = {
   periodLabel: '최근 30일 누적 (전국 가맹점 평균 기준)',
   competitorPlatformLabel: '타사 대형 배달앱 평균 (중개·광고 약 14.8%)',
-  alleCommissionRateLabel: 'baro 상생 수수료 0% (광고비 0원)',
+  alleCommissionRateLabel: 'Baro 상생 수수료 0% (광고비 0원)',
   savedCommissionAndAdFee: 1842000,
   savedBreakdown: {
     brokerageFeeSaved: 1122000,

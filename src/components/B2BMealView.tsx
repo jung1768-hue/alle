@@ -206,7 +206,7 @@ export function B2BMealView({
     { id: 'b2b_meal_point', title: '기업 식대 포인트', desc: '월말 법인 정산' },
     {
       id: 'alle_pay',
-      title: 'baro페이',
+      title: 'Baro페이',
       desc: `잔액 ${formatWon(walletBalance)} · 1.5%`,
     },
   ];
@@ -216,7 +216,7 @@ export function B2BMealView({
     if (paymentMethod === 'personal_card') return `개인카드 (${cardIssuer})`;
     if (paymentMethod === 'bank_transfer') return `계좌이체 (${bankName})`;
     if (paymentMethod === 'b2b_meal_point') return '기업 식대 포인트';
-    return 'baro페이 잔액';
+    return 'Baro페이 잔액';
   }, [paymentMethod, cardIssuer, bankName]);
 
   const allePayInsufficient =
@@ -255,7 +255,7 @@ export function B2BMealView({
     }
     if (allePayInsufficient) {
       setB2bError(
-        `baro페이 잔액(${formatWon(walletBalance)})이 부족합니다. 다른 결제 수단을 선택해 주세요.`
+        `Baro페이 잔액(${formatWon(walletBalance)})이 부족합니다. 다른 결제 수단을 선택해 주세요.`
       );
       return;
     }
@@ -762,7 +762,7 @@ export function B2BMealView({
 
             {allePayInsufficient && (
               <p className="text-xs font-bold text-red-700">
-                baro페이 잔액({formatWon(walletBalance)})이 결제 금액(
+                Baro페이 잔액({formatWon(walletBalance)})이 결제 금액(
                 {formatWon(b2bTotal)})보다 부족합니다.
               </p>
             )}

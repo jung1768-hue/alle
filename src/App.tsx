@@ -938,7 +938,7 @@ export default function App() {
   };
 
   const handleShareDemoSummary = () => {
-    const summaryText = `[baro 같은 브라우저 시연 요약] 주문 ${appState.orders.length}건 · 찜 ${appState.wishlistIds.length}개 · 스탬프 ${appState.stampCount}개 · 잔액 ${appState.walletBalance.toLocaleString('ko-KR')}원`;
+    const summaryText = `[Baro 같은 브라우저 시연 요약] 주문 ${appState.orders.length}건 · 찜 ${appState.wishlistIds.length}개 · 스탬프 ${appState.stampCount}개 · 잔액 ${appState.walletBalance.toLocaleString('ko-KR')}원`;
     if (
       navigator.clipboard &&
       typeof navigator.clipboard.writeText === 'function'
@@ -1358,7 +1358,7 @@ export default function App() {
     if (chosenPayMethod === 'alle_pay' && appState.walletBalance < totalAmount) {
       return {
         ok: false,
-        error: `baro페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
+        error: `Baro페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
       };
     }
 
@@ -1500,7 +1500,7 @@ export default function App() {
     ) {
       return {
         ok: false,
-        error: `baro페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
+        error: `Baro페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
       };
     }
 
@@ -2390,7 +2390,7 @@ export default function App() {
                 setStep(ConsumerStep.HOME);
               }}
               className="whitespace-nowrap shrink-0 cursor-pointer"
-              aria-label="baro 홈"
+              aria-label="Baro 홈"
             >
               <AlleLogo />
             </button>
@@ -2633,7 +2633,7 @@ export default function App() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1A1D1A]">
-                    baro · 실시간 배달 알림
+                    Baro · 실시간 배달 알림
                   </span>
                   <button
                     type="button"
@@ -3091,7 +3091,7 @@ export default function App() {
 
       <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span>baro · 바른 가격, 바로 오는 우리 동네</span>
+          <span>Baro · 바른 가격, 바로 오는 우리 동네</span>
           <div className="flex items-center gap-5">
             <button
               type="button"

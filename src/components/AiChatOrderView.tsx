@@ -246,8 +246,8 @@ function getVoicePaymentOptions(
     },
     {
       id: 'alle_pay',
-      shortLabel: `baro페이 (${formatWon(walletBalance)})`,
-      label: 'baro페이 잔액',
+      shortLabel: `Baro페이 (${formatWon(walletBalance)})`,
+      label: 'Baro페이 잔액',
     },
     {
       id: 'local_currency',
@@ -1258,7 +1258,7 @@ export function AiChatOrderView({
     }
 
     if (draft.paymentMethod === 'alle_pay' && walletBalance < summary.finalTotal) {
-      const shortText = `baro페이 잔액(${formatWon(walletBalance)})이 결제 금액(${formatWon(summary.finalTotal)})보다 부족합니다. 카카오페이나 토스페이 등 다른 결제 수단을 말씀하거나 눌러 주세요.`;
+      const shortText = `Baro페이 잔액(${formatWon(walletBalance)})이 결제 금액(${formatWon(summary.finalTotal)})보다 부족합니다. 카카오페이나 토스페이 등 다른 결제 수단을 말씀하거나 눌러 주세요.`;
       setMessages((prev) => [
         ...prev,
         {
@@ -4246,7 +4246,7 @@ export function AiChatOrderView({
             </div>
             <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse" />
-              <span>baro 분석이 컨디션과 조건에 맞는 매장을 찾고 있어요...</span>
+              <span>Baro 분석이 컨디션과 조건에 맞는 매장을 찾고 있어요...</span>
             </div>
           </div>
         )}

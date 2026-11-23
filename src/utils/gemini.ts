@@ -141,7 +141,7 @@ export async function parseConditionWithAI(
   }
 
   try {
-    const prompt = `당신은 전국 매장 동일가 배달앱 'baro'의 AI 주문 파서입니다.
+    const prompt = `당신은 전국 매장 동일가 배달앱 'Baro'의 AI 주문 파서입니다.
 사용자의 자연어 주문 요청을 분석해 아래 JSON 형식으로만 응답하세요.
 
 사용 가능한 표준 태그 목록:
@@ -522,7 +522,7 @@ export async function understandChatTurnWithAI(
       .map((m) => `${m.sender === 'user' ? '사용자' : '바로'}: ${m.text}`)
       .join('\n');
 
-    const prompt = `당신은 AI 생활주문 플랫폼 'baro(바로)'의 한국어 대화형 주문 어시스턴트입니다.
+    const prompt = `당신은 AI 생활주문 플랫폼 'Baro(바로)'의 한국어 대화형 주문 어시스턴트입니다.
 사용자의 마지막 발화와 직전 대화 맥락, 현재 보고 있는 메뉴/결제 상태를 정확히 이해해 다음에 수행할 액션과 자연스러운 응답을 JSON으로만 반환하세요.
 
 [현재 상태]

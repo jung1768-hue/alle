@@ -9,11 +9,11 @@ export function AlleLogo({ className = '' }: AlleLogoProps) {
     <span className={`inline-flex items-center gap-1.5 select-none ${className}`}>
       <img
         src={ALLE_ICON_SRC}
-        alt="baro 아이콘"
+        alt="Baro 아이콘"
         className="w-8 h-8 object-contain mix-blend-multiply -mt-1 shrink-0"
       />
       <span className="font-display text-[24px] font-extrabold tracking-[-0.045em] text-[#1A1D1A] leading-none">
-        baro
+        Baro
       </span>
       <span className="text-xs font-extrabold text-[#4E6E2A] tracking-tight leading-none mt-1">
         바로

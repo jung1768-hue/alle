@@ -1,6 +1,6 @@
 {
-  "name": "baro — 바른 가격, 바로 오는 우리 동네",
-  "description": "말 한마디로 10초 만에 주문하고, 전국 매장 동일가와 수수료 0% 상생을 누리는 AI 로컬 플랫폼 baro",
+  "name": "Baro — 바른 가격, 바로 오는 우리 동네",
+  "description": "말 한마디로 10초 만에 주문하고, 전국 매장 동일가와 수수료 0% 상생을 누리는 AI 로컬 플랫폼 Baro",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

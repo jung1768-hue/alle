@@ -867,7 +867,7 @@ export function RecommendationView({
                               {isSummarizingReviews
                                 ? '리뷰 요약 중...'
                                 : aiReviewSummary.source === 'gemini'
-                                  ? 'baro 분석 요약'
+                                  ? 'Baro 분석 요약'
                                   : '자동 태그 요약'}
                             </span>
                           </div>
