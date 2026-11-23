@@ -454,7 +454,7 @@ export function CategoryBrowseView({
             className="easy-compact text-xs font-bold text-[#4E6E2A] hover:underline underline-offset-2 inline-flex items-center gap-1 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>AI 올레에게 추천받기 →</span>
+            <span>AI 바로에게 추천받기 →</span>
           </button>
         </div>
 

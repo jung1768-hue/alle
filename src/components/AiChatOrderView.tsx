@@ -189,7 +189,7 @@ function detectPaymentMethodFromSpeech(rawText: string): PaymentMethod | null {
   if (/카카오/.test(t)) return 'kakaopay';
   if (/토스/.test(t)) return 'tosspay';
   if (/네이버/.test(t)) return 'naverpay';
-  if (/(alle\s*페이|알레\s*페이|올레\s*페이|페이\s*잔액|지갑\s*잔액|예치금)/.test(t)) {
+  if (/(baro\s*페이|바로\s*페이|alle\s*페이|알레\s*페이|올레\s*페이|페이\s*잔액|지갑\s*잔액|예치금)/.test(t)) {
     return 'alle_pay';
   }
   if (/(지역\s*화폐|사랑\s*상품권|동백전|대구로페이|이음|상생카드)/.test(t)) {
@@ -246,8 +246,8 @@ function getVoicePaymentOptions(
     },
     {
       id: 'alle_pay',
-      shortLabel: `alle페이 (${formatWon(walletBalance)})`,
-      label: 'alle페이 잔액',
+      shortLabel: `baro페이 (${formatWon(walletBalance)})`,
+      label: 'baro페이 잔액',
     },
     {
       id: 'local_currency',
@@ -1258,7 +1258,7 @@ export function AiChatOrderView({
     }
 
     if (draft.paymentMethod === 'alle_pay' && walletBalance < summary.finalTotal) {
-      const shortText = `alle페이 잔액(${formatWon(walletBalance)})이 결제 금액(${formatWon(summary.finalTotal)})보다 부족합니다. 카카오페이나 토스페이 등 다른 결제 수단을 말씀하거나 눌러 주세요.`;
+      const shortText = `baro페이 잔액(${formatWon(walletBalance)})이 결제 금액(${formatWon(summary.finalTotal)})보다 부족합니다. 카카오페이나 토스페이 등 다른 결제 수단을 말씀하거나 눌러 주세요.`;
       setMessages((prev) => [
         ...prev,
         {
@@ -3127,7 +3127,7 @@ export function AiChatOrderView({
           </button>
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold text-[#1A1D1A] tracking-tight whitespace-nowrap">
-              올레 대화 주문
+              바로 대화 주문
             </h1>
             <p className="text-xs text-[#687064] truncate">
               {activeLocation?.areaName ?? '전국'} · 착한가격 · 1개도 배달
@@ -3216,7 +3216,7 @@ export function AiChatOrderView({
                   {msg.aiSource === 'gemini' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold">
                       <Sparkles className="w-2.5 h-2.5" />
-                      올레 추천
+                      바로 추천
                     </span>
                   )}
                   <p>{msg.text}</p>
@@ -4172,7 +4172,7 @@ export function AiChatOrderView({
               className="min-h-[42px] px-4 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Volume2 className="w-4 h-4 shrink-0" />
-              <span>터치해서 올레 음성 주문 시작하기 (&quot;어떤 음식을 찾아드릴까요?&quot;)</span>
+              <span>터치해서 바로 음성 주문 시작하기 (&quot;어떤 음식을 찾아드릴까요?&quot;)</span>
             </button>
           </div>
         )}
@@ -4181,7 +4181,7 @@ export function AiChatOrderView({
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
             <span className="inline-flex items-center gap-2">
               <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-              <span>올레가 말씀드리고 있어요 · 다 말하면 마이크가 켜져요</span>
+              <span>바로가 말씀드리고 있어요 · 다 말하면 마이크가 켜져요</span>
             </span>
             <button
               type="button"
@@ -4246,7 +4246,7 @@ export function AiChatOrderView({
             </div>
             <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse" />
-              <span>alle 분석이 컨디션과 조건에 맞는 매장을 찾고 있어요...</span>
+              <span>baro 분석이 컨디션과 조건에 맞는 매장을 찾고 있어요...</span>
             </div>
           </div>
         )}
@@ -4340,7 +4340,7 @@ export function AiChatOrderView({
                 onClick={() => setRecommendedSpotlight(null)}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`${spotMenu.name} 올레 추천 설명`}
+                aria-label={`${spotMenu.name} 바로 추천 설명`}
                 className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
               >
                 <motion.div
@@ -4425,12 +4425,12 @@ export function AiChatOrderView({
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="px-2.5 py-1 rounded-full bg-[#3D5720] text-white text-xs font-bold inline-flex items-center gap-1 shadow-sm">
                           <Sparkles className="w-3.5 h-3.5" />
-                          올레 추천 {recommendedSpotlight.activeIndex + 1}순위
+                          바로 추천 {recommendedSpotlight.activeIndex + 1}순위
                         </span>
                         {isSpeaking && (
                           <span className="px-2.5 py-1 rounded-full bg-white/95 text-[#3D5720] text-xs font-bold inline-flex items-center gap-1 shadow-sm animate-pulse">
                             <AudioLines className="w-3.5 h-3.5 text-[#82B440]" />
-                            올레 설명 중
+                            바로 설명 중
                           </span>
                         )}
                       </div>
@@ -4740,7 +4740,7 @@ export function AiChatOrderView({
                           <>
                             <Volume2 className="w-3.5 h-3.5 animate-pulse shrink-0" />
                             <span className="truncate">
-                              올레 설명 중 (마이크 꺼짐) · 다 말하면 자동 켜짐
+                              바로 설명 중 (마이크 꺼짐) · 다 말하면 자동 켜짐
                             </span>
                           </>
                         ) : isListening ? (

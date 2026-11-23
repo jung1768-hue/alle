@@ -99,7 +99,7 @@ export function MyHubView({
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1D1A]">MY alle</h1>
+          <h1 className="text-2xl font-bold text-[#1A1D1A]">MY baro</h1>
         </div>
         <button
           type="button"
@@ -118,14 +118,14 @@ export function MyHubView({
 
       {/* Monthly Food Expense Savings Report Card */}
       <section
-        aria-label="이번 달 alle로 아낀 외식비"
+        aria-label="이번 달 baro로 아낀 외식비"
         className="bg-[#EAF1E2] border border-[#82B440]/50 rounded-2xl p-5 sm:p-6 space-y-4 shadow-[0_2px_12px_rgba(78,110,42,0.06)]"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3D5720]">
               <TrendingDown className="w-4 h-4 text-[#4E6E2A]" />
-              <span>이번 달 alle로 아낀 외식비</span>
+              <span>이번 달 baro로 아낀 외식비</span>
             </div>
             <div className="os-kpi text-3xl sm:text-4xl font-bold text-[#4E6E2A]">
               +{formatWon(savingsSummary.totalSaved)} 절약
@@ -179,7 +179,7 @@ export function MyHubView({
           <div className="text-left sm:text-right">
             <div className="text-xs font-semibold text-[#687064] flex items-center sm:justify-end gap-1">
               <Wallet className="w-3.5 h-3.5 text-[#4E6E2A]" />
-              <span>alle페이 잔액</span>
+              <span>baro페이 잔액</span>
             </div>
             <div className="text-2xl font-bold text-[#4E6E2A] font-mono tabular-nums mt-0.5">
               {formatWon(walletBalance)}
@@ -503,7 +503,7 @@ export function MyHubView({
                   id="topup-confirm-title"
                   className="text-lg font-bold text-[#1A1D1A] mt-1"
                 >
-                  alle페이 {formatWon(confirmTopupAmount)} 충전
+                  baro페이 {formatWon(confirmTopupAmount)} 충전
                 </h2>
               </div>
               <button

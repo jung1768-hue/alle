@@ -534,7 +534,7 @@ export function RecommendationView({
                   <div className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A]">
                       <Sparkles className="w-4 h-4 shrink-0" />
-                      <span>올레가 이 메뉴를 추천한 이유</span>
+                      <span>바로가 이 메뉴를 추천한 이유</span>
                     </span>
                     <span className="text-[11px] font-mono font-semibold text-[#3D5720] tabular-nums">
                       예상 도착 {activeMatch.effectiveMinutes}분
@@ -867,7 +867,7 @@ export function RecommendationView({
                               {isSummarizingReviews
                                 ? '리뷰 요약 중...'
                                 : aiReviewSummary.source === 'gemini'
-                                  ? 'alle 분석 요약'
+                                  ? 'baro 분석 요약'
                                   : '자동 태그 요약'}
                             </span>
                           </div>

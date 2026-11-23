@@ -229,11 +229,11 @@ export function OrderConfirmationView({
       },
       {
         id: 'alle_pay',
-        shortLabel: 'alle페이',
-        label: 'alle페이 잔액',
+        shortLabel: 'baro페이',
+        label: 'baro페이 잔액',
         subtitle: `잔액 ${formatWon(walletBalance)} · 수수료 1.5%`,
         benefitText:
-          '충전해 둔 alle페이 잔액으로 즉시 결제/환불되며, 결제 수수료 1.5%(타사 PG 약 3% 대비 절반)로 점주 상생에 기여합니다.',
+          '충전해 둔 baro페이 잔액으로 즉시 결제/환불되며, 결제 수수료 1.5%(타사 PG 약 3% 대비 절반)로 점주 상생에 기여합니다.',
       },
       {
         id: 'local_currency',
@@ -750,7 +750,7 @@ export function OrderConfirmationView({
             <Sparkles className="w-4 h-4 text-[#4E6E2A] shrink-0 mt-0.5" />
             <p className="text-xs leading-relaxed text-[#3D5720]">
               <strong className="font-semibold text-[#4E6E2A] mr-1.5">
-                올레 추천 근거
+                바로 추천 근거
               </strong>
               {leadMenu.aiReason}
             </p>
@@ -1094,7 +1094,7 @@ export function OrderConfirmationView({
         {insufficientAllePay && (
           <div className="p-3.5 bg-[#FFFBEF] border border-[#E8D595] rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
             <span>
-              alle페이 잔액({formatWon(walletBalance)})이 결제 금액({formatWon(totalAmount)})보다 부족합니다.
+              baro페이 잔액({formatWon(walletBalance)})이 결제 금액({formatWon(totalAmount)})보다 부족합니다.
             </span>
             {onTopupWalletConfirmed && (
               <button
@@ -1149,7 +1149,7 @@ export function OrderConfirmationView({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
               <span className="font-bold text-[#3D5720]">
-                alle로 주문하면 예상 절약액
+                baro로 주문하면 예상 절약액
               </span>
               <span className="font-mono font-bold text-[#4E6E2A] tabular-nums">
                 총 약 {formatWon(savings.totalSaved)} 절약!

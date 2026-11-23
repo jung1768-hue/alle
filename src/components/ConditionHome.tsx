@@ -469,7 +469,7 @@ export function ConditionHome({
         {showVoiceFallback && (
           <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl space-y-2.5">
             <p className="text-xs sm:text-sm font-semibold text-[#1A1D1A]">
-              마이크 대신 아래 문장을 눌러도 올레가 바로 찾아드려요
+              마이크 대신 아래 문장을 눌러도 바로가 찾아드려요
             </p>
             <div className="grid grid-cols-1 gap-2">
               {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (

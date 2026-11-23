@@ -43,7 +43,7 @@ export function B2BStatementModal({
   const buyerCompany = doc?.companyName || order.customerAlias || '법인 고객';
   const buyerBizNo = doc?.businessNumber || '미입력 (사후 등록 가능)';
   const buyerDept = doc?.representativeOrDept || '총무/경영지원팀';
-  const buyerEmail = doc?.contactEmail || 'finance@alle.kr';
+  const buyerEmail = doc?.contactEmail || 'finance@baro.kr';
   const requestedDocs: B2BDocumentType[] =
     doc?.requestedDocs && doc.requestedDocs.length > 0
       ? doc.requestedDocs
@@ -119,7 +119,7 @@ export function B2BStatementModal({
 <body>
   <div class="sheet">
     <h1>거 래 명 세 표</h1>
-    <div class="sub">(공급받는자 보관용 · 올레 B2B 기업 식대)</div>
+    <div class="sub">(공급받는자 보관용 · 바로 B2B 기업 식대)</div>
     <div class="meta">
       <div>문서번호: <strong>${escapeHtml(statementNumber)}</strong> (주문 ${escapeHtml(order.orderCode)})</div>
       <div>발행일시: ${escapeHtml(issuedAt)}</div>
@@ -127,7 +127,7 @@ export function B2BStatementModal({
     <div class="grid">
       <div class="box">
         <div class="box-title">공급자 (플랫폼 · 판매처)</div>
-        <div>상호: (주)올레 (alle) · 판매매장: ${escapeHtml(order.storeName)}</div>
+        <div>상호: (주)바로 (baro) · 판매매장: ${escapeHtml(order.storeName)}</div>
         <div>사업자등록번호: 504-86-01928</div>
         <div>중개수수료 정책: 음식값 중개수수료 0% (착한가격)</div>
       </div>
@@ -247,7 +247,7 @@ export function B2BStatementModal({
                 공급자 (플랫폼 · 판매처)
               </div>
               <p className="font-bold text-[#1A1D1A]">
-                (주)올레 (alle) · {order.storeName}
+                (주)바로 (baro) · {order.storeName}
               </p>
               <p className="text-[#555E52] font-mono">
                 사업자번호: 504-86-01928

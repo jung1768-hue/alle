@@ -53,7 +53,7 @@ export function GeminiKeyModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="alle 분석 설정"
+      aria-label="baro 분석 설정"
       className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4"
     >
       <div className="w-full max-w-md bg-white border border-[#E8ECE4] rounded-3xl shadow-2xl p-6 space-y-4">
@@ -64,7 +64,7 @@ export function GeminiKeyModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-[#1A1D1A]">
-                alle 분석 연동 설정
+                baro 분석 연동 설정
               </h2>
               <p className="text-[11px] text-[#687064]">
                 자연어 추천 · 리뷰 요약 · 메뉴판 사진 OCR에 사용됩니다
@@ -85,7 +85,7 @@ export function GeminiKeyModal({
           <div className="p-3 bg-[#EAF1E2] border border-[#82B440] rounded-2xl flex items-start gap-2 text-xs text-[#3D5720]">
             <CheckCircle2 className="w-4 h-4 text-[#4E6E2A] shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <p className="font-bold">alle 분석 서버가 연결되어 있습니다.</p>
+              <p className="font-bold">baro 분석 서버가 연결되어 있습니다.</p>
               <p className="text-[11px] opacity-90">
                 Cloudflare 환경변수 키가 정상 인식되었으므로 별도로 키를 입력하지 않으셔도 됩니다.
               </p>
@@ -99,7 +99,7 @@ export function GeminiKeyModal({
               htmlFor="gemini-api-key-input"
               className="block text-xs font-semibold text-[#1A1D1A] mb-1.5"
             >
-              alle 분석 API Key (브라우저 로컬 저장)
+              baro 분석 API Key (브라우저 로컬 저장)
             </label>
             <div className="relative flex items-center">
               <KeyRound className="w-4 h-4 text-[#687064] absolute left-3 pointer-events-none" />
@@ -114,7 +114,7 @@ export function GeminiKeyModal({
             </div>
             <p className="text-[11px] text-[#687064] mt-1.5 leading-relaxed">
               키가 없어도 모든 시연 기능은 온디바이스 규칙 엔진으로 동작하며, 키를
-              입력하면 alle 분석이 복합 문장·리뷰·메뉴판 사진을 직접
+              입력하면 baro 분석이 복합 문장·리뷰·메뉴판 사진을 직접
               분석합니다.
             </p>
           </div>

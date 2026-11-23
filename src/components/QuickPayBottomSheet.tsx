@@ -106,8 +106,8 @@ export function QuickPayBottomSheet({
       { id: 'card_oneclick', shortLabel: '등록카드', label: '등록카드 1초결제' },
       {
         id: 'alle_pay',
-        shortLabel: `alle페이 (${formatWon(walletBalance)})`,
-        label: 'alle페이 잔액 (수수료 1.5%)',
+        shortLabel: `baro페이 (${formatWon(walletBalance)})`,
+        label: 'baro페이 잔액 (수수료 1.5%)',
       },
       {
         id: 'local_currency',
@@ -472,7 +472,7 @@ export function QuickPayBottomSheet({
             {insufficientWallet && (
               <div className="p-3 bg-[#FFFBEF] border border-[#E8D595] rounded-xl flex items-center justify-between gap-2 text-xs text-amber-900">
                 <span>
-                  alle페이 잔액({formatWon(walletBalance)})이 부족합니다.
+                  baro페이 잔액({formatWon(walletBalance)})이 부족합니다.
                 </span>
                 <button
                   type="button"

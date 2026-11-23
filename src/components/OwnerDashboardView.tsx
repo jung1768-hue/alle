@@ -737,7 +737,7 @@ export function OwnerDashboardView({
 
       if (!hasGeminiApiKey()) {
         setOcrError(
-          '실제 메뉴판 사진 인식은 alle 분석 연동 키가 필요합니다. 연동 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
+          '실제 메뉴판 사진 인식은 baro 분석 연동 키가 필요합니다. 연동 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
         );
         return;
       }
@@ -793,7 +793,7 @@ export function OwnerDashboardView({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-[#4E6E2A]">
-            alle 파트너 · 점주 OS
+            baro 파트너 · 점주 OS
           </p>
           <h1 className="text-xl sm:text-2xl font-bold text-[#1A1D1A] tracking-tight mt-0.5">
             점주 수익 · 운영 센터
@@ -851,7 +851,7 @@ export function OwnerDashboardView({
               +{formatWon(analytics.profitComparison.totalSavedCommissionAndAdFee)}
             </div>
             <p className="text-xs text-[#4C6235] tabular-nums pt-1">
-              타사 수수료 14.8% → <strong className="text-[#1A1D1A]">alle 0%</strong> · 상단 광고비 0원
+              타사 수수료 14.8% → <strong className="text-[#1A1D1A]">baro 0%</strong> · 상단 광고비 0원
             </p>
           </div>
 
@@ -898,12 +898,12 @@ export function OwnerDashboardView({
               <p className="text-[#687064]">노출 입찰 없는 컨디션 맞춤 매칭</p>
             </div>
             <div className="space-y-1">
-              <span className="text-[#687064]">🏢 B2B 기업 식대 · alle페이 정산</span>
+              <span className="text-[#687064]">🏢 B2B 기업 식대 · baro페이 정산</span>
               <div className="font-mono tabular-nums text-base font-bold text-[#4E6E2A]">
                 {analytics.b2bCount}건 · {formatWon(analytics.b2bRevenue)}
               </div>
               <p className="text-[#687064]">
-                B2B 식대 우선 매칭 · alle페이 수수료 1.5% (일반 PG 3% 대비 절반)
+                B2B 식대 우선 매칭 · baro페이 수수료 1.5% (일반 PG 3% 대비 절반)
               </p>
             </div>
           </div>
@@ -2645,7 +2645,7 @@ export function OwnerDashboardView({
                     <div>
                       <p className="text-xs font-bold text-[#1A1D1A] inline-flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                        <span>alle 분석 종이 메뉴판 추출 결과</span>
+                        <span>baro 분석 종이 메뉴판 추출 결과</span>
                       </p>
                       <p className="text-[11px] text-[#687064] mt-0.5">
                         인식된 메뉴를 확인하고 선택 항목을 한 번에 등록하세요.

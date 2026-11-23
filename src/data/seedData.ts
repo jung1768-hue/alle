@@ -2083,7 +2083,7 @@ export const INITIAL_MENUS: MenuItem[] = enrichStoresWithCompanionMenus(
 export const INITIAL_OWNER_PROFIT_COMPARISON: OwnerProfitComparison = {
   periodLabel: '최근 30일 누적 (전국 가맹점 평균 기준)',
   competitorPlatformLabel: '타사 대형 배달앱 평균 (중개·광고 약 14.8%)',
-  alleCommissionRateLabel: 'alle 상생 수수료 0% (광고비 0원)',
+  alleCommissionRateLabel: 'baro 상생 수수료 0% (광고비 0원)',
   savedCommissionAndAdFee: 1842000,
   savedBreakdown: {
     brokerageFeeSaved: 1122000,
@@ -2287,7 +2287,7 @@ export const INITIAL_REVIEWS: Review[] = [
 export const INITIAL_ORDERS: Order[] = [
   {
     id: 'ord-101',
-    orderCode: 'ALLE-101',
+    orderCode: 'BARO-101',
     storeId: 's1',
     menuId: 'm1',
     menuName: '얼큰 소고기국밥',
@@ -2316,7 +2316,7 @@ export const INITIAL_ORDERS: Order[] = [
   },
   {
     id: 'ord-102',
-    orderCode: 'ALLE-102',
+    orderCode: 'BARO-102',
     storeId: 's9',
     menuId: 'm15',
     menuName: '바삭 후라이드·양념 반반치킨',
@@ -2345,7 +2345,7 @@ export const INITIAL_ORDERS: Order[] = [
   },
   {
     id: 'ord-103',
-    orderCode: 'ALLE-103',
+    orderCode: 'BARO-103',
     storeId: 's2',
     menuId: 'm3',
     menuName: '얼큰 묵은지 김치찌개 정식',
@@ -2381,7 +2381,7 @@ export const INITIAL_ORDERS: Order[] = [
   },
   {
     id: 'ord-104',
-    orderCode: 'ALLE-104',
+    orderCode: 'BARO-104',
     storeId: 's24',
     menuId: 'm32',
     menuName: '생딸기 쇼트케이크 & 아메리카노',

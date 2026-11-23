@@ -176,11 +176,11 @@ export function B2BMealView({
   const [requestedDocs, setRequestedDocs] = useState<B2BDocumentType[]>([
     'transaction_statement',
   ]);
-  const [companyName, setCompanyName] = useState<string>('(주)올레테크');
+  const [companyName, setCompanyName] = useState<string>('(주)바로테크');
   const [businessNumber, setBusinessNumber] = useState<string>('123-45-67890');
   const [representativeOrDept, setRepresentativeOrDept] =
     useState<string>('경영지원팀');
-  const [contactEmail, setContactEmail] = useState<string>('finance@alle.kr');
+  const [contactEmail, setContactEmail] = useState<string>('finance@baro.kr');
 
   const [b2bError, setB2bError] = useState<string | null>(null);
   const [statementOrder, setStatementOrder] = useState<Order | null>(null);
@@ -206,7 +206,7 @@ export function B2BMealView({
     { id: 'b2b_meal_point', title: '기업 식대 포인트', desc: '월말 법인 정산' },
     {
       id: 'alle_pay',
-      title: 'alle페이',
+      title: 'baro페이',
       desc: `잔액 ${formatWon(walletBalance)} · 1.5%`,
     },
   ];
@@ -216,7 +216,7 @@ export function B2BMealView({
     if (paymentMethod === 'personal_card') return `개인카드 (${cardIssuer})`;
     if (paymentMethod === 'bank_transfer') return `계좌이체 (${bankName})`;
     if (paymentMethod === 'b2b_meal_point') return '기업 식대 포인트';
-    return 'alle페이 잔액';
+    return 'baro페이 잔액';
   }, [paymentMethod, cardIssuer, bankName]);
 
   const allePayInsufficient =
@@ -255,7 +255,7 @@ export function B2BMealView({
     }
     if (allePayInsufficient) {
       setB2bError(
-        `alle페이 잔액(${formatWon(walletBalance)})이 부족합니다. 다른 결제 수단을 선택해 주세요.`
+        `baro페이 잔액(${formatWon(walletBalance)})이 부족합니다. 다른 결제 수단을 선택해 주세요.`
       );
       return;
     }
@@ -275,7 +275,7 @@ export function B2BMealView({
             companyName: companyName.trim(),
             businessNumber: businessNumber.trim(),
             representativeOrDept: representativeOrDept.trim() || undefined,
-            contactEmail: contactEmail.trim() || 'finance@alle.kr',
+            contactEmail: contactEmail.trim() || 'finance@baro.kr',
             requestedDocs,
             issuedAt: formatNowDisplay(),
             statementNumber: `STMT-${Date.now().toString().slice(-6)}`,
@@ -762,7 +762,7 @@ export function B2BMealView({
 
             {allePayInsufficient && (
               <p className="text-xs font-bold text-red-700">
-                alle페이 잔액({formatWon(walletBalance)})이 결제 금액(
+                baro페이 잔액({formatWon(walletBalance)})이 결제 금액(
                 {formatWon(b2bTotal)})보다 부족합니다.
               </p>
             )}
@@ -819,7 +819,7 @@ export function B2BMealView({
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="예: (주)올레테크"
+                    placeholder="예: (주)바로테크"
                     className="w-full min-h-[40px] px-3 border border-[#E8ECE4] rounded-xl text-sm"
                   />
                 </div>

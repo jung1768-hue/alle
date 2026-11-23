@@ -938,7 +938,7 @@ export default function App() {
   };
 
   const handleShareDemoSummary = () => {
-    const summaryText = `[alle 같은 브라우저 시연 요약] 주문 ${appState.orders.length}건 · 찜 ${appState.wishlistIds.length}개 · 스탬프 ${appState.stampCount}개 · 잔액 ${appState.walletBalance.toLocaleString('ko-KR')}원`;
+    const summaryText = `[baro 같은 브라우저 시연 요약] 주문 ${appState.orders.length}건 · 찜 ${appState.wishlistIds.length}개 · 스탬프 ${appState.stampCount}개 · 잔액 ${appState.walletBalance.toLocaleString('ko-KR')}원`;
     if (
       navigator.clipboard &&
       typeof navigator.clipboard.writeText === 'function'
@@ -1358,7 +1358,7 @@ export default function App() {
     if (chosenPayMethod === 'alle_pay' && appState.walletBalance < totalAmount) {
       return {
         ok: false,
-        error: `alle페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
+        error: `baro페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
       };
     }
 
@@ -1372,7 +1372,7 @@ export default function App() {
 
     const newOrder: Order = {
       id: newOrderId,
-      orderCode: `ALLE-${nextNumber}`,
+      orderCode: `BARO-${nextNumber}`,
       storeId: targetStore.id,
       menuId: firstLine.menuId,
       menuName:
@@ -1500,7 +1500,7 @@ export default function App() {
     ) {
       return {
         ok: false,
-        error: `alle페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
+        error: `baro페이 잔액(${formatWon(appState.walletBalance)})이 부족합니다.`,
       };
     }
 
@@ -2217,7 +2217,7 @@ export default function App() {
       setAiChatInitialPrompt('어제 야근해서 얼큰한 국물 2인분 30분 이내로 추천해줘');
       setRole(DemoRole.CONSUMER);
       setStep(ConsumerStep.AI_CHAT);
-      showToast('① 올레 10초 음성·채팅 주문 시연');
+      showToast('① 바로 10초 음성·채팅 주문 시연');
     } else if (scene === 'b2b_checkout') {
       const targetMenu =
         appState.menus.find((m) => {
@@ -2390,7 +2390,7 @@ export default function App() {
                 setStep(ConsumerStep.HOME);
               }}
               className="whitespace-nowrap shrink-0 cursor-pointer"
-              aria-label="alle 홈"
+              aria-label="baro 홈"
             >
               <AlleLogo />
             </button>
@@ -2485,7 +2485,7 @@ export default function App() {
                           className="flex-1 text-left cursor-pointer"
                         >
                           <p className="text-xs font-semibold text-white">
-                            ① [고객] 컨디션 홈 & 올레 10초 주문
+                            ① [고객] 컨디션 홈 & 바로 10초 주문
                           </p>
                           <p className="text-[10.5px] text-[#C8D0C4] mt-0.5">
                             비가격 효용 지표 · 원탭 Zero-UI 진입
@@ -2496,7 +2496,7 @@ export default function App() {
                           onClick={() => handleJumpDemoScene('customer_chat')}
                           className="px-2.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[10.5px] font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
                         >
-                          올레 대화 →
+                          바로 대화 →
                         </button>
                       </div>
                     </div>
@@ -2633,7 +2633,7 @@ export default function App() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1A1D1A]">
-                    올레 · 실시간 배달 알림
+                    baro · 실시간 배달 알림
                   </span>
                   <button
                     type="button"
@@ -3091,7 +3091,7 @@ export default function App() {
 
       <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span>alle · 일상을 알아서, 우리 동네와 함께</span>
+          <span>baro · 바른 가격, 바로 오는 우리 동네</span>
           <div className="flex items-center gap-5">
             <button
               type="button"
@@ -3222,7 +3222,7 @@ export default function App() {
                   : 1.75
               }
             />
-            <span className="text-xs leading-none">올레 주문</span>
+            <span className="text-xs leading-none">바로 주문</span>
           </button>
 
           <button
