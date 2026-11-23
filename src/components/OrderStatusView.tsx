@@ -9,6 +9,9 @@ import {
   Clock,
   List,
   MessageCircle,
+  PencilLine,
+  Receipt,
+  Star,
   Store as StoreIcon,
   Truck,
   X,
@@ -24,6 +27,7 @@ import {
   MenuItem,
   Order,
   OrderStatus,
+  Review,
   Store,
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
@@ -38,6 +42,7 @@ interface OrderStatusViewProps {
   errands?: ErrandRequest[];
   stores: Store[];
   menus: MenuItem[];
+  reviews?: Review[];
   highlightedOrderId: string | null;
   mapFocusRequest?: { orderId: string; seq: number } | null;
   showPresenterMode?: boolean;
@@ -47,12 +52,29 @@ interface OrderStatusViewProps {
     orderId: string,
     payload: Omit<EvidenceRecord, 'recordedAt'>
   ) => void;
+  onAddReview?: (payload: {
+    menuId: string;
+    orderId?: string;
+    rating: number;
+    content: string;
+    prosTags: string[];
+    consTags?: string[];
+  }) => void;
+  onAdvanceErrand?: (errandId: string, nextStatus: ErrandStatus) => void;
   onQuickReorderToConfirm: (menuId: string, servings: number) => void;
   onQuickReorderOrder?: (order: Order) => void;
   onUseRelayCoupon?: (menuId: string) => void;
   onGoToOwnerDemo: () => void;
   onNewOrder: () => void;
 }
+
+const ORDER_QUICK_REVIEW_TAGS = [
+  '맛있어요',
+  '양 넉넉함',
+  '빠른 배달',
+  '포장 깔끔',
+  '따뜻하게 도착',
+];
 
 const STEPS: Array<{ status: OrderStatus; label: string }> = [
   { status: OrderStatus.PENDING, label: '접수 대기' },
@@ -63,10 +85,10 @@ const STEPS: Array<{ status: OrderStatus; label: string }> = [
 ];
 
 const ERRAND_STEPS: Array<{ status: ErrandStatus; label: string }> = [
-  { status: ErrandStatus.OPEN, label: '요청 등록' },
-  { status: ErrandStatus.MATCHED, label: '파트너 매칭' },
-  { status: ErrandStatus.RECEIPT_CHECKED, label: '배송 시작' },
-  { status: ErrandStatus.COMPLETED, label: '도착 완료' },
+  { status: ErrandStatus.OPEN, label: '매칭 대기' },
+  { status: ErrandStatus.MATCHED, label: '파트너 진행 중' },
+  { status: ErrandStatus.RECEIPT_CHECKED, label: '영수증 확인 대기' },
+  { status: ErrandStatus.COMPLETED, label: '승인·정산 완료' },
 ];
 
 function getStepIndex(status: OrderStatus): number {
@@ -121,12 +143,15 @@ export function OrderStatusView({
   errands = [],
   stores,
   menus,
+  reviews = [],
   highlightedOrderId,
   mapFocusRequest = null,
   showPresenterMode = false,
   onCancelBeforeCooking,
   onRequestCancelAfterCooking,
   onAttachEvidence,
+  onAddReview,
+  onAdvanceErrand,
   onQuickReorderToConfirm,
   onQuickReorderOrder,
   onUseRelayCoupon,
@@ -204,6 +229,22 @@ export function OrderStatusView({
     '국물 용기 실링 및 도착 상태 확인 요청'
   );
   const [evidencePhotos, setEvidencePhotos] = useState<EvidencePhoto[]>([]);
+
+  // Order review form state
+  const [reviewOrderId, setReviewOrderId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewTags, setReviewTags] = useState<string[]>(['맛있어요']);
+  const [reviewContent, setReviewContent] = useState<string>('');
+
+  const reviewByOrderId = useMemo(() => {
+    const map = new Map<string, Review>();
+    for (const rev of reviews) {
+      if (rev.orderId && !map.has(rev.orderId)) {
+        map.set(rev.orderId, rev);
+      }
+    }
+    return map;
+  }, [reviews]);
 
   const handleEvidenceFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const loaded = await readCompressedEvidencePhotos(
@@ -1298,49 +1339,180 @@ export function OrderStatusView({
                   </div>
                 )}
 
-                {(order.status === OrderStatus.COMPLETED || isCancelled) && (
-                  <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs text-[#687064]">
-                        이전 옵션 그대로 바로 다시 주문
-                      </span>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {order.status === OrderStatus.COMPLETED && !order.evidenceRecord && (
+                {(order.status === OrderStatus.COMPLETED || isCancelled) && (() => {
+                  const writtenReview = reviewByOrderId.get(order.id);
+                  const isReviewFormOpen = reviewOrderId === order.id;
+
+                  return (
+                    <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs text-[#687064]">
+                          이전 옵션 그대로 바로 다시 주문
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {order.status === OrderStatus.COMPLETED &&
+                            (writtenReview ? (
+                              <span className="min-h-[40px] px-3 py-1.5 rounded-xl bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-xs font-bold inline-flex items-center gap-1">
+                                <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#4E6E2A]" />
+                                <span>리뷰 작성 완료 ({writtenReview.rating.toFixed(1)})</span>
+                              </span>
+                            ) : (
+                              onAddReview && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isReviewFormOpen) {
+                                      setReviewOrderId(null);
+                                    } else {
+                                      setReviewOrderId(order.id);
+                                      setReviewRating(5);
+                                      setReviewTags(['맛있어요']);
+                                      setReviewContent('');
+                                    }
+                                  }}
+                                  className="min-h-[40px] px-3.5 py-1.5 border border-[#4E6E2A] bg-white hover:bg-[#EAF1E2] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <PencilLine className="w-3.5 h-3.5" />
+                                  <span>{isReviewFormOpen ? '작성 닫기' : '리뷰 쓰기'}</span>
+                                </button>
+                              )
+                            ))}
+                          {order.status === OrderStatus.COMPLETED && !order.evidenceRecord && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEvidenceOrderId((prev) =>
+                                  prev === order.id ? null : order.id
+                                )
+                              }
+                              className="min-h-[40px] px-3.5 py-1.5 border border-[#D4E1C5] bg-white hover:bg-[#F7F8F5] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
+                            >
+                              10초 자동 중재 시연
+                            </button>
+                          )}
                           <button
                             type="button"
+                            disabled={!canReorder}
                             onClick={() =>
-                              setEvidenceOrderId((prev) =>
-                                prev === order.id ? null : order.id
-                              )
+                              onQuickReorderOrder
+                                ? onQuickReorderOrder(order)
+                                : onQuickReorderToConfirm(order.menuId, order.servings)
                             }
-                            className="min-h-[40px] px-3.5 py-1.5 border border-[#D4E1C5] bg-white hover:bg-[#F7F8F5] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
+                            className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
                           >
-                            10초 자동 중재 시연
+                            <span>
+                              {canReorder ? '⚡ 1초 결제 재주문' : '현재 재고 없음'}
+                            </span>
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={!canReorder}
-                          onClick={() =>
-                            onQuickReorderOrder
-                              ? onQuickReorderOrder(order)
-                              : onQuickReorderToConfirm(order.menuId, order.servings)
-                          }
-                          className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
-                        >
-                          <span>
-                            {canReorder ? '⚡ 1초 결제 재주문' : '현재 재고 없음'}
-                          </span>
-                        </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {order.status === OrderStatus.COMPLETED &&
-                      evidenceOrderId === order.id &&
-                      !order.evidenceRecord &&
-                      renderEvidenceForm(order)}
-                  </div>
-                )}
+                      {order.status === OrderStatus.COMPLETED &&
+                        isReviewFormOpen &&
+                        !writtenReview &&
+                        onAddReview && (
+                          <div className="p-3.5 bg-[#F7F8F5] border border-[#D4E1C5] rounded-2xl space-y-2.5 text-xs">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-bold text-[#1A1D1A]">
+                                {order.menuName} 리뷰 남기기
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setReviewRating(star)}
+                                    aria-label={`${star}점 선택`}
+                                    className="easy-compact p-1 rounded-lg hover:bg-white cursor-pointer"
+                                  >
+                                    <Star
+                                      className={`w-5 h-5 ${
+                                        star <= reviewRating
+                                          ? 'fill-[#82B440] text-[#4E6E2A]'
+                                          : 'text-[#C8D0C4]'
+                                      }`}
+                                    />
+                                  </button>
+                                ))}
+                                <span className="ml-1 font-mono font-bold text-[#3D5720]">
+                                  {reviewRating}.0
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              {ORDER_QUICK_REVIEW_TAGS.map((tag) => {
+                                const selected = reviewTags.includes(tag);
+                                return (
+                                  <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={() =>
+                                      setReviewTags((prev) =>
+                                        selected
+                                          ? prev.filter((t) => t !== tag)
+                                          : [...prev, tag]
+                                      )
+                                    }
+                                    className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-semibold cursor-pointer transition-colors ${
+                                      selected
+                                        ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                                        : 'bg-white border-[#E8ECE4] text-[#434B40]'
+                                    }`}
+                                  >
+                                    {tag}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <textarea
+                              rows={3}
+                              value={reviewContent}
+                              onChange={(e) => setReviewContent(e.target.value)}
+                              placeholder="음식 맛과 배달 경험을 편하게 적어주세요."
+                              className="w-full p-3 bg-white border border-[#D4E1C5] rounded-xl text-xs sm:text-sm text-[#1A1D1A] placeholder:text-[#687064]"
+                            />
+
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setReviewOrderId(null)}
+                                className="min-h-[36px] px-3 py-1.5 rounded-xl border border-[#D4E1C5] bg-white text-[#555E52] font-semibold cursor-pointer"
+                              >
+                                닫기
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!reviewContent.trim()}
+                                onClick={() => {
+                                  const trimmed = reviewContent.trim();
+                                  if (!trimmed) return;
+                                  onAddReview({
+                                    menuId: order.menuId,
+                                    orderId: order.id,
+                                    rating: reviewRating,
+                                    content: trimmed,
+                                    prosTags: reviewTags,
+                                  });
+                                  setReviewContent('');
+                                  setReviewOrderId(null);
+                                }}
+                                className="min-h-[36px] px-4 py-1.5 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] text-white font-bold cursor-pointer disabled:cursor-not-allowed"
+                              >
+                                리뷰 등록
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                      {order.status === OrderStatus.COMPLETED &&
+                        evidenceOrderId === order.id &&
+                        !order.evidenceRecord &&
+                        renderEvidenceForm(order)}
+                    </div>
+                  );
+                })()}
 
                 {!isCancelled && order.status !== OrderStatus.COMPLETED && (
                   <div className="pt-3 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-3">
@@ -1468,9 +1640,9 @@ export function OrderStatusView({
                         }`}
                       >
                         {errand.status === ErrandStatus.COMPLETED
-                          ? '✅ 도착 완료'
+                          ? '승인·정산 완료'
                           : errand.status === ErrandStatus.RECEIPT_CHECKED
-                            ? '🚚 배송 시작됨'
+                            ? '영수증 도착 · 승인 대기'
                             : ERRAND_STEPS[eIdx]?.label ?? errand.status}
                       </span>
                     </div>
@@ -1479,6 +1651,7 @@ export function OrderStatusView({
                     </h2>
                     <p className="text-xs text-[#687064] mt-0.5">
                       {errand.pickupAlias} → {errand.dropoffAlias} · {errand.createdAt}
+                      {errand.partnerName ? ` · 파트너: ${errand.partnerName}` : ''}
                     </p>
                   </div>
                   <div className="text-left sm:text-right shrink-0">
@@ -1511,6 +1684,44 @@ export function OrderStatusView({
                     );
                   })}
                 </div>
+
+                {errand.status === ErrandStatus.RECEIPT_CHECKED && (
+                  <div className="pt-3 border-t border-[#E8ECE4] space-y-2.5 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 font-bold text-[#1A1D1A]">
+                        <Receipt className="w-4 h-4 text-[#4E6E2A]" />
+                        <span>
+                          파트너 영수증 실비 {formatWon(errand.actualReceiptCost ?? 0)}
+                        </span>
+                      </span>
+                      <span className="font-bold text-[#4E6E2A]">
+                        {(errand.refundDifference ?? 0) >= 0
+                          ? `차액 환불 ${formatWon(errand.refundDifference ?? 0)}`
+                          : `추가 차액 ${formatWon(Math.abs(errand.refundDifference ?? 0))}`}
+                      </span>
+                    </div>
+                    {errand.receiptPhoto && (
+                      <img
+                        src={errand.receiptPhoto.dataUrl}
+                        alt={errand.receiptPhoto.name}
+                        className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5]"
+                      />
+                    )}
+                    {onAdvanceErrand && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onAdvanceErrand(errand.id, ErrandStatus.COMPLETED)
+                          }
+                          className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl cursor-pointer"
+                        >
+                          확인 · 승인 완료
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </article>
             );
           })}

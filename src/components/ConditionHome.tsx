@@ -86,6 +86,12 @@ interface ConditionHomeProps {
       preselectHighlight?: boolean;
     }
   ) => void;
+  onAddReview?: (payload: {
+    menuId: string;
+    rating: number;
+    content: string;
+    prosTags: string[];
+  }) => void;
   activeLocation?: SavedLocation;
 }
 
@@ -122,6 +128,7 @@ export function ConditionHome({
   onOpenErrand,
   onOpenBrowse,
   onOpenStoreMenu,
+  onAddReview,
   activeLocation,
 }: ConditionHomeProps) {
   const [activeCategoryChip, setActiveCategoryChip] =
@@ -838,6 +845,7 @@ export function ConditionHome({
         storeMenuCount={detailStoreMenuCount}
         reviews={reviews}
         reviewReplies={reviewReplies}
+        onAddReview={onAddReview}
         onClose={() => setDetailMenuId(null)}
         onQuickOrder={(id, servings) => onQuickReorderToConfirm(id, servings)}
         onOpenStoreMenu={

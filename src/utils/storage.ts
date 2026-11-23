@@ -4,6 +4,7 @@ import {
   INITIAL_MENUS,
   INITIAL_ORDERS,
   INITIAL_PREFERENCES,
+  INITIAL_REVIEWS,
   INITIAL_SAVED_LOCATIONS,
   INITIAL_STORE_COUPONS,
   INITIAL_STORE_PROMOTIONS,
@@ -13,6 +14,7 @@ import {
 import {
   AllePersistedState,
   MenuItem,
+  Review,
   Store,
   StoreCoupon,
   StorePromotion,
@@ -33,6 +35,7 @@ export function getDefaultState(): AllePersistedState {
     wishlistIds: ['m1', 'm15', 'm32'],
     preferences: structuredClone(INITIAL_PREFERENCES),
     lastConditionInput: INITIAL_CONDITION_INPUT,
+    reviews: structuredClone(INITIAL_REVIEWS),
     reviewReplies: {
       r2: {
         text: '[점주 답글] 간이 조금 세게 느껴지셨다니 죄송합니다. 다음 주문 시 메모 남겨주시면 육수를 따로 챙겨드리겠습니다.',
@@ -147,6 +150,19 @@ export function loadDemoState(): {
       }
     }
 
+    let mergedReviews: Review[];
+    if (Array.isArray(parsed.reviews)) {
+      const existingReviewIds = new Set(parsed.reviews.map((r) => r.id));
+      mergedReviews = [...parsed.reviews];
+      for (const seedRev of INITIAL_REVIEWS) {
+        if (!existingReviewIds.has(seedRev.id)) {
+          mergedReviews.push(structuredClone(seedRev));
+        }
+      }
+    } else {
+      mergedReviews = structuredClone(INITIAL_REVIEWS);
+    }
+
     return {
       state: {
         stores: migratedStores,
@@ -161,6 +177,7 @@ export function loadDemoState(): {
           typeof parsed.lastConditionInput === 'string'
             ? parsed.lastConditionInput
             : INITIAL_CONDITION_INPUT,
+        reviews: mergedReviews,
         reviewReplies: parsed.reviewReplies ?? {},
         priceReports: Array.isArray(parsed.priceReports) ? parsed.priceReports : [],
         savedLocations:

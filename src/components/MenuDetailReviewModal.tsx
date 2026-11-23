@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Clock,
   MessageSquare,
+  PencilLine,
   Sparkles,
   Star,
   Store as StoreIcon,
@@ -13,12 +14,26 @@ import { buildRuleReviewSummary } from '../utils/gemini';
 import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import { FoodImage } from './FoodImage';
 
+const QUICK_REVIEW_TAGS = [
+  '맛있어요',
+  '양 넉넉함',
+  '빠른 배달',
+  '포장 깔끔',
+  '따뜻하게 도착',
+];
+
 interface MenuDetailReviewModalProps {
   menu: MenuItem | null;
   store: Store | null;
   storeMenuCount?: number;
   reviews: Review[];
   reviewReplies: Record<string, ReviewReply>;
+  onAddReview?: (payload: {
+    menuId: string;
+    rating: number;
+    content: string;
+    prosTags: string[];
+  }) => void;
   onClose: () => void;
   onQuickOrder: (menuId: string, servings: number) => void;
   onOpenStoreMenu?: () => void;
@@ -30,11 +45,23 @@ export function MenuDetailReviewModal({
   storeMenuCount = 0,
   reviews,
   reviewReplies,
+  onAddReview,
   onClose,
   onQuickOrder,
   onOpenStoreMenu,
 }: MenuDetailReviewModalProps) {
   const isOpen = Boolean(menu && store);
+  const [isWritingReview, setIsWritingReview] = useState(false);
+  const [draftRating, setDraftRating] = useState(5);
+  const [draftTags, setDraftTags] = useState<string[]>(['맛있어요']);
+  const [draftContent, setDraftContent] = useState('');
+
+  useEffect(() => {
+    setIsWritingReview(false);
+    setDraftRating(5);
+    setDraftTags(['맛있어요']);
+    setDraftContent('');
+  }, [menu?.id]);
 
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return;
@@ -130,15 +157,120 @@ export function MenuDetailReviewModal({
         )}
 
         <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold text-[#1A1D1A] flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-[#4E6E2A]" />
               <span>리뷰 ({menuReviews.length}건)</span>
             </h3>
-            <span className="text-xs font-semibold text-[#4E6E2A]">
-              {summary.headline}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-[#4E6E2A]">
+                {summary.headline}
+              </span>
+              {onAddReview && (
+                <button
+                  type="button"
+                  onClick={() => setIsWritingReview((prev) => !prev)}
+                  className="easy-compact min-h-[32px] px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <PencilLine className="w-3.5 h-3.5" />
+                  <span>{isWritingReview ? '작성 닫기' : '리뷰 쓰기'}</span>
+                </button>
+              )}
+            </div>
           </div>
+
+          {isWritingReview && onAddReview && (
+            <div className="p-3.5 bg-[#F7F8F5] border border-[#D4E1C5] rounded-2xl space-y-2.5 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-[#1A1D1A]">별점 선택</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setDraftRating(star)}
+                      aria-label={`${star}점 선택`}
+                      className="easy-compact p-1 rounded-lg hover:bg-white cursor-pointer"
+                    >
+                      <Star
+                        className={`w-5 h-5 ${
+                          star <= draftRating
+                            ? 'fill-[#82B440] text-[#4E6E2A]'
+                            : 'text-[#C8D0C4]'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-1 font-mono font-bold text-[#3D5720]">
+                    {draftRating}.0
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_REVIEW_TAGS.map((tag) => {
+                  const selected = draftTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() =>
+                        setDraftTags((prev) =>
+                          selected
+                            ? prev.filter((t) => t !== tag)
+                            : [...prev, tag]
+                        )
+                      }
+                      className={`easy-compact px-2.5 py-1 rounded-full border text-xs font-semibold cursor-pointer transition-colors ${
+                        selected
+                          ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                          : 'bg-white border-[#E8ECE4] text-[#434B40]'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <textarea
+                rows={3}
+                value={draftContent}
+                onChange={(e) => setDraftContent(e.target.value)}
+                placeholder="메뉴의 맛, 양, 포장 상태를 솔직하게 남겨주세요."
+                className="w-full p-3 bg-white border border-[#D4E1C5] rounded-xl text-xs sm:text-sm text-[#1A1D1A] placeholder:text-[#687064]"
+              />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsWritingReview(false)}
+                  className="min-h-[36px] px-3 py-1.5 rounded-xl border border-[#E8ECE4] bg-white text-[#555E52] font-semibold cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={!draftContent.trim()}
+                  onClick={() => {
+                    const trimmed = draftContent.trim();
+                    if (!trimmed) return;
+                    onAddReview({
+                      menuId: menu.id,
+                      rating: draftRating,
+                      content: trimmed,
+                      prosTags: draftTags,
+                    });
+                    setDraftContent('');
+                    setIsWritingReview(false);
+                  }}
+                  className="min-h-[36px] px-4 py-1.5 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] text-white font-bold cursor-pointer disabled:cursor-not-allowed"
+                >
+                  리뷰 등록
+                </button>
+              </div>
+            </div>
+          )}
 
           {menuReviews.length === 0 ? (
             <p className="p-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl text-xs text-[#687064]">

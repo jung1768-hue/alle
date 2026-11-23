@@ -115,6 +115,7 @@ export interface MenuItem {
 export interface Review {
   id: string;
   menuId: string;
+  orderId?: string;
   author: string;
   date: string;
   rating: number;
@@ -300,6 +301,7 @@ export interface ErrandRequest {
   actualReceiptCost: number | null;
   refundDifference: number | null;
   receiptPhoto?: EvidencePhoto;
+  partnerName?: string;
   status: ErrandStatus;
   createdAt: string;
 }
@@ -401,6 +403,7 @@ export interface AllePersistedState {
   ownerSaasSubscribed?: boolean;
   ownerSaasPlan?: PartnerPlanTier;
   lastConditionInput: string;
+  reviews: Review[];
   reviewReplies: Record<string, ReviewReply>;
   priceReports: PriceReport[];
   savedLocations: SavedLocation[];

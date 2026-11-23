@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import {
   INITIAL_MENUS,
+  INITIAL_REVIEWS,
   INITIAL_STORE_COUPONS,
   INITIAL_STORE_PROMOTIONS,
   INITIAL_STORES,
@@ -19,6 +20,7 @@ import {
   MenuItem,
   Order,
   PriceReport,
+  Review,
   ReviewReply,
   Store,
   StoreCoupon,
@@ -51,6 +53,7 @@ export interface SharedOperationalState {
   menus: MenuItem[];
   orders: Order[];
   errands: ErrandRequest[];
+  reviews?: Review[];
   reviewReplies: Record<string, ReviewReply>;
   priceReports: PriceReport[];
   storePromotions: StorePromotion[];
@@ -72,6 +75,7 @@ export function extractSharedState(
     menus: state.menus,
     orders: state.orders,
     errands: state.errands,
+    reviews: state.reviews,
     reviewReplies: state.reviewReplies,
     priceReports: state.priceReports,
     storePromotions: state.storePromotions,
@@ -125,11 +129,25 @@ function normalizeRemoteSharedState(
     }
   }
 
+  let mergedReviews: Review[];
+  if (Array.isArray(raw.reviews)) {
+    const existingRevIds = new Set(raw.reviews.map((r) => r.id));
+    mergedReviews = [...raw.reviews];
+    for (const seedRev of INITIAL_REVIEWS) {
+      if (!existingRevIds.has(seedRev.id)) {
+        mergedReviews.push(structuredClone(seedRev));
+      }
+    }
+  } else {
+    mergedReviews = structuredClone(INITIAL_REVIEWS);
+  }
+
   return {
     stores: mergedStores,
     menus: mergedMenus,
     orders: raw.orders,
     errands: Array.isArray(raw.errands) ? raw.errands : [],
+    reviews: mergedReviews,
     reviewReplies: raw.reviewReplies ?? {},
     priceReports: Array.isArray(raw.priceReports) ? raw.priceReports : [],
     storePromotions: Array.isArray(raw.storePromotions)

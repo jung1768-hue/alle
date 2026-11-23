@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Camera,
   CheckCircle2,
+  Clock,
   Footprints,
   Receipt,
   ShieldCheck,
@@ -12,10 +13,8 @@ import { PROHIBITED_ERRAND_KEYWORDS } from '../data/seedData';
 import {
   ErrandRequest,
   ErrandStatus,
-  EvidencePhoto,
   SavedLocation,
 } from '../types/alle';
-import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
 import { MATCHING_FEE_PER_CASE } from '../utils/pricing';
 
@@ -33,10 +32,9 @@ interface ErrandViewProps {
   }) => { ok: boolean; error?: string };
   onAdvanceErrand: (
     errandId: string,
-    nextStatus: ErrandStatus,
-    actualReceiptCost?: number,
-    receiptPhoto?: EvidencePhoto
+    nextStatus: ErrandStatus
   ) => void;
+  onOpenPartnerDemo?: () => void;
 }
 
 export function ErrandView({
@@ -45,6 +43,7 @@ export function ErrandView({
   onBackToHome,
   onCreateErrand,
   onAdvanceErrand,
+  onOpenPartnerDemo,
 }: ErrandViewProps) {
   const activeOrigin =
     activeLocation?.detailAddress ?? '대구 북구 산격동 수령지 A';
@@ -59,12 +58,6 @@ export function ErrandView({
   const [estimatedItemCost, setEstimatedItemCost] = useState<number>(8000);
   const [errandFee, setErrandFee] = useState<number>(2000);
   const [errandError, setErrandError] = useState<string | null>(null);
-  const [receiptInputs, setReceiptInputs] = useState<Record<string, number>>(
-    {}
-  );
-  const [receiptPhotos, setReceiptPhotos] = useState<
-    Record<string, EvidencePhoto>
-  >({});
   const [dualPhotoChecked, setDualPhotoChecked] = useState<
     Record<string, boolean>
   >({});
@@ -344,10 +337,6 @@ export function ErrandView({
 
         <div className="lg:col-span-7 space-y-3">
           {errands.map((err) => {
-            const receiptVal =
-              receiptInputs[err.id] ??
-              err.actualReceiptCost ??
-              err.estimatedItemCost;
             const dualOk = dualPhotoChecked[err.id] ?? false;
 
             return (
@@ -359,129 +348,86 @@ export function ErrandView({
                   <div>
                     <div className="text-xs text-[#687064]">
                       {err.category} · {err.pickupAlias} → {err.dropoffAlias}
+                      {err.partnerName ? ` · 파트너: ${err.partnerName}` : ''}
                     </div>
                     <h3 className="text-sm sm:text-base font-bold text-[#1A1D1A] mt-0.5">
                       {err.title}
                     </h3>
                     <p className="text-xs text-[#687064] font-mono tabular-nums mt-0.5">
-                      선예치 {formatWon(err.escrowTotal)}
+                      선예치 {formatWon(err.escrowTotal)} (예상 물품비{' '}
+                      {formatWon(err.estimatedItemCost)} · 심부름비{' '}
+                      {formatWon(err.errandFee)})
                     </p>
                   </div>
-                  <span className="text-xs font-semibold text-[#4E6E2A]">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                      err.status === ErrandStatus.COMPLETED
+                        ? 'bg-[#4E6E2A] text-white'
+                        : err.status === ErrandStatus.RECEIPT_CHECKED
+                          ? 'bg-amber-100 text-amber-900'
+                          : err.status === ErrandStatus.MATCHED
+                            ? 'bg-[#EAF1E2] text-[#3D5720]'
+                            : 'bg-[#F7F8F5] border border-[#E8ECE4] text-[#434B40]'
+                    }`}
+                  >
                     {err.status === ErrandStatus.OPEN
                       ? '매칭 대기'
                       : err.status === ErrandStatus.MATCHED
-                        ? '안심 보험 적용'
+                        ? '파트너 진행 중'
                         : err.status === ErrandStatus.RECEIPT_CHECKED
-                          ? '영수증 확인'
-                          : '완료됨'}
+                          ? '영수증 확인 대기'
+                          : '승인 · 정산 완료'}
                   </span>
                 </div>
 
                 {err.status === ErrandStatus.OPEN && (
-                  <div className="pt-2.5 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs text-[#687064] flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                      시간제 안심 보험 적용
+                  <div className="pt-2.5 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-[#555E52] inline-flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+                      <span>
+                        배달 파트너 앱에 심부름이 등록되었습니다. 파트너가 확인 후 수락하면 매칭됩니다.
+                      </span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onAdvanceErrand(err.id, ErrandStatus.MATCHED)
-                      }
-                      className="min-h-[36px] px-3.5 py-1.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] text-xs font-semibold rounded-xl cursor-pointer"
-                    >
-                      심부름 수락
-                    </button>
+                    {onOpenPartnerDemo && (
+                      <button
+                        type="button"
+                        onClick={onOpenPartnerDemo}
+                        className="easy-compact text-xs font-bold text-[#4E6E2A] hover:underline shrink-0 cursor-pointer"
+                      >
+                        파트너 앱에서 수락 확인 →
+                      </button>
+                    )}
                   </div>
                 )}
 
                 {err.status === ErrandStatus.MATCHED && (
-                  <div className="pt-2.5 border-t border-[#E8ECE4] space-y-2 text-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 font-semibold text-[#1A1D1A]">
-                        <Receipt className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                        <span>영수증 사진 OCR · 실비 정산</span>
+                  <div className="pt-2.5 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-[#3D5720] font-semibold inline-flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+                      <span>
+                        배달 파트너({err.partnerName ?? '이웃 배달 파트너'})가 심부름을 진행 중입니다. 배송 완료 후 영수증이 도착하면 확인·승인해 주세요.
                       </span>
-                      <label className="min-h-[30px] px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] font-bold inline-flex items-center gap-1 cursor-pointer">
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>
-                          {receiptPhotos[err.id]
-                            ? '영수증 재첨부'
-                            : '영수증 사진 첨부'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const loaded = await readCompressedEvidencePhotos(
-                              e,
-                              0,
-                              1
-                            );
-                            if (loaded[0]) {
-                              setReceiptPhotos((prev) => ({
-                                ...prev,
-                                [err.id]: loaded[0],
-                              }));
-                            }
-                          }}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                    {receiptPhotos[err.id] && (
-                      <div className="flex items-center gap-2 p-2 rounded-xl bg-[#F7F8F5] border border-[#D4E1C5]">
-                        <img
-                          src={receiptPhotos[err.id].dataUrl}
-                          alt={receiptPhotos[err.id].name}
-                          className="w-12 h-12 rounded-lg object-cover border border-[#D4E1C5] shrink-0"
-                        />
-                        <div className="min-w-0 text-[11px] text-[#3D5720] font-semibold">
-                          ✓ 영수증 첨부 완료 · 실비 금액 확인 후 정산을 확정하세요.
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={receiptVal}
-                        onChange={(e) =>
-                          setReceiptInputs((prev) => ({
-                            ...prev,
-                            [err.id]: Math.max(
-                              0,
-                              parseInt(e.target.value, 10) || 0
-                            ),
-                          }))
-                        }
-                        className="flex-1 min-h-[38px] px-3 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl font-mono tabular-nums"
-                      />
+                    </span>
+                    {onOpenPartnerDemo && (
                       <button
                         type="button"
-                        onClick={() =>
-                          onAdvanceErrand(
-                            err.id,
-                            ErrandStatus.RECEIPT_CHECKED,
-                            receiptVal,
-                            receiptPhotos[err.id]
-                          )
-                        }
-                        className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-semibold rounded-xl cursor-pointer"
+                        onClick={onOpenPartnerDemo}
+                        className="easy-compact text-xs font-bold text-[#4E6E2A] hover:underline shrink-0 cursor-pointer"
                       >
-                        정산 확인
+                        파트너 앱에서 영수증 첨부 →
                       </button>
-                    </div>
+                    )}
                   </div>
                 )}
 
                 {err.status === ErrandStatus.RECEIPT_CHECKED && (
                   <div className="pt-2.5 border-t border-[#E8ECE4] space-y-2.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[#1A1D1A]">
-                        영수증 {formatWon(err.actualReceiptCost ?? 0)}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 font-bold text-[#1A1D1A]">
+                        <Receipt className="w-4 h-4 text-[#4E6E2A]" />
+                        <span>
+                          파트너 영수증 실비 {formatWon(err.actualReceiptCost ?? 0)}
+                        </span>
                       </span>
                       <span className="font-semibold text-[#4E6E2A]">
                         {(err.refundDifference ?? 0) >= 0
@@ -490,11 +436,16 @@ export function ErrandView({
                       </span>
                     </div>
                     {err.receiptPhoto && (
-                      <img
-                        src={err.receiptPhoto.dataUrl}
-                        alt={err.receiptPhoto.name}
-                        className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5]"
-                      />
+                      <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#F7F8F5] border border-[#D4E1C5]">
+                        <img
+                          src={err.receiptPhoto.dataUrl}
+                          alt={err.receiptPhoto.name}
+                          className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5] shrink-0"
+                        />
+                        <span className="text-[11px] text-[#3D5720] font-semibold">
+                          배달 파트너가 첨부한 구매 영수증입니다. 금액과 물품을 확인한 뒤 승인해 주세요.
+                        </span>
+                      </div>
                     )}
                     <label className="flex items-center gap-2 text-[#555E52] cursor-pointer">
                       <input
@@ -509,7 +460,7 @@ export function ErrandView({
                         className="w-4 h-4 accent-[#4E6E2A]"
                       />
                       <Camera className="w-3.5 h-3.5" />
-                      <span>물품 외관 및 도착 확인 완료</span>
+                      <span>물품 외관 및 영수증 금액 확인 완료</span>
                     </label>
                     <button
                       type="button"
@@ -517,9 +468,9 @@ export function ErrandView({
                       onClick={() =>
                         onAdvanceErrand(err.id, ErrandStatus.COMPLETED)
                       }
-                      className="min-h-[38px] px-4 py-1.5 bg-[#1A1D1A] disabled:bg-[#D4DCD0] text-white font-semibold rounded-xl cursor-pointer disabled:cursor-not-allowed"
+                      className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] text-white font-bold rounded-xl cursor-pointer disabled:cursor-not-allowed"
                     >
-                      완료 확정
+                      확인 · 승인 완료
                     </button>
                   </div>
                 )}
@@ -528,7 +479,7 @@ export function ErrandView({
                   <div className="pt-2.5 border-t border-[#E8ECE4] flex items-center justify-between text-xs text-[#4E6E2A] font-semibold">
                     <span className="flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4" />
-                      영수증 정산 완료
+                      고객 확인 승인 · 영수증 정산 완료
                     </span>
                     <span className="font-mono tabular-nums">
                       {formatWon(err.actualReceiptCost ?? 0)}

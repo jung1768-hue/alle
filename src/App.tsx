@@ -39,7 +39,7 @@ import { ErrandView } from './components/ErrandView';
 import { RecommendationView } from './components/RecommendationView';
 import { StoreMenuModal } from './components/StoreMenuModal';
 import { WishlistView } from './components/WishlistView';
-import { INITIAL_REVIEWS, PROHIBITED_ERRAND_KEYWORDS } from './data/seedData';
+import { PROHIBITED_ERRAND_KEYWORDS } from './data/seedData';
 import {
   AllePersistedState,
   B2BDocumentInfo,
@@ -63,6 +63,7 @@ import {
   PartnerPlanTier,
   PaymentMethod,
   PriceReport,
+  Review,
   SavedLocation,
   StoreCoupon,
   StorePromotion,
@@ -372,6 +373,7 @@ export default function App() {
           menus: remote.menus,
           orders: remote.orders,
           errands: remote.errands,
+          reviews: remote.reviews ?? prev.reviews,
           reviewReplies: remote.reviewReplies,
           priceReports: remote.priceReports,
           storePromotions: remote.storePromotions,
@@ -1625,6 +1627,14 @@ export default function App() {
       ...prev,
       errands: prev.errands.map((err) => {
         if (err.id !== errandId) return err;
+        if (nextStatus === ErrandStatus.MATCHED) {
+          return {
+            ...err,
+            status: nextStatus,
+            partnerName:
+              err.partnerName ?? pickRandomRiderName(DispatchMode.NEIGHBOR_WALK),
+          };
+        }
         if (
           nextStatus === ErrandStatus.RECEIPT_CHECKED &&
           typeof actualReceiptCost === 'number'
@@ -1644,7 +1654,15 @@ export default function App() {
         };
       }),
     }));
-    showToast('심부름 상태가 업데이트되었습니다.');
+    const toastText =
+      nextStatus === ErrandStatus.MATCHED
+        ? '배달 파트너가 심부름을 수락했습니다.'
+        : nextStatus === ErrandStatus.RECEIPT_CHECKED
+          ? '영수증이 첨부되어 고객 확인 대기로 전달되었습니다.'
+          : nextStatus === ErrandStatus.COMPLETED
+            ? '심부름 확인 및 정산 승인이 완료되었습니다.'
+            : '심부름 상태가 업데이트되었습니다.';
+    showToast(toastText);
   };
 
   const handleAdvanceOrderStatus = (
@@ -2140,6 +2158,45 @@ export default function App() {
       ownerSaasPlan: plan,
     }));
     showToast(`파트너 구독 요금제가 ‘${planLabelMap[plan]}’으로 변경되었습니다.`);
+  };
+
+  const handleAddReview = (payload: {
+    menuId: string;
+    orderId?: string;
+    rating: number;
+    content: string;
+    prosTags: string[];
+    consTags?: string[];
+    author?: string;
+  }) => {
+    const trimmedContent = payload.content.trim();
+    if (!trimmedContent) return;
+    const safeRating = Math.max(1, Math.min(5, Math.round(payload.rating)));
+    const targetMenu = appState.menus.find((m) => m.id === payload.menuId);
+    const newReview: Review = {
+      id: `rev-${Date.now()}`,
+      menuId: payload.menuId,
+      orderId: payload.orderId,
+      author: payload.author?.trim() || '고객 A',
+      date: formatNowTime().slice(0, 10),
+      rating: safeRating,
+      prosTags: payload.prosTags.length > 0 ? payload.prosTags : ['맛있어요'],
+      consTags: payload.consTags ?? [],
+      isComplaint: safeRating <= 2,
+      content: trimmedContent,
+    };
+    setAppState((prev) => ({
+      ...prev,
+      reviews: [newReview, ...prev.reviews],
+      stores: targetMenu
+        ? prev.stores.map((st) =>
+            st.id === targetMenu.storeId
+              ? { ...st, reviewCount: (st.reviewCount ?? 0) + 1 }
+              : st
+          )
+        : prev.stores,
+    }));
+    showToast('소중한 리뷰가 등록되었습니다.');
   };
 
   const handleSaveReviewReply = (reviewId: string, replyText: string) => {
@@ -2800,7 +2857,7 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             orders={appState.orders}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             reviewReplies={appState.reviewReplies}
             priceReports={appState.priceReports}
             stampCount={appState.stampCount}
@@ -2854,7 +2911,7 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             orders={appState.orders}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             reviewReplies={appState.reviewReplies}
             storePromotions={appState.storePromotions}
             storeCoupons={appState.storeCoupons}
@@ -2871,13 +2928,14 @@ export default function App() {
             onOpenErrand={handleOpenErrand}
             onOpenBrowse={handleOpenBrowse}
             onOpenStoreMenu={handleOpenStoreMenu}
+            onAddReview={handleAddReview}
             activeLocation={activeLocation}
           />
         ) : step === ConsumerStep.BROWSE ? (
           <CategoryBrowseView
             stores={appState.stores}
             menus={appState.menus}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             wishlistIds={appState.wishlistIds}
             storePromotions={appState.storePromotions}
             storeCoupons={appState.storeCoupons}
@@ -2903,7 +2961,7 @@ export default function App() {
           <AiChatOrderView
             stores={appState.stores}
             menus={appState.menus}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             wishlistIds={appState.wishlistIds}
             storePromotions={appState.storePromotions}
             storeCoupons={appState.storeCoupons}
@@ -2937,7 +2995,7 @@ export default function App() {
             condition={activeCondition}
             matches={recommendationResult.matches}
             excluded={recommendationResult.excluded}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             reviewReplies={appState.reviewReplies}
             allMenus={appState.menus}
             selectedMenuId={selectedMenuId}
@@ -2989,7 +3047,7 @@ export default function App() {
             menus={appState.menus}
             stores={appState.stores}
             wishlistIds={appState.wishlistIds}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             reviewReplies={appState.reviewReplies}
             onToggleWishlist={handleToggleWishlist}
             onQuickSelectMenu={handleQuickSelectMenu}
@@ -3038,7 +3096,7 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             orders={appState.orders}
-            reviews={INITIAL_REVIEWS}
+            reviews={appState.reviews}
             reviewReplies={appState.reviewReplies}
             activeLocation={activeLocation}
             walletBalance={appState.walletBalance}
@@ -3065,6 +3123,10 @@ export default function App() {
             }}
             onCreateErrand={handleCreateErrand}
             onAdvanceErrand={handleAdvanceErrand}
+            onOpenPartnerDemo={() => {
+              setRole(DemoRole.PARTNER);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         ) : (
           <OrderStatusView
@@ -3072,12 +3134,15 @@ export default function App() {
             errands={appState.errands}
             stores={appState.stores}
             menus={appState.menus}
+            reviews={appState.reviews}
             highlightedOrderId={highlightedOrderId}
             mapFocusRequest={mapFocusRequest}
             showPresenterMode={showPresenterMode}
             onCancelBeforeCooking={handleCancelBeforeCooking}
             onRequestCancelAfterCooking={handleRequestCancelAfterCooking}
             onAttachEvidence={handleAttachEvidence}
+            onAddReview={handleAddReview}
+            onAdvanceErrand={handleAdvanceErrand}
             onQuickReorderToConfirm={handleQuickReorderToConfirm}
             onQuickReorderOrder={handleOpenQuickPayFromOrder}
             onUseRelayCoupon={(menuId) =>
@@ -3430,7 +3495,7 @@ export default function App() {
         initialServings={storeMenuModal?.initialServings}
         initialOptionIds={storeMenuModal?.initialOptionIds}
         preselectHighlight={storeMenuModal?.preselectHighlight}
-        reviews={INITIAL_REVIEWS}
+        reviews={appState.reviews}
         reviewReplies={appState.reviewReplies}
         cart={cart}
         wishlistIds={appState.wishlistIds}
