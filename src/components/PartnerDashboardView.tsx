@@ -289,75 +289,88 @@ export function PartnerDashboardView({
                 key={order.id}
                 className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-[0_2px_10px_rgba(26,29,26,0.03)]"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                      <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
-                        {getDeliveryMethodMeta(getEffectiveOrderMethod(order)).label}
+                {/* Band 1: Top delivery method / tags + current stage pill */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                      {getDeliveryMethodMeta(getEffectiveOrderMethod(order)).label}
+                    </span>
+                    {order.isB2B && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#EEF4FC] text-[#1D4ED8] text-[11px] font-bold">
+                        B2B 단체
                       </span>
-                      {order.isB2B && (
-                        <span className="px-2 py-0.5 rounded-full bg-[#EEF4FC] text-[#1D4ED8] text-[11px] font-bold">
-                          B2B 단체
-                        </span>
-                      )}
-                      {order.reservationSlot && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-bold">
-                          예약 {order.reservationSlot}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs font-medium text-[#687064]">
-                      <span className="font-mono font-bold text-[#1A1D1A]">
-                        {order.orderCode}
-                      </span>
-                      <span aria-hidden="true"> · </span>
-                      <span>
-                        {order.storeName} → {order.addressAlias}
-                      </span>
-                    </div>
-                    <h3 className="text-base font-bold text-[#1A1D1A] mt-1">
-                      {order.menuName} ({order.servings}인)
-                    </h3>
-                    {order.items && order.items.length > 1 && (
-                      <p className="text-xs text-[#555E52] mt-0.5">
-                        구성:{' '}
-                        {order.items
-                          .map((it) => `${it.menuName}×${it.quantity}`)
-                          .join(', ')}
-                      </p>
                     )}
-                    {order.customerNote && (
-                      <p className="text-xs font-semibold text-[#3D5720] bg-[#F7F8F5] border border-[#E8ECE4] rounded-lg px-2.5 py-1.5 mt-1.5">
-                        요청사항: {order.customerNote}
-                      </p>
-                    )}
-                    <p className="text-xs text-[#555E52] mt-1 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#4E6E2A]" />
-                      <span>
-                        {order.dispatchMode === DispatchMode.AGENCY_RIDER
-                          ? `전문 라이더 배차${order.riderName ? ` (${order.riderName})` : ''}`
-                          : order.dispatchMode === DispatchMode.NEIGHBOR_WALK
-                            ? `이웃 도보 파트너${order.riderName ? ` (${order.riderName})` : ''}`
-                            : '배차 대기 (픽업 수락 시 방식 선택)'}
+                    {order.reservationSlot && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-bold">
+                        예약 {order.reservationSlot}
                       </span>
-                    </p>
+                    )}
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-bold text-[#4E6E2A] font-mono tabular-nums">
-                      배달료 {formatWon(basePayout)}
-                    </div>
-                    <div className="text-[11px] text-[#687064] tabular-nums">
-                      매칭 수수료 {formatWon(MATCHING_FEE_PER_CASE)} 제외 실수령{' '}
-                      {formatWon(netPayout)}
-                    </div>
-                    <div className="text-xs text-[#687064] mt-0.5">
-                      {isAcceptedOnly
-                        ? '점주 조리 시작 대기'
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                      isAcceptedOnly
+                        ? 'bg-[#F7F8F5] text-[#555E52] border border-[#E8ECE4]'
                         : isCooking
-                          ? '조리 중 · 픽업 가능'
-                          : '픽업 완료 · 이동 중'}
-                    </div>
+                          ? 'bg-[#EAF1E2] text-[#3D5720] border border-[#D4E1C5]'
+                          : 'bg-[#1A1D1A] text-white'
+                    }`}
+                  >
+                    {isAcceptedOnly
+                      ? '점주 조리 시작 대기'
+                      : isCooking
+                        ? '조리 중 · 픽업 가능'
+                        : '픽업 완료 · 이동 중'}
+                  </span>
+                </div>
+
+                {/* Band 2: Full-width order route, menu, items, customer note & dispatch */}
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-[#687064] leading-relaxed">
+                    <span className="font-mono font-bold text-[#1A1D1A]">
+                      {order.orderCode}
+                    </span>
+                    <span aria-hidden="true"> · </span>
+                    <span>
+                      {order.storeName} → {order.addressAlias}
+                    </span>
                   </div>
+                  <h3 className="text-base font-bold text-[#1A1D1A] leading-snug">
+                    {order.menuName} ({order.servings}인)
+                  </h3>
+                  {order.items && order.items.length > 1 && (
+                    <p className="text-xs text-[#555E52] leading-relaxed">
+                      구성:{' '}
+                      {order.items
+                        .map((it) => `${it.menuName}×${it.quantity}`)
+                        .join(', ')}
+                    </p>
+                  )}
+                  {order.customerNote && (
+                    <p className="text-xs font-semibold text-[#3D5720] bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl px-3 py-2 leading-relaxed">
+                      요청사항: {order.customerNote}
+                    </p>
+                  )}
+                  <p className="text-xs text-[#555E52] flex items-center gap-1.5 pt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
+                    <span>
+                      {order.dispatchMode === DispatchMode.AGENCY_RIDER
+                        ? `전문 라이더 배차${order.riderName ? ` (${order.riderName})` : ''}`
+                        : order.dispatchMode === DispatchMode.NEIGHBOR_WALK
+                          ? `이웃 도보 파트너${order.riderName ? ` (${order.riderName})` : ''}`
+                          : '배차 대기 (픽업 수락 시 방식 선택)'}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Band 3: Full-width payout summary strip */}
+                <div className="px-3.5 py-2.5 rounded-2xl bg-[#F4F8EF] border border-[#DCE7CF] flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <span className="text-sm font-bold text-[#4E6E2A] font-mono tabular-nums">
+                    배달료 {formatWon(basePayout)}
+                  </span>
+                  <span className="text-xs font-bold text-[#3D5720] tabular-nums">
+                    매칭 수수료 {formatWon(MATCHING_FEE_PER_CASE)} 제외 · 실수령{' '}
+                    {formatWon(netPayout)}
+                  </span>
                 </div>
 
                 {(isCooking || isPickup) && (
@@ -373,11 +386,11 @@ export function PartnerDashboardView({
                   />
                 )}
 
-                <div className="pt-3 border-t border-[#E8ECE4] flex flex-wrap items-center justify-between gap-2">
+                <div className="pt-3 border-t border-[#E8ECE4] space-y-3">
                   {isAcceptedOnly && (
                     <span className="text-xs font-medium text-[#687064] flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5" />
-                      점주가 ‘조리 시작’을 누른 후 픽업할 수 있습니다.
+                      <Lock className="w-3.5 h-3.5 shrink-0" />
+                      <span>점주가 ‘조리 시작’을 누른 후 픽업할 수 있습니다.</span>
                     </span>
                   )}
 
@@ -428,7 +441,7 @@ export function PartnerDashboardView({
                   )}
 
                   {onAttachRiderPhotos && (
-                    <div className="p-2.5 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2 text-xs">
+                    <div className="w-full p-3 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2 text-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-semibold text-[#3D5720]">
                           라이더 픽업 · 문 앞 배송 사진 ({(order.riderDeliveryPhotos ?? []).length}/3)
@@ -526,7 +539,7 @@ export function PartnerDashboardView({
                   {openErrands.map((err) => (
                     <div
                       key={err.id}
-                      className="bg-white border border-[#E8ECE4] rounded-2xl p-4 flex items-center justify-between gap-3"
+                      className="bg-white border border-[#E8ECE4] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div className="min-w-0">
                         <div className="text-xs text-[#687064]">

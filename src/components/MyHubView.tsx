@@ -775,102 +775,6 @@ export function MyHubView({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="p-4 bg-[#F6F7F8] border border-[#D7DEE5] rounded-2xl flex flex-col justify-between gap-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-[#0F6B46] min-w-0">
-                  <CalendarClock className="w-4 h-4 shrink-0" />
-                  <span className="truncate tabular-nums">
-                    {formatRoutineDaysSummary(routine.days)}{' '}
-                    {formatTime24(routine.hour, routine.minute)} 자동 알림
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={routine.enabled}
-                  onClick={() => {
-                    const next = { ...routine, enabled: !routine.enabled };
-                    setDraftRoutine(next);
-                    onSaveRoutine?.(next);
-                  }}
-                  className={`easy-compact min-h-[30px] px-2.5 py-0.5 rounded-lg text-[12px] font-bold border transition-colors cursor-pointer shrink-0 ${
-                    routine.enabled
-                      ? 'bg-[#0F6B46] border-[#0F6B46] text-white'
-                      : 'bg-white border-[#D7DEE5] text-[#4B5563]'
-                  }`}
-                >
-                  {routine.enabled ? '자동 ON' : '꺼짐'}
-                </button>
-              </div>
-              <div>
-                <h3 className="text-[15.5px] font-extrabold text-[#111827]">
-                  {routine.title}
-                </h3>
-                <p className="text-[13.5px] text-[#4B5563] mt-1 leading-relaxed tabular-nums">
-                  설정한 시간 기준 도착{' '}
-                  <strong className="text-[#111827]">
-                    {routine.leadMinutes}분 전
-                  </strong>{' '}
-                  ‘{regularMenuName}’ 등 맞춤 메뉴를 먼저 제안합니다.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onOpenAiChat
-                  ? onOpenAiChat(buildPreferencePrompt(preferences))
-                  : onGoToHomePrefs?.()
-              }
-              className="w-full min-h-[42px] px-3.5 py-2 bg-white hover:bg-[#EAF6F0] border border-[#CBD5DF] text-[#0B4F34] text-[14px] font-bold rounded-xl cursor-pointer transition-colors"
-            >
-              지금 맞춤 제안 바로 보기
-            </button>
-          </div>
-
-          <div className="p-4 bg-[#EAF6F0] text-[#111827] border border-[#CFE4D8] rounded-2xl flex flex-col justify-between gap-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="font-bold text-[#0B4F34] flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5 text-[#0F6B46] fill-[#0F6B46] shrink-0" />
-                  <span>탐색 0단계 · 단골 고정</span>
-                </span>
-                <span className="font-mono font-semibold text-[#0F6B46] tabular-nums">
-                  평균 3초
-                </span>
-              </div>
-              <div>
-                <h3 className="text-[15.5px] font-extrabold text-[#111827]">
-                  원탭 3초 재주문
-                </h3>
-                <p className="text-[13.5px] text-[#0B4F34] mt-1 leading-relaxed">
-                  {regularStoreName} ·{' '}
-                  <strong className="text-[#111827] font-bold">
-                    {regularMenuName} ({regularServings}인)
-                  </strong>{' '}
-                  이전 옵션과 요청사항 그대로 즉시 주문합니다.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onQuickReorderToConfirm
-                  ? onQuickReorderToConfirm(regularMenuId, regularServings)
-                  : onGoToHomePrefs?.()
-              }
-              className="w-full min-h-[42px] px-3.5 py-2 bg-[#0F6B46] hover:bg-[#0B5638] text-white text-[14px] font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>원탭 3초 재주문 실행</span>
-            </button>
-          </div>
-        </div>
-
         {routineSavedNotice && (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EAF6F0] text-[#0F6B46] text-[14px] font-bold">
             <Check className="w-4 h-4 shrink-0" />
@@ -879,7 +783,7 @@ export function MyHubView({
         )}
 
         {editingRoutine && (
-          <div className="pt-4 border-t border-[#E5E8EC] space-y-5">
+          <div className="p-4 bg-[#F9FBFA] border border-[#CFE4D8] rounded-2xl space-y-5">
             {/* 요일 선택 */}
             <div className="space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1096,6 +1000,102 @@ export function MyHubView({
             </div>
           </div>
         )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="p-4 bg-[#F6F7F8] border border-[#D7DEE5] rounded-2xl flex flex-col justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-[#0F6B46] min-w-0">
+                  <CalendarClock className="w-4 h-4 shrink-0" />
+                  <span className="truncate tabular-nums">
+                    {formatRoutineDaysSummary(routine.days)}{' '}
+                    {formatTime24(routine.hour, routine.minute)} 자동 알림
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={routine.enabled}
+                  onClick={() => {
+                    const next = { ...routine, enabled: !routine.enabled };
+                    setDraftRoutine(next);
+                    onSaveRoutine?.(next);
+                  }}
+                  className={`easy-compact min-h-[30px] px-2.5 py-0.5 rounded-lg text-[12px] font-bold border transition-colors cursor-pointer shrink-0 ${
+                    routine.enabled
+                      ? 'bg-[#0F6B46] border-[#0F6B46] text-white'
+                      : 'bg-white border-[#D7DEE5] text-[#4B5563]'
+                  }`}
+                >
+                  {routine.enabled ? '자동 ON' : '꺼짐'}
+                </button>
+              </div>
+              <div>
+                <h3 className="text-[15.5px] font-extrabold text-[#111827]">
+                  {routine.title}
+                </h3>
+                <p className="text-[13.5px] text-[#4B5563] mt-1 leading-relaxed tabular-nums">
+                  설정한 시간 기준 도착{' '}
+                  <strong className="text-[#111827]">
+                    {routine.leadMinutes}분 전
+                  </strong>{' '}
+                  ‘{regularMenuName}’ 등 맞춤 메뉴를 먼저 제안합니다.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                onOpenAiChat
+                  ? onOpenAiChat(buildPreferencePrompt(preferences))
+                  : onGoToHomePrefs?.()
+              }
+              className="w-full min-h-[42px] px-3.5 py-2 bg-white hover:bg-[#EAF6F0] border border-[#CBD5DF] text-[#0B4F34] text-[14px] font-bold rounded-xl cursor-pointer transition-colors"
+            >
+              지금 맞춤 제안 바로 보기
+            </button>
+          </div>
+
+          <div className="p-4 bg-[#EAF6F0] text-[#111827] border border-[#CFE4D8] rounded-2xl flex flex-col justify-between gap-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-bold text-[#0B4F34] flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-[#0F6B46] fill-[#0F6B46] shrink-0" />
+                  <span>탐색 0단계 · 단골 고정</span>
+                </span>
+                <span className="font-mono font-semibold text-[#0F6B46] tabular-nums">
+                  평균 3초
+                </span>
+              </div>
+              <div>
+                <h3 className="text-[15.5px] font-extrabold text-[#111827]">
+                  원탭 3초 재주문
+                </h3>
+                <p className="text-[13.5px] text-[#0B4F34] mt-1 leading-relaxed">
+                  {regularStoreName} ·{' '}
+                  <strong className="text-[#111827] font-bold">
+                    {regularMenuName} ({regularServings}인)
+                  </strong>{' '}
+                  이전 옵션과 요청사항 그대로 즉시 주문합니다.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                onQuickReorderToConfirm
+                  ? onQuickReorderToConfirm(regularMenuId, regularServings)
+                  : onGoToHomePrefs?.()
+              }
+              className="w-full min-h-[42px] px-3.5 py-2 bg-[#0F6B46] hover:bg-[#0B5638] text-white text-[14px] font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>원탭 3초 재주문 실행</span>
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* O2O Stamps & Coupons */}
