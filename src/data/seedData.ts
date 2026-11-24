@@ -13,6 +13,7 @@ import {
   StoreCoupon,
   StorePromotion,
   UserPreferences,
+  ZeroClickRoutine,
 } from '../types/alle';
 
 import IMG_HAEJANG from '../assets/images/korean_beef_haejangguk_1794615612924.jpg';
@@ -331,6 +332,15 @@ export const INITIAL_PREFERENCES: UserPreferences = {
   defaultMaxBudget: 25000,
   defaultMaxMinutes: 30,
   memoNote: '일회용 수저 빼기',
+};
+
+export const INITIAL_ZERO_CLICK_ROUTINE: ZeroClickRoutine = {
+  enabled: true,
+  days: ['fri'],
+  hour: 18,
+  minute: 30,
+  leadMinutes: 25,
+  title: '매주 금요일 퇴근길 자동 제안',
 };
 
 export const INITIAL_STORES: Store[] = [

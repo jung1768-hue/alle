@@ -1,10 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
 import { AVAILABLE_TAGS } from '../data/seedData';
 import { ParsedCondition, PaymentMethod, Review } from '../types/alle';
 import { parseConditionInput } from './parser';
-
-const GEMINI_KEY_STORAGE = 'alle_gemini_api_key';
-const MODEL_NAME = 'gemini-3.8-flash';
 
 let serverProxyAvailable: boolean | null = null;
 let serverProxyCheckPromise: Promise<boolean> | null = null;
@@ -33,39 +29,12 @@ export async function checkServerGeminiAvailable(): Promise<boolean> {
   return serverProxyCheckPromise;
 }
 
-export function getGeminiApiKey(): string {
-  const envKey = (
-    import.meta as unknown as { env?: Record<string, string | undefined> }
-  ).env?.VITE_GEMINI_API_KEY;
-  if (envKey && envKey.trim() && envKey !== 'MY_GEMINI_API_KEY') {
-    return envKey.trim();
-  }
-  try {
-    return window.localStorage.getItem(GEMINI_KEY_STORAGE)?.trim() ?? '';
-  } catch {
-    return '';
-  }
-}
-
-export function setGeminiApiKey(key: string): void {
-  try {
-    const trimmed = key.trim();
-    if (trimmed) {
-      window.localStorage.setItem(GEMINI_KEY_STORAGE, trimmed);
-    } else {
-      window.localStorage.removeItem(GEMINI_KEY_STORAGE);
-    }
-  } catch {
-    // ignore storage errors
-  }
-}
-
 export function isServerProxyAvailable(): boolean {
   return serverProxyAvailable === true;
 }
 
 export function hasGeminiApiKey(): boolean {
-  return getGeminiApiKey().length > 0 || serverProxyAvailable === true;
+  return serverProxyAvailable === true;
 }
 
 async function generateGeminiText(params: {
@@ -73,23 +42,6 @@ async function generateGeminiText(params: {
   inlineData?: { data: string; mimeType: string };
   temperature?: number;
 }): Promise<string | null> {
-  const clientKey = getGeminiApiKey();
-  if (clientKey) {
-    const client = new GoogleGenAI({ apiKey: clientKey });
-    const contents = params.inlineData
-      ? [{ inlineData: params.inlineData }, params.prompt]
-      : params.prompt;
-    const response = await client.models.generateContent({
-      model: MODEL_NAME,
-      contents,
-      config: {
-        responseMimeType: 'application/json',
-        temperature: params.temperature ?? 0.2,
-      },
-    });
-    return response.text ?? null;
-  }
-
   const available = await checkServerGeminiAvailable();
   if (!available) return null;
 
@@ -357,8 +309,10 @@ export async function extractMenusFromImageWithAI(
   base64Data: string,
   mimeType: string
 ): Promise<ExtractedMenuCandidate[]> {
-  if (!hasGeminiApiKey() && !(await checkServerGeminiAvailable())) {
-    throw new Error('GEMINI_API_KEY가 설정되어 있지 않습니다.');
+  if (!(await checkServerGeminiAvailable())) {
+    throw new Error(
+      'Cloudflare 서버에 Gemini API 키가 연결되어 있지 않습니다. 배포 환경에서 이용하거나 "샘플 일괄 등록"을 이용해 주세요.'
+    );
   }
 
   const prompt = `첨부된 음식점 메뉴판/전단지 이미지에서 메뉴명과 가격을 모두 추출해 JSON 배열로 반환하세요.

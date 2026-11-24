@@ -28,6 +28,7 @@ import {
   Order,
   OrderStatus,
   Review,
+  ReviewReply,
   Store,
 } from '../types/alle';
 import { readCompressedEvidencePhotos } from '../utils/imageUpload';
@@ -43,6 +44,7 @@ interface OrderStatusViewProps {
   stores: Store[];
   menus: MenuItem[];
   reviews?: Review[];
+  reviewReplies?: Record<string, ReviewReply>;
   highlightedOrderId: string | null;
   mapFocusRequest?: { orderId: string; seq: number } | null;
   showPresenterMode?: boolean;
@@ -144,6 +146,7 @@ export function OrderStatusView({
   stores,
   menus,
   reviews = [],
+  reviewReplies = {},
   highlightedOrderId,
   mapFocusRequest = null,
   showPresenterMode = false,
@@ -490,6 +493,7 @@ export function OrderStatusView({
   );
 
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
 
   const activeOrders = useMemo(
     () =>
@@ -853,8 +857,9 @@ export function OrderStatusView({
               <div className="space-y-3">
                 {selectedDayOrders.map((ord) => {
                   const menuObj = menuMap.get(ord.menuId);
+                  const storeObj = storeMap.get(ord.storeId);
                   const canReorder = Boolean(
-                    menuObj && !menuObj.isSoldOut && menuObj.stock >= 1
+                    storeObj?.isOpen && menuObj && !menuObj.isSoldOut && menuObj.stock >= 1
                   );
                   return (
                     <div
@@ -960,9 +965,10 @@ export function OrderStatusView({
               order.status === OrderStatus.COMPLETED;
             const isHighlighted = order.id === highlightedOrderId;
             const menuObj = menuMap.get(order.menuId);
+            const storeObj = storeMap.get(order.storeId);
             const menuImage = menuObj?.image ?? '';
             const canReorder = Boolean(
-              menuObj && !menuObj.isSoldOut && menuObj.stock >= 1
+              storeObj?.isOpen && menuObj && !menuObj.isSoldOut && menuObj.stock >= 1
             );
 
             return (
@@ -1238,6 +1244,47 @@ export function OrderStatusView({
                   </div>
                 )}
 
+                {/* Owner Packaging & Rider Delivery Proof Photos */}
+                {((order.ownerPackagingPhotos?.length ?? 0) > 0 ||
+                  (order.riderDeliveryPhotos?.length ?? 0) > 0) && (
+                  <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl space-y-3 text-xs">
+                    {(order.ownerPackagingPhotos?.length ?? 0) > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="font-bold text-[#3D5720]">
+                          매장 포장 · 실링 사진 ({order.ownerPackagingPhotos!.length}장)
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {order.ownerPackagingPhotos!.map((p, idx) => (
+                            <img
+                              key={`${p.name}-${idx}`}
+                              src={p.dataUrl}
+                              alt={p.name}
+                              className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5] bg-white"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(order.riderDeliveryPhotos?.length ?? 0) > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="font-bold text-[#3D5720]">
+                          파트너 문 앞 배송 사진 ({order.riderDeliveryPhotos!.length}장)
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {order.riderDeliveryPhotos!.map((p, idx) => (
+                            <img
+                              key={`${p.name}-${idx}`}
+                              src={p.dataUrl}
+                              alt={p.name}
+                              className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5] bg-white"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Recorded Post-Cooking Cancel Request & 4-Way Evidence Record (No AI Fault Judgement) */}
                 {order.cancelRequested && !isCancelled && (
                   <div className="p-4 bg-[#F7F8F5] border border-[#D4E1C5] rounded-2xl space-y-1.5 text-xs">
@@ -1401,11 +1448,27 @@ export function OrderStatusView({
                             className="min-h-[42px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#82B440]/50 disabled:bg-[#F7F8F5] disabled:border-[#E8ECE4] disabled:text-[#687064] text-[#3D5720] text-xs sm:text-sm font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed transition-colors"
                           >
                             <span>
-                              {canReorder ? '⚡ 1초 결제 재주문' : '현재 재고 없음'}
+                              {canReorder
+                                ? '⚡ 1초 결제 재주문'
+                                : storeObj && !storeObj.isOpen
+                                  ? '영업 중단'
+                                  : '현재 재고 없음'}
                             </span>
                           </button>
                         </div>
                       </div>
+
+                      {writtenReview && (() => {
+                        const rawReply = reviewReplies[writtenReview.id]?.text?.trim() ?? '';
+                        const replyText = rawReply.replace(/^\[점주 답글\]\s*/, '');
+                        if (!replyText) return null;
+                        return (
+                          <div className="p-3 rounded-xl bg-[#EAF1E2]/70 border border-[#D4E1C5] text-xs text-[#3D5720]">
+                            <span className="font-bold">점주 답글:</span>{' '}
+                            {replyText}
+                          </div>
+                        );
+                      })()}
 
                       {order.status === OrderStatus.COMPLETED &&
                         isReviewFormOpen &&

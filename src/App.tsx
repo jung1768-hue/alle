@@ -23,7 +23,6 @@ import { AlleLogo } from './components/AlleBrand';
 import { CategoryBrowseView } from './components/CategoryBrowseView';
 import { ConditionHome } from './components/ConditionHome';
 import { FutureScopeModal } from './components/FutureScopeModal';
-import { GeminiKeyModal } from './components/GeminiKeyModal';
 import { LocationPickerModal } from './components/LocationPickerModal';
 import { MyHubView } from './components/MyHubView';
 import { OrderConfirmationView } from './components/OrderConfirmationView';
@@ -39,7 +38,11 @@ import { ErrandView } from './components/ErrandView';
 import { RecommendationView } from './components/RecommendationView';
 import { StoreMenuModal } from './components/StoreMenuModal';
 import { WishlistView } from './components/WishlistView';
-import { PROHIBITED_ERRAND_KEYWORDS } from './data/seedData';
+import {
+  INITIAL_ZERO_CLICK_ROUTINE,
+  MOCK_COUPONS,
+  PROHIBITED_ERRAND_KEYWORDS,
+} from './data/seedData';
 import {
   AllePersistedState,
   B2BDocumentInfo,
@@ -68,6 +71,7 @@ import {
   StoreCoupon,
   StorePromotion,
   UserPreferences,
+  ZeroClickRoutine,
 } from './types/alle';
 import {
   evaluateRecommendations,
@@ -79,8 +83,10 @@ import {
   B2B_SERVICE_FEE_RATE,
   calculateStoreDeliveryFee,
   estimateCompetitorSavings,
+  getAvailableCouponsForStore,
   getDeliveryMethodMeta,
   getLocalCurrencyLabel,
+  isCouponEligible,
   MATCHING_FEE_PER_CASE,
 } from './utils/pricing';
 import { PlatformCategoryId } from './utils/categories';
@@ -155,12 +161,12 @@ function buildMenuFromRawLine(
   const validPrice = Number.isInteger(price) && price >= 1000 ? price : 10000;
 
   const parsed = parseConditionInput(trimmed);
-  const cleanedName = trimmed
-    .replace(/([\d,]+)\s*원/, '')
-    .replace(
-      /(얼큰한|국물|담백한|순한맛|바삭한|덮밥|면|한식|중식|일식|해물|고기|찌개|해장|돈까스)/g,
-      ''
-    )
+  const priceIndex =
+    priceMatch && typeof priceMatch.index === 'number' ? priceMatch.index : -1;
+  const beforePrice =
+    priceIndex >= 0 ? trimmed.slice(0, priceIndex).trim() : trimmed;
+  const cleanedName = beforePrice
+    .replace(/\s+/g, ' ')
     .trim();
 
   const menuName = cleanedName || '매장 추가 메뉴';
@@ -262,7 +268,6 @@ export default function App() {
     }
   });
   const [showFutureModal, setShowFutureModal] = useState<boolean>(false);
-  const [showGeminiModal, setShowGeminiModal] = useState<boolean>(false);
   const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [showDemoSwitcher, setShowDemoSwitcher] = useState<boolean>(false);
@@ -320,7 +325,6 @@ export default function App() {
       } | null;
 
       setShowFutureModal(false);
-      setShowGeminiModal(false);
       setShowLocationPicker(false);
       setShowNotifications(false);
       setShowDemoSwitcher(false);
@@ -378,6 +382,9 @@ export default function App() {
           priceReports: remote.priceReports,
           storePromotions: remote.storePromotions,
           storeCoupons: remote.storeCoupons,
+          ownerSaasPlan: remote.ownerSaasPlan ?? prev.ownerSaasPlan,
+          ownerSaasSubscribed:
+            remote.ownerSaasSubscribed ?? prev.ownerSaasSubscribed,
         }));
       }
     );
@@ -999,6 +1006,15 @@ export default function App() {
       ...prev,
       preferences: nextPrefs,
     }));
+    showToast('내 취향 설정이 저장되었습니다.');
+  };
+
+  const handleSaveRoutine = (nextRoutine: ZeroClickRoutine) => {
+    setAppState((prev) => ({
+      ...prev,
+      zeroClickRoutine: nextRoutine,
+    }));
+    showToast('단골 루틴 설정이 저장되었습니다.');
   };
 
   const handleApplyPreferencesToInput = (prefs: UserPreferences) => {
@@ -1143,6 +1159,75 @@ export default function App() {
     setMapFocusRequest({ orderId: notif.orderId, seq: Date.now() });
   };
 
+  const schedulePostPickupTimers = (
+    order: Pick<Order, 'id' | 'orderCode' | 'storeName' | 'menuName' | 'addressAlias'>,
+    dispatchMode: DispatchMode,
+    riderLabel: string,
+    fiveMinDelayMs: number,
+    arriveDelayMs: number,
+    includeTimers: number[] = []
+  ) => {
+    const tFiveMin = window.setTimeout(() => {
+      setAppState((prev) => ({
+        ...prev,
+        orders: prev.orders.map((ord) =>
+          ord.id === order.id && ord.status === OrderStatus.PICKUP
+            ? {
+                ...ord,
+                dispatchMode: ord.dispatchMode ?? dispatchMode,
+                deliveryStage: 'FIVE_MIN_LEFT',
+                riderName: ord.riderName ?? riderLabel,
+                remainingMinutes: 5,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      }));
+      pushDeliveryNotification({
+        orderId: order.id,
+        orderCode: order.orderCode,
+        storeName: order.storeName,
+        stage: 'FIVE_MIN_LEFT',
+        title: '도착 5분 전 알림',
+        body: `${riderLabel}가 ${order.addressAlias} 인근에 곧 도착합니다 (약 5분 전).`,
+        riderLabel,
+        dispatchMode,
+      });
+    }, fiveMinDelayMs);
+
+    const tArrive = window.setTimeout(() => {
+      setAppState((prev) => ({
+        ...prev,
+        orders: prev.orders.map((ord) =>
+          ord.id === order.id && ord.status === OrderStatus.PICKUP
+            ? {
+                ...ord,
+                status: OrderStatus.COMPLETED,
+                dispatchMode: ord.dispatchMode ?? dispatchMode,
+                deliveryStage: 'ARRIVED',
+                riderName: ord.riderName ?? riderLabel,
+                remainingMinutes: 0,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      }));
+      pushDeliveryNotification({
+        orderId: order.id,
+        orderCode: order.orderCode,
+        storeName: order.storeName,
+        stage: 'ARRIVED',
+        title: '배달 도착 완료',
+        body: `${order.storeName} (${order.menuName}) 주문이 안전하게 도착했습니다!`,
+        riderLabel,
+        dispatchMode,
+      });
+      clearOrderDeliveryTimers(order.id);
+    }, arriveDelayMs);
+
+    deliveryTimersRef.current.set(order.id, [...includeTimers, tFiveMin, tArrive]);
+  };
+
   const scheduleDeliveryLifecycleForOrder = (
     order: Order,
     estimatedMinutes: number
@@ -1164,7 +1249,7 @@ export default function App() {
       setAppState((prev) => ({
         ...prev,
         orders: prev.orders.map((ord) =>
-          ord.id === order.id && ord.status !== OrderStatus.CANCELLED
+          ord.id === order.id && ord.status === OrderStatus.PENDING
             ? {
                 ...ord,
                 status: OrderStatus.PICKUP,
@@ -1187,68 +1272,16 @@ export default function App() {
         riderLabel,
         dispatchMode,
       });
-    }, 4000);
-
-    const tFiveMin = window.setTimeout(() => {
-      setAppState((prev) => ({
-        ...prev,
-        orders: prev.orders.map((ord) =>
-          ord.id === order.id && ord.status !== OrderStatus.CANCELLED
-            ? {
-                ...ord,
-                status: OrderStatus.PICKUP,
-                dispatchMode,
-                deliveryStage: 'FIVE_MIN_LEFT',
-                riderName: riderLabel,
-                remainingMinutes: 5,
-                updatedAt: formatNowTime(),
-              }
-            : ord
-        ),
-      }));
-      pushDeliveryNotification({
-        orderId: order.id,
-        orderCode: order.orderCode,
-        storeName: order.storeName,
-        stage: 'FIVE_MIN_LEFT',
-        title: '도착 5분 전 알림',
-        body: `${riderLabel}가 ${order.addressAlias} 인근에 곧 도착합니다 (약 5분 전).`,
-        riderLabel,
-        dispatchMode,
-      });
     }, 12000);
 
-    const tArrive = window.setTimeout(() => {
-      setAppState((prev) => ({
-        ...prev,
-        orders: prev.orders.map((ord) =>
-          ord.id === order.id && ord.status !== OrderStatus.CANCELLED
-            ? {
-                ...ord,
-                status: OrderStatus.COMPLETED,
-                dispatchMode,
-                deliveryStage: 'ARRIVED',
-                riderName: riderLabel,
-                remainingMinutes: 0,
-                updatedAt: formatNowTime(),
-              }
-            : ord
-        ),
-      }));
-      pushDeliveryNotification({
-        orderId: order.id,
-        orderCode: order.orderCode,
-        storeName: order.storeName,
-        stage: 'ARRIVED',
-        title: '배달 도착 완료',
-        body: `${order.storeName} (${order.menuName}) 주문이 안전하게 도착했습니다!`,
-        riderLabel,
-        dispatchMode,
-      });
-      clearOrderDeliveryTimers(order.id);
-    }, 20000);
-
-    deliveryTimersRef.current.set(order.id, [tDepart, tFiveMin, tArrive]);
+    schedulePostPickupTimers(
+      order,
+      dispatchMode,
+      riderLabel,
+      20000,
+      28000,
+      [tDepart]
+    );
   };
 
   const handleConfirmOrder = (payload: {
@@ -1349,14 +1382,45 @@ export default function App() {
       menuSubtotal,
       deliveryMethod
     ).finalDeliveryFee;
-    const cappedCoupon = Math.max(
-      0,
-      Math.min(payload.couponDiscount, menuSubtotal)
-    );
+    const chosenPayMethod = payload.paymentMethod ?? 'kakaopay';
+
+    let resolvedCouponCode: string | null =
+      payload.couponCode && payload.couponCode !== 'NONE'
+        ? payload.couponCode
+        : null;
+    let resolvedCouponDiscount = 0;
+
+    if (resolvedCouponCode) {
+      const validCoupons = getAvailableCouponsForStore(
+        MOCK_COUPONS,
+        appState.storeCoupons,
+        targetStore.id,
+        menuSubtotal
+      );
+      const matchedCoupon = validCoupons.find(
+        (c) => c.code === resolvedCouponCode
+      );
+      if (
+        matchedCoupon &&
+        isCouponEligible(matchedCoupon, {
+          menuSubtotal,
+          stampCount: appState.stampCount,
+          paymentMethod: chosenPayMethod,
+        })
+      ) {
+        resolvedCouponDiscount = Math.max(
+          0,
+          Math.min(matchedCoupon.discountAmount, menuSubtotal)
+        );
+      } else {
+        resolvedCouponCode = null;
+      }
+    }
+
+    const cappedCoupon = resolvedCouponDiscount;
     const totalAmount =
       menuSubtotal + optionsSubtotal + effectiveDeliveryFee - cappedCoupon;
 
-    const chosenPayMethod = payload.paymentMethod ?? 'kakaopay';
     if (chosenPayMethod === 'alle_pay' && appState.walletBalance < totalAmount) {
       return {
         ok: false,
@@ -1401,7 +1465,7 @@ export default function App() {
         (chosenPayMethod === 'local_currency'
           ? localCur.fullLabel
           : '간편결제'),
-      couponCode: payload.couponCode === 'NONE' ? null : payload.couponCode,
+      couponCode: resolvedCouponCode,
       couponDiscount: cappedCoupon,
       totalAmount,
       estimatedSavings: payload.estimatedSavings,
@@ -1493,8 +1557,13 @@ export default function App() {
 
     const effectiveUnitPrice = getEffectiveMenuPrice(targetMenu);
     const menuSubtotal = effectiveUnitPrice * payload.servings;
+    const deliveryFee = calculateStoreDeliveryFee(
+      targetStore,
+      menuSubtotal,
+      'partner_direct'
+    ).finalDeliveryFee;
     const b2bServiceFee = Math.round(menuSubtotal * B2B_SERVICE_FEE_RATE);
-    const totalAmount = menuSubtotal + targetStore.deliveryFee + b2bServiceFee;
+    const totalAmount = menuSubtotal + deliveryFee + b2bServiceFee;
 
     if (
       payload.paymentMethod === 'alle_pay' &&
@@ -1525,7 +1594,7 @@ export default function App() {
       selectedOptionNames: [],
       menuSubtotal,
       optionsSubtotal: 0,
-      deliveryFee: targetStore.deliveryFee,
+      deliveryFee,
       reservationSlot: payload.reservationSlot,
       isB2B: true,
       b2bServiceFee,
@@ -1593,6 +1662,16 @@ export default function App() {
       };
     }
 
+    const escrowTotal =
+      payload.estimatedItemCost + payload.errandFee + MATCHING_FEE_PER_CASE;
+
+    if (appState.walletBalance < escrowTotal) {
+      return {
+        ok: false,
+        error: `Baro페이 잔액(${formatWon(appState.walletBalance)})이 예치 총액(${formatWon(escrowTotal)})보다 부족합니다. MY 탭에서 충전 후 다시 요청해 주세요.`,
+      };
+    }
+
     const newErrand: ErrandRequest = {
       id: `err-${Date.now()}`,
       title: payload.title,
@@ -1601,8 +1680,7 @@ export default function App() {
       dropoffAlias: payload.dropoffAlias,
       estimatedItemCost: payload.estimatedItemCost,
       errandFee: payload.errandFee,
-      escrowTotal:
-        payload.estimatedItemCost + payload.errandFee + MATCHING_FEE_PER_CASE,
+      escrowTotal,
       actualReceiptCost: null,
       refundDifference: null,
       status: ErrandStatus.OPEN,
@@ -1611,9 +1689,12 @@ export default function App() {
 
     setAppState((prev) => ({
       ...prev,
+      walletBalance: Math.max(0, prev.walletBalance - escrowTotal),
       errands: [newErrand, ...prev.errands],
     }));
-    showToast('생활 심부름이 등록되었습니다.');
+    showToast(
+      `생활 심부름이 등록되었습니다 (에스크로 ${formatWon(escrowTotal)} 예치).`
+    );
     return { ok: true };
   };
 
@@ -1623,10 +1704,29 @@ export default function App() {
     actualReceiptCost?: number,
     receiptPhoto?: NonNullable<ErrandRequest['receiptPhoto']>
   ) => {
+    const targetErrand = appState.errands.find((e) => e.id === errandId);
+    const refundAmt =
+      nextStatus === ErrandStatus.COMPLETED && targetErrand
+        ? Math.max(0, targetErrand.refundDifference ?? 0)
+        : 0;
+
     setAppState((prev) => ({
       ...prev,
+      walletBalance:
+        nextStatus === ErrandStatus.COMPLETED && refundAmt > 0
+          ? prev.walletBalance + refundAmt
+          : prev.walletBalance,
       errands: prev.errands.map((err) => {
         if (err.id !== errandId) return err;
+        if (nextStatus === ErrandStatus.OPEN) {
+          return {
+            ...err,
+            status: ErrandStatus.OPEN,
+            partnerName: undefined,
+            actualReceiptCost: null,
+            refundDifference: null,
+          };
+        }
         if (nextStatus === ErrandStatus.MATCHED) {
           return {
             ...err,
@@ -1655,13 +1755,17 @@ export default function App() {
       }),
     }));
     const toastText =
-      nextStatus === ErrandStatus.MATCHED
-        ? '배달 파트너가 심부름을 수락했습니다.'
-        : nextStatus === ErrandStatus.RECEIPT_CHECKED
-          ? '영수증이 첨부되어 고객 확인 대기로 전달되었습니다.'
-          : nextStatus === ErrandStatus.COMPLETED
-            ? '심부름 확인 및 정산 승인이 완료되었습니다.'
-            : '심부름 상태가 업데이트되었습니다.';
+      nextStatus === ErrandStatus.OPEN
+        ? '배달 파트너가 심부름 수락을 취소했습니다.'
+        : nextStatus === ErrandStatus.MATCHED
+          ? '배달 파트너가 심부름을 수락했습니다.'
+          : nextStatus === ErrandStatus.RECEIPT_CHECKED
+            ? '영수증이 첨부되어 고객 확인 대기로 전달되었습니다.'
+            : nextStatus === ErrandStatus.COMPLETED
+              ? refundAmt > 0
+                ? `심부름 승인 완료 · 차액 ${formatWon(refundAmt)}이 Baro페이로 환불되었습니다.`
+                : '심부름 확인 및 정산 승인이 완료되었습니다.'
+              : '심부름 상태가 업데이트되었습니다.';
     showToast(toastText);
   };
 
@@ -1671,16 +1775,22 @@ export default function App() {
     dispatchMode?: DispatchMode
   ) => {
     const currentOrder = appState.orders.find((o) => o.id === orderId);
+    if (!currentOrder || ALLOWED_NEXT_STATUS[currentOrder.status] !== nextStatus) {
+      return;
+    }
+
+    clearOrderDeliveryTimers(orderId);
+
     const chosenMode =
-      dispatchMode ?? currentOrder?.dispatchMode ?? DispatchMode.AGENCY_RIDER;
+      dispatchMode ?? currentOrder.dispatchMode ?? DispatchMode.AGENCY_RIDER;
     const riderLabel =
-      currentOrder?.riderName ?? pickRandomRiderName(chosenMode);
+      currentOrder.riderName ?? pickRandomRiderName(chosenMode);
     const nextStage: DeliveryProgressStage | undefined =
       nextStatus === OrderStatus.PICKUP
         ? 'DEPARTED'
         : nextStatus === OrderStatus.COMPLETED
           ? 'ARRIVED'
-          : currentOrder?.deliveryStage;
+          : currentOrder.deliveryStage;
 
     setAppState((prev) => ({
       ...prev,
@@ -1697,7 +1807,7 @@ export default function App() {
             nextStatus === OrderStatus.PICKUP && dispatchMode
               ? dispatchMode
               : ord.dispatchMode,
-          deliveryStage: nextStage,
+          ...(nextStage !== undefined ? { deliveryStage: nextStage } : {}),
           riderName:
             nextStatus === OrderStatus.PICKUP ||
             nextStatus === OrderStatus.COMPLETED
@@ -1714,35 +1824,49 @@ export default function App() {
       }),
     }));
 
-    if (currentOrder && ALLOWED_NEXT_STATUS[currentOrder.status] === nextStatus) {
-      if (nextStatus === OrderStatus.PICKUP) {
-        pushDeliveryNotification({
-          orderId: currentOrder.id,
-          orderCode: currentOrder.orderCode,
-          storeName: currentOrder.storeName,
-          stage: 'DEPARTED',
-          title: `${riderLabel} 배정 · 배달 출발`,
-          body: `${currentOrder.storeName}에서 음식을 픽업해 출발했습니다.`,
-          riderLabel,
-          dispatchMode: chosenMode,
-        });
-      } else if (nextStatus === OrderStatus.COMPLETED) {
-        clearOrderDeliveryTimers(currentOrder.id);
-        pushDeliveryNotification({
-          orderId: currentOrder.id,
-          orderCode: currentOrder.orderCode,
-          storeName: currentOrder.storeName,
-          stage: 'ARRIVED',
-          title: '배달 도착 완료',
-          body: `${currentOrder.storeName} (${currentOrder.menuName}) 주문이 도착했습니다!`,
-          riderLabel,
-          dispatchMode: chosenMode,
-        });
-      }
+    if (nextStatus === OrderStatus.PICKUP) {
+      pushDeliveryNotification({
+        orderId: currentOrder.id,
+        orderCode: currentOrder.orderCode,
+        storeName: currentOrder.storeName,
+        stage: 'DEPARTED',
+        title: `${riderLabel} 배정 · 배달 출발`,
+        body: `${currentOrder.storeName}에서 음식을 픽업해 출발했습니다.`,
+        riderLabel,
+        dispatchMode: chosenMode,
+      });
+      schedulePostPickupTimers(
+        currentOrder,
+        chosenMode,
+        riderLabel,
+        8000,
+        16000
+      );
+    } else if (nextStatus === OrderStatus.COMPLETED) {
+      pushDeliveryNotification({
+        orderId: currentOrder.id,
+        orderCode: currentOrder.orderCode,
+        storeName: currentOrder.storeName,
+        stage: 'ARRIVED',
+        title: '배달 도착 완료',
+        body: `${currentOrder.storeName} (${currentOrder.menuName}) 주문이 도착했습니다!`,
+        riderLabel,
+        dispatchMode: chosenMode,
+      });
     }
   };
 
   const handleCancelBeforeCooking = (orderId: string) => {
+    const preTarget = appState.orders.find((o) => o.id === orderId);
+    if (
+      !preTarget ||
+      (preTarget.status !== OrderStatus.PENDING &&
+        preTarget.status !== OrderStatus.ACCEPTED)
+    ) {
+      showToast('이미 조리가 시작되어 취소할 수 없습니다.');
+      return;
+    }
+
     clearOrderDeliveryTimers(orderId);
     setAppState((prev) => {
       const targetOrder = prev.orders.find((o) => o.id === orderId);
@@ -1810,6 +1934,16 @@ export default function App() {
   };
 
   const handleRequestCancelAfterCooking = (orderId: string, reason: string) => {
+    const preTarget = appState.orders.find((o) => o.id === orderId);
+    if (
+      !preTarget ||
+      (preTarget.status !== OrderStatus.COOKING &&
+        preTarget.status !== OrderStatus.PICKUP)
+    ) {
+      showToast('현재 주문 상태에서는 조리 후 취소를 요청할 수 없습니다.');
+      return;
+    }
+
     const nowStr = formatNowTime();
     setAppState((prev) => ({
       ...prev,
@@ -1831,6 +1965,104 @@ export default function App() {
       }),
     }));
     showToast('취소 요청이 매장에 전달되었습니다.');
+  };
+
+  const handleResolveCancelRequest = (
+    orderId: string,
+    decision: 'approve' | 'reject'
+  ) => {
+    const preTarget = appState.orders.find((o) => o.id === orderId);
+    if (
+      !preTarget ||
+      !preTarget.cancelRequested ||
+      preTarget.status === OrderStatus.CANCELLED ||
+      preTarget.status === OrderStatus.COMPLETED
+    ) {
+      showToast('처리할 취소 요청이 없습니다.');
+      return;
+    }
+
+    if (decision === 'reject') {
+      setAppState((prev) => ({
+        ...prev,
+        orders: prev.orders.map((ord) =>
+          ord.id === orderId
+            ? {
+                ...ord,
+                cancelRequested: false,
+                cancelRequestReason: null,
+                cancelRequestedAt: null,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      }));
+      showToast('조리 후 취소 요청을 반려하고 주문을 계속 진행합니다.');
+      return;
+    }
+
+    clearOrderDeliveryTimers(orderId);
+    setAppState((prev) => {
+      const targetOrder = prev.orders.find((o) => o.id === orderId);
+      if (
+        !targetOrder ||
+        targetOrder.status === OrderStatus.CANCELLED ||
+        targetOrder.status === OrderStatus.COMPLETED
+      ) {
+        return prev;
+      }
+
+      const shouldRestoreStock =
+        targetOrder.stockDeducted && !targetOrder.stockRestored;
+      const restoreQtyByMenu = new Map<string, number>();
+      if (shouldRestoreStock) {
+        const lines =
+          targetOrder.items && targetOrder.items.length > 0
+            ? targetOrder.items
+            : [{ menuId: targetOrder.menuId, quantity: targetOrder.servings }];
+        for (const line of lines) {
+          restoreQtyByMenu.set(
+            line.menuId,
+            (restoreQtyByMenu.get(line.menuId) ?? 0) + line.quantity
+          );
+        }
+      }
+
+      const shouldRefundAllePay =
+        targetOrder.paymentMethod === 'alle_pay' && !targetOrder.mockRefunded;
+
+      return {
+        ...prev,
+        walletBalance: shouldRefundAllePay
+          ? prev.walletBalance + targetOrder.totalAmount
+          : prev.walletBalance,
+        menus: shouldRestoreStock
+          ? prev.menus.map((m) => {
+              const restoreAmt = restoreQtyByMenu.get(m.id);
+              if (!restoreAmt) return m;
+              const restoredStock = m.stock + restoreAmt;
+              return {
+                ...m,
+                stock: restoredStock,
+                isSoldOut: restoredStock > 0 ? false : m.isSoldOut,
+              };
+            })
+          : prev.menus,
+        orders: prev.orders.map((ord) =>
+          ord.id === orderId
+            ? {
+                ...ord,
+                status: OrderStatus.CANCELLED,
+                cancelRequested: false,
+                stockRestored: shouldRestoreStock ? true : ord.stockRestored,
+                mockRefunded: true,
+                updatedAt: formatNowTime(),
+              }
+            : ord
+        ),
+      };
+    });
+    showToast('조리 후 취소 요청을 승인하여 환불 처리했습니다.');
   };
 
   const handleAttachEvidence = (
@@ -1917,9 +2149,15 @@ export default function App() {
   const handleToggleMenuSoldOut = (menuId: string) => {
     setAppState((prev) => ({
       ...prev,
-      menus: prev.menus.map((m) =>
-        m.id === menuId ? { ...m, isSoldOut: !m.isSoldOut } : m
-      ),
+      menus: prev.menus.map((m) => {
+        if (m.id !== menuId) return m;
+        const nextSoldOut = !m.isSoldOut;
+        return {
+          ...m,
+          isSoldOut: nextSoldOut,
+          stock: !nextSoldOut && m.stock <= 0 ? 5 : m.stock,
+        };
+      }),
     }));
   };
 
@@ -2091,6 +2329,39 @@ export default function App() {
     };
   };
 
+  const handleUpdateMenu = (
+    menuId: string,
+    patch: { name: string; pricePerPerson: number }
+  ) => {
+    const nextName = patch.name.trim();
+    const nextPrice = Math.max(500, Math.round(patch.pricePerPerson || 0));
+    if (!nextName) return;
+    setAppState((prev) => ({
+      ...prev,
+      menus: prev.menus.map((m) =>
+        m.id === menuId
+          ? {
+              ...m,
+              name: nextName,
+              pricePerPerson: nextPrice,
+              storePrice: nextPrice,
+              comparisonDate: formatNowTime().slice(0, 10),
+            }
+          : m
+      ),
+    }));
+    showToast(`‘${nextName}’ 메뉴 정보가 수정되었습니다.`);
+  };
+
+  const handleDeleteMenu = (menuId: string) => {
+    setAppState((prev) => ({
+      ...prev,
+      menus: prev.menus.filter((m) => m.id !== menuId),
+      wishlistIds: prev.wishlistIds.filter((id) => id !== menuId),
+    }));
+    showToast('메뉴가 삭제되었습니다.');
+  };
+
   const handleBulkAddMenusFromSample = (
     storeId: string,
     lines: string[]
@@ -2147,7 +2418,7 @@ export default function App() {
 
   const handleSelectOwnerSaasPlan = (plan: PartnerPlanTier) => {
     const planLabelMap: Record<PartnerPlanTier, string> = {
-      trial: '체험형 (2개월 무료)',
+      trial: '프로모션 (3개월 무료)',
       basic: '베이직 (월 2.9만 원)',
       pro: '프로 (월 5.9만 원)',
       premium: '프리미엄 (월 9.9만 원)',
@@ -2863,6 +3134,7 @@ export default function App() {
             stampCount={appState.stampCount}
             onAdvanceOrderStatus={handleAdvanceOrderStatus}
             onCancelOrderBeforeCooking={handleCancelBeforeCooking}
+            onResolveCancelRequest={handleResolveCancelRequest}
             onToggleStoreOpen={handleToggleStoreOpen}
             onAdjustStoreExtraPrep={handleAdjustStoreExtraPrep}
             onSetStoreExtraPrep={handleSetStoreExtraPrep}
@@ -2870,6 +3142,8 @@ export default function App() {
             onToggleMenuClosingSale={handleToggleMenuClosingSale}
             onAdjustMenuStock={handleAdjustMenuStock}
             onAddMenuFromLine={handleAddMenuFromLine}
+            onUpdateMenu={handleUpdateMenu}
+            onDeleteMenu={handleDeleteMenu}
             onBulkAddMenusFromSample={handleBulkAddMenusFromSample}
             onSaveReviewReply={handleSaveReviewReply}
             onToggleReviewFlag={handleToggleReviewFlag}
@@ -2892,7 +3166,7 @@ export default function App() {
             onToggleStoreCoupon={handleToggleStoreCoupon}
             onDeleteStoreCoupon={handleDeleteStoreCoupon}
             onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
-            onOpenAiSettings={() => setShowGeminiModal(true)}
+            onSwitchToPartner={() => setRole(DemoRole.PARTNER)}
           />
         ) : role === DemoRole.PARTNER ? (
           <PartnerDashboardView
@@ -2970,12 +3244,18 @@ export default function App() {
             walletBalance={appState.walletBalance}
             stampCount={appState.stampCount}
             defaultNote={appState.preferences.memoNote}
+            hasOverlayOpen={Boolean(
+              storeMenuModal ||
+                quickPayDraft ||
+                showLocationPicker ||
+                showFutureModal ||
+                pendingCartSwitch
+            )}
             onToggleWishlist={handleToggleWishlist}
             onBackToHome={() => {
               setAiChatInitialPrompt(undefined);
               setStep(ConsumerStep.HOME);
             }}
-            onOpenAiSettings={() => setShowGeminiModal(true)}
             onOpenB2BMeal={handleOpenB2BMeal}
             onOpenErrand={handleOpenErrand}
             onUseRelayCoupon={(menuId) =>
@@ -3061,11 +3341,11 @@ export default function App() {
             walletBalance={appState.walletBalance}
             stampCount={appState.stampCount}
             preferences={appState.preferences}
+            routine={appState.zeroClickRoutine ?? INITIAL_ZERO_CLICK_ROUTINE}
             wishlistCount={appState.wishlistIds.length}
             orderCount={appState.orders.length}
             orders={appState.orders}
             menus={appState.menus}
-            showPresenterMode={showPresenterMode}
             regularMenuId={appState.orders[0]?.menuId ?? 'm1'}
             regularMenuName={appState.orders[0]?.menuName ?? '얼큰 소고기국밥'}
             regularStoreName={
@@ -3076,9 +3356,9 @@ export default function App() {
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onEarnStamp={handleEarnStamp}
             onChangeRole={setRole}
-            onTogglePresenterMode={() => setShowPresenterMode((prev) => !prev)}
-            onOpenAiSettings={() => setShowGeminiModal(true)}
             onShareDemoSummary={handleShareDemoSummary}
+            onSavePreferences={handleSavePreferences}
+            onSaveRoutine={handleSaveRoutine}
             onGoToHomePrefs={() => setStep(ConsumerStep.HOME)}
             onQuickReorderToConfirm={(menuId, servings) =>
               handleQuickReorderToConfirm(menuId, servings)
@@ -3135,6 +3415,7 @@ export default function App() {
             stores={appState.stores}
             menus={appState.menus}
             reviews={appState.reviews}
+            reviewReplies={appState.reviewReplies}
             highlightedOrderId={highlightedOrderId}
             mapFocusRequest={mapFocusRequest}
             showPresenterMode={showPresenterMode}
@@ -3556,11 +3837,6 @@ export default function App() {
         onAddLocation={handleAddLocation}
         onDeleteLocation={handleDeleteLocation}
         onClose={() => setShowLocationPicker(false)}
-      />
-
-      <GeminiKeyModal
-        isOpen={showGeminiModal}
-        onClose={() => setShowGeminiModal(false)}
       />
 
       <FutureScopeModal

@@ -9,6 +9,7 @@ import {
   INITIAL_STORE_COUPONS,
   INITIAL_STORE_PROMOTIONS,
   INITIAL_STORES,
+  INITIAL_ZERO_CLICK_ROUTINE,
   resolveBundledImage,
 } from '../data/seedData';
 import {
@@ -34,6 +35,7 @@ export function getDefaultState(): AllePersistedState {
     walletBalance: 35000,
     wishlistIds: ['m1', 'm15', 'm32'],
     preferences: structuredClone(INITIAL_PREFERENCES),
+    zeroClickRoutine: structuredClone(INITIAL_ZERO_CLICK_ROUTINE),
     lastConditionInput: INITIAL_CONDITION_INPUT,
     reviews: structuredClone(INITIAL_REVIEWS),
     reviewReplies: {
@@ -173,6 +175,10 @@ export function loadDemoState(): {
         walletBalance: typeof parsed.walletBalance === 'number' ? parsed.walletBalance : 35000,
         wishlistIds: Array.isArray(parsed.wishlistIds) ? parsed.wishlistIds : ['m1', 'm9'],
         preferences: parsed.preferences,
+        zeroClickRoutine:
+          parsed.zeroClickRoutine ?? structuredClone(INITIAL_ZERO_CLICK_ROUTINE),
+        ownerSaasSubscribed: parsed.ownerSaasSubscribed,
+        ownerSaasPlan: parsed.ownerSaasPlan,
         lastConditionInput:
           typeof parsed.lastConditionInput === 'string'
             ? parsed.lastConditionInput

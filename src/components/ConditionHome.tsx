@@ -121,20 +121,9 @@ const EASY_GRID_CATEGORIES: Array<{
   { id: 'all', label: '전체보기' },
 ];
 
-function getHeroHeadline(shortSlot: string): string {
-  switch (shortSlot) {
-    case '아침':
-      return '오늘 아침, 말 한마디로 바로 주문';
-    case '점심':
-      return '오늘 점심, 뭐 드실래요?';
-    case '오후':
-      return '출출한 오후, 말만 하면 바로 와요';
-    case '저녁':
-      return '오늘 저녁, 뭐 드실래요?';
-    default:
-      return '오늘 야식, 고민 없이 말로 주문';
-  }
-}
+const HOME_VOICE_SAMPLES = VOICE_TRANSCRIPT_SAMPLES.filter(
+  (sample) => sample.label !== '마라탕 땡기네'
+).slice(0, 2);
 
 type WeatherMode = 'chilly' | 'rainy' | 'clear';
 
@@ -771,7 +760,7 @@ export function ConditionHome({
           </span>
 
           <h1 className="!text-[26px] sm:!text-[34px] font-extrabold tracking-[-0.03em] leading-[1.25] break-keep text-white mt-4">
-            {getHeroHeadline(timeSlot.shortSlot)}
+            가격은 바르게, 주문은 말로 바로
           </h1>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-[1.08fr_1fr] gap-3">
@@ -836,7 +825,7 @@ export function ConditionHome({
             <span className="text-[14px] font-bold text-[#A5D5C0] shrink-0">
               예시
             </span>
-            {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
+            {HOME_VOICE_SAMPLES.map((sample) => (
               <button
                 key={sample.label}
                 type="button"
@@ -854,7 +843,7 @@ export function ConditionHome({
                 마이크 대신 아래 문장을 눌러도 바로가 찾아드려요
               </p>
               <div className="grid grid-cols-1 gap-2">
-                {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
+                {HOME_VOICE_SAMPLES.map((sample) => (
                   <button
                     key={sample.label}
                     type="button"

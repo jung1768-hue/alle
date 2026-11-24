@@ -6,7 +6,7 @@ import {
   SavedLocation,
   Store,
 } from '../types/alle';
-import { estimateCompetitorSavings } from './pricing';
+import { calculateStoreDeliveryFee, estimateCompetitorSavings } from './pricing';
 
 interface TagSynonymEntry {
   /** Substring or exact patterns (length >= 2) */
@@ -721,7 +721,12 @@ export function evaluateRecommendations(
 
     const effectiveUnitPrice = getEffectiveMenuPrice(menu);
     const menuSubtotal = effectiveUnitPrice * validServings;
-    const estimatedTotal = menuSubtotal + store.deliveryFee;
+    const deliveryFee = calculateStoreDeliveryFee(
+      store,
+      menuSubtotal,
+      'partner_direct'
+    ).finalDeliveryFee;
+    const estimatedTotal = menuSubtotal + deliveryFee;
 
     if (condition.maxBudget !== null && estimatedTotal > condition.maxBudget) {
       reasons.push(
@@ -780,7 +785,7 @@ export function evaluateRecommendations(
     const savings = estimateCompetitorSavings({
       menuSubtotal,
       originalMenuSubtotal: menu.pricePerPerson * validServings,
-      deliveryFee: store.deliveryFee,
+      deliveryFee,
       originalDeliveryFee: store.deliveryFee,
       couponDiscount: 0,
       isSameStorePrice,
@@ -818,7 +823,7 @@ export function evaluateRecommendations(
         store,
         servings: validServings,
         menuSubtotal,
-        deliveryFee: store.deliveryFee,
+        deliveryFee,
         estimatedTotal,
         effectiveMinutes,
         matchedTags,

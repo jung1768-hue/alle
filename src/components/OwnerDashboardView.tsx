@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardCheck,
+  FileText,
   Flag,
   Loader2,
   Lock,
@@ -15,9 +16,11 @@ import {
   Mic,
   MicOff,
   PackageCheck,
+  Pencil,
   PlusCircle,
   QrCode,
   ScanText,
+  Search,
   ShieldCheck,
   Sparkles,
   Store as StoreIcon,
@@ -50,12 +53,13 @@ import { readCompressedEvidencePhotos } from '../utils/imageUpload';
 import { formatWon } from '../utils/parser';
 import { getDeliveryMethodMeta } from '../utils/pricing';
 import {
+  checkServerGeminiAvailable,
   ExtractedMenuCandidate,
   extractMenusFromImageWithAI,
-  hasGeminiApiKey,
   parseOwnerVoiceCommandWithAI,
 } from '../utils/gemini';
 import { startKoreanVoiceInput } from '../utils/voice';
+import { B2BStatementModal } from './B2BStatementModal';
 
 interface OwnerDashboardViewProps {
   stores: Store[];
@@ -71,6 +75,10 @@ interface OwnerDashboardViewProps {
     dispatchMode?: DispatchMode
   ) => void;
   onCancelOrderBeforeCooking: (orderId: string) => void;
+  onResolveCancelRequest?: (
+    orderId: string,
+    decision: 'approve' | 'reject'
+  ) => void;
   onToggleStoreOpen: (storeId: string) => void;
   onAdjustStoreExtraPrep: (storeId: string, delta: number) => void;
   onSetStoreExtraPrep: (storeId: string, minutes: number) => void;
@@ -86,6 +94,11 @@ interface OwnerDashboardViewProps {
     message: string;
   };
   onBulkAddMenusFromSample: (storeId: string, lines: string[]) => number;
+  onUpdateMenu?: (
+    menuId: string,
+    patch: { name: string; pricePerPerson: number }
+  ) => void;
+  onDeleteMenu?: (menuId: string) => void;
   storePromotions?: StorePromotion[];
   storeCoupons?: StoreCoupon[];
   onUpdateStoreDeliveryPolicy?: (
@@ -107,7 +120,7 @@ interface OwnerDashboardViewProps {
   ownerSaasPlan?: PartnerPlanTier;
   onSelectOwnerSaasPlan?: (plan: PartnerPlanTier) => void;
   onSwitchToConsumer: () => void;
-  onOpenAiSettings?: () => void;
+  onSwitchToPartner?: () => void;
 }
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -129,6 +142,7 @@ export function OwnerDashboardView({
   stampCount,
   onAdvanceOrderStatus,
   onCancelOrderBeforeCooking,
+  onResolveCancelRequest,
   onToggleStoreOpen,
   onAdjustStoreExtraPrep,
   onSetStoreExtraPrep,
@@ -138,6 +152,8 @@ export function OwnerDashboardView({
   onAdjustMenuStock,
   onAddMenuFromLine,
   onBulkAddMenusFromSample,
+  onUpdateMenu,
+  onDeleteMenu,
   storePromotions = [],
   storeCoupons = [],
   onUpdateStoreDeliveryPolicy,
@@ -153,7 +169,7 @@ export function OwnerDashboardView({
   ownerSaasPlan = 'trial',
   onSelectOwnerSaasPlan,
   onSwitchToConsumer,
-  onOpenAiSettings,
+  onSwitchToPartner,
 }: OwnerDashboardViewProps) {
   const [ownerSection, setOwnerSection] = useState<
     'orders' | 'promo' | 'ops' | 'dashboard' | 'crm'
@@ -235,6 +251,20 @@ export function OwnerDashboardView({
   const [campaignNotice, setCampaignNotice] = useState<string | null>(null);
   const [aiMarketingNotice, setAiMarketingNotice] = useState<string | null>(
     null
+  );
+  const [statementOrder, setStatementOrder] = useState<Order | null>(null);
+  const [opsStoreQuery, setOpsStoreQuery] = useState('');
+  const [showAllOpsStores, setShowAllOpsStores] = useState(false);
+  const [showAllDashboardStores, setShowAllDashboardStores] = useState(false);
+  const [crmReviewQuery, setCrmReviewQuery] = useState('');
+  const [showAllCrmReviews, setShowAllCrmReviews] = useState(false);
+  const [editingMenuId, setEditingMenuId] = useState<string | null>(null);
+  const [editMenuName, setEditMenuName] = useState('');
+  const [editMenuPrice, setEditMenuPrice] = useState('');
+
+  const ownerStoreMap = useMemo(
+    () => new Map(stores.map((s) => [s.id, s])),
+    [stores]
   );
 
   const PLAN_RANK: Record<PartnerPlanTier, number> = {
@@ -326,7 +356,10 @@ export function OwnerDashboardView({
       (o) => o.status === OrderStatus.CANCELLED
     ).length;
     const cancelRequestCount = orders.filter(
-      (o) => o.cancelRequested && o.status !== OrderStatus.CANCELLED
+      (o) =>
+        o.cancelRequested &&
+        o.status !== OrderStatus.CANCELLED &&
+        o.status !== OrderStatus.COMPLETED
     ).length;
     const completionRate =
       orders.length > 0 ? Math.round((completedCount / orders.length) * 100) : 0;
@@ -580,9 +613,6 @@ export function OwnerDashboardView({
         }
         const qty = opts?.value ?? 5;
         onAdjustMenuStock(targetMenu.id, qty);
-        if (targetMenu.isSoldOut) {
-          onToggleMenuSoldOut(targetMenu.id);
-        }
         setCommandFeedback(
           `"${targetMenu.name}" 재고를 +${qty}개 입고(판매 재개)했습니다.`
         );
@@ -694,7 +724,7 @@ export function OwnerDashboardView({
       return;
     }
 
-    if (hasGeminiApiKey()) {
+    if (await checkServerGeminiAvailable()) {
       setIsCommandProcessing(true);
       const aiCmd = await parseOwnerVoiceCommandWithAI(
         cmd,
@@ -735,9 +765,9 @@ export function OwnerDashboardView({
       const base64 = dataUrl.split(',')[1] ?? '';
       const mimeType = file.type || 'image/jpeg';
 
-      if (!hasGeminiApiKey()) {
+      if (!(await checkServerGeminiAvailable())) {
         setOcrError(
-          '실제 메뉴판 사진 인식은 Baro 분석 연동 키가 필요합니다. 연동 설정에서 키를 입력하거나 "샘플 일괄 등록"을 이용해 주세요.'
+          '현재 서버에 Gemini API가 연결되어 있지 않습니다. Cloudflare 배포 환경에서 이용하거나 "샘플 일괄 등록"을 이용해 주세요.'
         );
         return;
       }
@@ -799,13 +829,24 @@ export function OwnerDashboardView({
             점주 수익 · 운영 센터
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={onSwitchToConsumer}
-          className="min-h-[40px] px-4 py-2 bg-white hover:bg-[#F7F8F5] border border-[#E8ECE4] text-[#1A1D1A] text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-        >
-          고객 화면 보기
-        </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onSwitchToPartner && (
+            <button
+              type="button"
+              onClick={onSwitchToPartner}
+              className="min-h-[40px] px-4 py-2 bg-[#EAF1E2] hover:bg-[#DCE7CF] border border-[#D4E1C5] text-[#3D5720] text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            >
+              배달 파트너
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onSwitchToConsumer}
+            className="min-h-[40px] px-4 py-2 bg-white hover:bg-[#F7F8F5] border border-[#E8ECE4] text-[#1A1D1A] text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+          >
+            고객 화면 보기
+          </button>
+        </div>
       </div>
 
       {/* Dominant 2-KPI Hero Card (1-Second IR Readability) */}
@@ -985,14 +1026,18 @@ export function OwnerDashboardView({
           {orders.filter(
             (o) =>
               o.evidenceRecord ||
-              (o.cancelRequested && o.status !== OrderStatus.CANCELLED)
+              (o.cancelRequested &&
+                o.status !== OrderStatus.CANCELLED &&
+                o.status !== OrderStatus.COMPLETED)
           ).length > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-[#D9381E] text-white text-[10px] font-extrabold leading-none">
               {
                 orders.filter(
                   (o) =>
                     o.evidenceRecord ||
-                    (o.cancelRequested && o.status !== OrderStatus.CANCELLED)
+                    (o.cancelRequested &&
+                      o.status !== OrderStatus.CANCELLED &&
+                      o.status !== OrderStatus.COMPLETED)
                 ).length
               }
             </span>
@@ -1196,8 +1241,12 @@ export function OwnerDashboardView({
                             <p className="text-xs text-[#555E52]">
                               구성:{' '}
                               {order.items
-                                .map((it) => `${it.menuName}×${it.quantity}`)
-                                .join(', ')}
+                                .map((it) =>
+                                  it.selectedOptionNames.length > 0
+                                    ? `${it.menuName}×${it.quantity} (${it.selectedOptionNames.join(', ')})`
+                                    : `${it.menuName}×${it.quantity}`
+                                )
+                                .join(' · ')}
                             </p>
                           )}
                           {order.reservationSlot && (
@@ -1205,10 +1254,21 @@ export function OwnerDashboardView({
                               예약 도착: {order.reservationSlot}
                             </p>
                           )}
-                          {order.selectedOptionNames.length > 0 && (
-                            <p className="text-xs text-[#687064]">
-                              옵션: {order.selectedOptionNames.join(', ')}
-                            </p>
+                          {(!order.items || order.items.length <= 1) &&
+                            order.selectedOptionNames.length > 0 && (
+                              <p className="text-xs text-[#687064]">
+                                옵션: {order.selectedOptionNames.join(', ')}
+                              </p>
+                            )}
+                          {order.isB2B && (
+                            <button
+                              type="button"
+                              onClick={() => setStatementOrder(order)}
+                              className="mt-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11px] font-bold cursor-pointer"
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span>B2B 거래명세표 보기</span>
+                            </button>
                           )}
                           {order.customerNote && (
                             <p className="text-xs text-[#687064]">
@@ -1229,10 +1289,11 @@ export function OwnerDashboardView({
                       </div>
 
                       {order.cancelRequested &&
-                        order.status !== OrderStatus.CANCELLED && (
-                          <div className="p-3.5 bg-[#EAF1E2] border border-[#DCE7CF] rounded-2xl space-y-1 text-xs">
-                            <div className="flex items-center gap-1.5 font-semibold text-[#3D5720]">
-                              <AlertCircle className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+                        order.status !== OrderStatus.CANCELLED &&
+                        order.status !== OrderStatus.COMPLETED && (
+                          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2.5 text-xs">
+                            <div className="flex items-center gap-1.5 font-semibold text-amber-900">
+                              <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
                               <span>
                                 조리 후 취소 요청 ({order.cancelRequestedAt})
                               </span>
@@ -1240,6 +1301,28 @@ export function OwnerDashboardView({
                             <p className="text-[#1A1D1A]">
                               사유: {order.cancelRequestReason}
                             </p>
+                            {onResolveCancelRequest && (
+                              <div className="flex flex-wrap gap-2 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onResolveCancelRequest(order.id, 'approve')
+                                  }
+                                  className="min-h-[34px] px-3 py-1 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer"
+                                >
+                                  취소 승인 (환불)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onResolveCancelRequest(order.id, 'reject')
+                                  }
+                                  className="min-h-[34px] px-3 py-1 rounded-xl bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] font-bold cursor-pointer"
+                                >
+                                  취소 반려 (진행 유지)
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -2268,73 +2351,100 @@ export function OwnerDashboardView({
           {/* Store Revenue & Pipeline Split */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
             <section className="lg:col-span-7 os-card rounded-3xl p-6 space-y-5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-1.5">
                   <TrendingUp className="w-4 h-4 text-[#4E6E2A]" />
                   <span>매장별 매출 · 수수료 절감</span>
                 </h2>
-                <span className="text-xs text-[#687064]">취소 제외</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#687064]">취소 제외</span>
+                  {analytics.byStore.length > 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllDashboardStores((prev) => !prev)}
+                      className="text-xs font-bold text-[#4E6E2A] hover:underline cursor-pointer"
+                    >
+                      {showAllDashboardStores
+                        ? '주요 매장만 보기'
+                        : `전체 매장 보기 (${analytics.byStore.length}곳)`}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4">
-                {analytics.byStore.map(({ store, count, revenue }) => {
-                  const pct = Math.round(
-                    (revenue / analytics.maxStoreRevenue) * 100
+                {(() => {
+                  const activeRevStores = analytics.byStore.filter(
+                    (s) => s.revenue > 0
                   );
-                  const storeProfit =
-                    analytics.profitComparison.byStore[store.id];
-                  return (
-                    <div key={store.id} className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-semibold text-[#1A1D1A] truncate">
-                          {store.name}
-                          {!store.isOpen && (
-                            <span className="text-red-700 ml-1.5">(영업중단)</span>
+                  const visibleDashboardStores = showAllDashboardStores
+                    ? analytics.byStore
+                    : activeRevStores.length > 0
+                      ? activeRevStores
+                      : analytics.byStore.slice(0, 10);
+                  return visibleDashboardStores.map(
+                    ({ store, count, revenue }) => {
+                      const pct = Math.round(
+                        (revenue / analytics.maxStoreRevenue) * 100
+                      );
+                      const storeProfit =
+                        analytics.profitComparison.byStore[store.id];
+                      return (
+                        <div key={store.id} className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="font-semibold text-[#1A1D1A] truncate">
+                              {store.name}
+                              {!store.isOpen && (
+                                <span className="text-red-700 ml-1.5">
+                                  (영업중단)
+                                </span>
+                              )}
+                            </span>
+                            <span className="font-mono tabular-nums font-bold text-[#1A1D1A] shrink-0">
+                              {formatWon(revenue)} · {count}건
+                            </span>
+                          </div>
+                          <div className="h-2 bg-[#EAF1E2] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#82B440] rounded-full transition-all"
+                              style={{
+                                width: `${Math.max(revenue > 0 ? 6 : 0, pct)}%`,
+                              }}
+                            />
+                          </div>
+                          {storeProfit && (
+                            <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-[#687064] tabular-nums">
+                              <span>
+                                30일 수수료 절감{' '}
+                                {hasPlan('pro') ? (
+                                  <strong className="font-mono text-[#4E6E2A]">
+                                    +{formatWon(storeProfit.savedCommissionAndAdFee)}
+                                  </strong>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 text-[#8A9485]">
+                                    <Lock className="w-3 h-3" /> 프로+
+                                  </span>
+                                )}
+                              </span>
+                              <span>
+                                단골 매칭 순증{' '}
+                                {hasPlan('basic') ? (
+                                  <strong className="font-mono text-[#1A1D1A]">
+                                    +{formatWon(storeProfit.aiRegularIncrementalSales)}
+                                  </strong>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 text-[#8A9485]">
+                                    <Lock className="w-3 h-3" /> 베이직+
+                                  </span>
+                                )}
+                              </span>
+                            </div>
                           )}
-                        </span>
-                        <span className="font-mono tabular-nums font-bold text-[#1A1D1A] shrink-0">
-                          {formatWon(revenue)} · {count}건
-                        </span>
-                      </div>
-                      <div className="h-2 bg-[#EAF1E2] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#82B440] rounded-full transition-all"
-                          style={{
-                            width: `${Math.max(revenue > 0 ? 6 : 0, pct)}%`,
-                          }}
-                        />
-                      </div>
-                      {storeProfit && (
-                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-[#687064] tabular-nums">
-                          <span>
-                            30일 수수료 절감{' '}
-                            {hasPlan('pro') ? (
-                              <strong className="font-mono text-[#4E6E2A]">
-                                +{formatWon(storeProfit.savedCommissionAndAdFee)}
-                              </strong>
-                            ) : (
-                              <span className="inline-flex items-center gap-0.5 text-[#8A9485]">
-                                <Lock className="w-3 h-3" /> 프로+
-                              </span>
-                            )}
-                          </span>
-                          <span>
-                            단골 매칭 순증{' '}
-                            {hasPlan('basic') ? (
-                              <strong className="font-mono text-[#1A1D1A]">
-                                +{formatWon(storeProfit.aiRegularIncrementalSales)}
-                              </strong>
-                            ) : (
-                              <span className="inline-flex items-center gap-0.5 text-[#8A9485]">
-                                <Lock className="w-3 h-3" /> 베이직+
-                              </span>
-                            )}
-                          </span>
                         </div>
-                      )}
-                    </div>
+                      );
+                    }
                   );
-                })}
+                })()}
               </div>
             </section>
 
@@ -2583,15 +2693,6 @@ export function OwnerDashboardView({
                 </h2>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {onOpenAiSettings && (
-                  <button
-                    type="button"
-                    onClick={onOpenAiSettings}
-                    className="min-h-[36px] px-3 py-1.5 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#E8ECE4] text-[#434B40] text-xs font-semibold rounded-xl cursor-pointer"
-                  >
-                    연동 키 설정
-                  </button>
-                )}
                 <input
                   ref={ocrFileInputRef}
                   type="file"
@@ -2668,15 +2769,6 @@ export function OwnerDashboardView({
                 {ocrError && (
                   <div className="p-3 bg-[#FFFBEF] border border-[#E8D595] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
                     <span>{ocrError}</span>
-                    {onOpenAiSettings && (
-                      <button
-                        type="button"
-                        onClick={onOpenAiSettings}
-                        className="px-3 py-1.5 bg-white border border-[#D4E1C5] hover:bg-[#EAF1E2] text-[#3D5720] font-bold rounded-lg cursor-pointer shrink-0"
-                      >
-                        연동 키 설정 열기
-                      </button>
-                    )}
                   </div>
                 )}
 
@@ -2781,16 +2873,61 @@ export function OwnerDashboardView({
             )}
           </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {stores.map((store) => {
-              const storeMenus = menus.filter((m) => m.storeId === store.id);
-              const activeKitchenCount = orders.filter(
-                (o) =>
-                  o.storeId === store.id &&
-                  (o.status === OrderStatus.ACCEPTED ||
-                    o.status === OrderStatus.COOKING)
-              ).length;
-              const recommendedExtraMins = activeKitchenCount * 5;
+          {(() => {
+            const opsQ = opsStoreQuery.trim().toLowerCase();
+            const matchedStores = stores.filter((st) => {
+              if (!opsQ) return true;
+              const hay = `${st.name} ${st.category} ${st.areaLabel}`.toLowerCase();
+              return hay.includes(opsQ);
+            });
+            const visibleStores =
+              opsQ || showAllOpsStores
+                ? matchedStores
+                : matchedStores.slice(0, 12);
+
+            return (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-[#687064] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={opsStoreQuery}
+                      onChange={(e) => setOpsStoreQuery(e.target.value)}
+                      placeholder="매장명·지역·업종 검색 (예: 소복한닭, 산격동, 국밥)"
+                      className="w-full min-h-[42px] pl-10 pr-3.5 bg-white border border-[#E8ECE4] rounded-xl text-sm text-[#1A1D1A]"
+                    />
+                  </div>
+                  {!opsQ && matchedStores.length > 12 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllOpsStores((prev) => !prev)}
+                      className="min-h-[42px] px-4 py-2 bg-white hover:bg-[#EAF1E2] border border-[#E8ECE4] text-xs font-bold text-[#3D5720] rounded-xl whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      {showAllOpsStores
+                        ? '주요 12곳만 보기'
+                        : `전체 매장 보기 (${matchedStores.length}곳)`}
+                    </button>
+                  )}
+                </div>
+
+                {visibleStores.length === 0 ? (
+                  <div className="os-card rounded-3xl p-8 text-center text-xs text-[#687064]">
+                    검색 조건에 맞는 매장이 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {visibleStores.map((store) => {
+                      const storeMenus = menus.filter(
+                        (m) => m.storeId === store.id && m.pricePerPerson > 0
+                      );
+                      const activeKitchenCount = orders.filter(
+                        (o) =>
+                          o.storeId === store.id &&
+                          (o.status === OrderStatus.ACCEPTED ||
+                            o.status === OrderStatus.COOKING)
+                      ).length;
+                      const recommendedExtraMins = activeKitchenCount * 5;
 
               return (
                 <div
@@ -2867,31 +3004,71 @@ export function OwnerDashboardView({
                     {storeMenus.map((menu) => {
                       const effectiveSoldOut =
                         menu.isSoldOut || menu.stock <= 0;
+                      const isEditingThis = editingMenuId === menu.id;
                       return (
                         <div
                           key={menu.id}
-                          className="flex flex-wrap items-center justify-between gap-2 text-xs py-1"
+                          className="space-y-2 text-xs py-2 border-b border-[#F0F3EC] last:border-b-0"
                         >
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`font-semibold truncate ${
-                                effectiveSoldOut
-                                  ? 'text-[#919A8D] line-through'
-                                  : 'text-[#1A1D1A]'
-                              }`}
-                            >
-                              {menu.name}
-                            </p>
-                            <p className="text-[11px] text-[#687064] font-mono tabular-nums">
-                              {formatWon(menu.pricePerPerson)} · 재고{' '}
-                              {menu.stock}개
-                            </p>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className={`font-semibold truncate ${
+                                  effectiveSoldOut
+                                    ? 'text-[#919A8D] line-through'
+                                    : 'text-[#1A1D1A]'
+                                }`}
+                              >
+                                {menu.name}
+                              </p>
+                              <p className="text-[11px] text-[#687064] font-mono tabular-nums mt-0.5">
+                                {formatWon(menu.pricePerPerson)} · 재고{' '}
+                                {menu.stock}개
+                              </p>
+                            </div>
+
+                            {(onUpdateMenu || onDeleteMenu) && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {onUpdateMenu && (
+                                  <button
+                                    type="button"
+                                    aria-label={`${menu.name} 수정`}
+                                    onClick={() => {
+                                      if (isEditingThis) {
+                                        setEditingMenuId(null);
+                                      } else {
+                                        setEditingMenuId(menu.id);
+                                        setEditMenuName(menu.name);
+                                        setEditMenuPrice(
+                                          String(menu.pricePerPerson)
+                                        );
+                                      }
+                                    }}
+                                    className="easy-compact min-h-[32px] px-2.5 border border-[#E8ECE4] rounded-lg bg-white hover:bg-[#EAF1E2] text-[#434B40] inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                                  >
+                                    <Pencil className="w-3 h-3 shrink-0" />
+                                    <span>수정</span>
+                                  </button>
+                                )}
+                                {onDeleteMenu && (
+                                  <button
+                                    type="button"
+                                    aria-label={`${menu.name} 삭제`}
+                                    onClick={() => onDeleteMenu(menu.id)}
+                                    className="easy-compact min-w-[32px] min-h-[32px] p-1.5 border border-[#E8ECE4] rounded-lg bg-white hover:bg-red-50 text-[#687064] hover:text-red-700 inline-flex items-center justify-center shrink-0 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-1 shrink-0">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5">
                             <div className="inline-flex rounded-lg border border-[#E8D595] bg-[#FFFBEF] p-0.5">
                               {[0, 10, 20, 30].map((pct) => {
-                                const currentPct = menu.closingDiscountPercent ?? 0;
+                                const currentPct =
+                                  menu.closingDiscountPercent ?? 0;
                                 const active = currentPct === pct;
                                 return (
                                   <button
@@ -2901,12 +3078,15 @@ export function OwnerDashboardView({
                                       if (onSetMenuDiscountPercent) {
                                         onSetMenuDiscountPercent(menu.id, pct);
                                       } else if (pct === 0 && currentPct > 0) {
-                                        onToggleMenuClosingSale(menu.id, currentPct);
+                                        onToggleMenuClosingSale(
+                                          menu.id,
+                                          currentPct
+                                        );
                                       } else if (pct > 0) {
                                         onToggleMenuClosingSale(menu.id, pct);
                                       }
                                     }}
-                                    className={`px-2 py-1 text-[11px] font-bold rounded-md cursor-pointer ${
+                                    className={`easy-compact min-h-[30px] px-2 py-1 text-[11px] font-bold rounded-md cursor-pointer whitespace-nowrap ${
                                       active
                                         ? pct === 0
                                           ? 'bg-white text-[#1A1D1A] shadow-2xs'
@@ -2919,36 +3099,88 @@ export function OwnerDashboardView({
                                 );
                               })}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => onAdjustMenuStock(menu.id, -1)}
-                              aria-label={`${menu.name} 재고 감소`}
-                              className="min-w-[32px] min-h-[32px] border border-[#E8ECE4] rounded-lg bg-[#F7F8F5] hover:bg-[#EAF1E2] font-semibold cursor-pointer"
-                            >
-                              -
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onAdjustMenuStock(menu.id, 1)}
-                              aria-label={`${menu.name} 재고 증가`}
-                              className="min-w-[32px] min-h-[32px] border border-[#E8ECE4] rounded-lg bg-[#F7F8F5] hover:bg-[#EAF1E2] font-semibold cursor-pointer"
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={!menu.isSoldOut}
-                              onClick={() => onToggleMenuSoldOut(menu.id)}
-                              className={`min-h-[32px] px-2.5 py-1 rounded-lg font-semibold border cursor-pointer ${
-                                menu.isSoldOut
-                                  ? 'bg-red-50 border-red-200 text-red-700'
-                                  : 'bg-[#EAF1E2] border-[#D4E1C5] text-[#4E6E2A]'
-                              }`}
-                            >
-                              {menu.isSoldOut ? '품절' : '판매 중'}
-                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => onAdjustMenuStock(menu.id, -1)}
+                                aria-label={`${menu.name} 재고 감소`}
+                                className="easy-compact min-w-[32px] min-h-[32px] border border-[#E8ECE4] rounded-lg bg-[#F7F8F5] hover:bg-[#EAF1E2] font-semibold cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onAdjustMenuStock(menu.id, 1)}
+                                aria-label={`${menu.name} 재고 증가`}
+                                className="easy-compact min-w-[32px] min-h-[32px] border border-[#E8ECE4] rounded-lg bg-[#F7F8F5] hover:bg-[#EAF1E2] font-semibold cursor-pointer"
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={!menu.isSoldOut}
+                                onClick={() => onToggleMenuSoldOut(menu.id)}
+                                className={`easy-compact min-h-[32px] px-2.5 py-1 rounded-lg font-semibold border whitespace-nowrap cursor-pointer ${
+                                  menu.isSoldOut
+                                    ? 'bg-red-50 border-red-200 text-red-700'
+                                    : 'bg-[#EAF1E2] border-[#D4E1C5] text-[#4E6E2A]'
+                                }`}
+                              >
+                                {menu.isSoldOut ? '품절' : '판매 중'}
+                              </button>
+                            </div>
                           </div>
+
+                          {isEditingThis && onUpdateMenu && (
+                            <div className="p-2.5 rounded-xl bg-[#F7F8F5] border border-[#D4E1C5] flex flex-wrap items-center gap-2">
+                              <input
+                                type="text"
+                                value={editMenuName}
+                                onChange={(e) => setEditMenuName(e.target.value)}
+                                placeholder="메뉴명"
+                                className="flex-1 min-w-[120px] min-h-[34px] px-2.5 bg-white border border-[#E8ECE4] rounded-lg text-xs"
+                              />
+                              <input
+                                type="number"
+                                min={500}
+                                step={500}
+                                value={editMenuPrice}
+                                onChange={(e) =>
+                                  setEditMenuPrice(e.target.value)
+                                }
+                                placeholder="가격(원)"
+                                className="w-24 min-h-[34px] px-2.5 bg-white border border-[#E8ECE4] rounded-lg font-mono text-xs"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const parsedPrice = parseInt(
+                                    editMenuPrice,
+                                    10
+                                  );
+                                  if (!editMenuName.trim() || !parsedPrice) {
+                                    return;
+                                  }
+                                  onUpdateMenu(menu.id, {
+                                    name: editMenuName.trim(),
+                                    pricePerPerson: parsedPrice,
+                                  });
+                                  setEditingMenuId(null);
+                                }}
+                                className="min-h-[34px] px-3 py-1 rounded-lg bg-[#4E6E2A] text-white font-bold cursor-pointer"
+                              >
+                                저장
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingMenuId(null)}
+                                className="min-h-[34px] px-2.5 py-1 rounded-lg bg-white border border-[#E8ECE4] text-[#687064] font-semibold cursor-pointer"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -2956,7 +3188,11 @@ export function OwnerDashboardView({
                 </div>
               );
             })}
-          </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2981,7 +3217,9 @@ export function OwnerDashboardView({
                   orders.filter(
                     (o) =>
                       o.evidenceRecord ||
-                      o.cancelRequested ||
+                      (o.cancelRequested &&
+                        o.status !== OrderStatus.CANCELLED &&
+                        o.status !== OrderStatus.COMPLETED) ||
                       (o.ownerPackagingPhotos?.length ?? 0) > 0 ||
                       (o.riderDeliveryPhotos?.length ?? 0) > 0
                   ).length
@@ -2994,7 +3232,9 @@ export function OwnerDashboardView({
               const csTargetOrders = orders.filter(
                 (o) =>
                   o.evidenceRecord ||
-                  o.cancelRequested ||
+                  (o.cancelRequested &&
+                    o.status !== OrderStatus.CANCELLED &&
+                    o.status !== OrderStatus.COMPLETED) ||
                   (o.ownerPackagingPhotos?.length ?? 0) > 0 ||
                   (o.riderDeliveryPhotos?.length ?? 0) > 0
               );
@@ -3045,11 +3285,43 @@ export function OwnerDashboardView({
                                 {ord.evidenceRecord.aiVerdict.faultLabel}
                               </span>
                             )}
-                            {ord.cancelRequested && (
-                              <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold">
-                                조리 후 취소 요청
-                              </span>
-                            )}
+                            {ord.cancelRequested &&
+                              ord.status !== OrderStatus.CANCELLED &&
+                              ord.status !== OrderStatus.COMPLETED && (
+                                <>
+                                  <span className="px-2.5 py-0.5 rounded-full bg-amber-600 text-white text-[11px] font-bold">
+                                    조리 후 취소 요청
+                                  </span>
+                                  {onResolveCancelRequest && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          onResolveCancelRequest(
+                                            ord.id,
+                                            'approve'
+                                          )
+                                        }
+                                        className="min-h-[28px] px-2.5 py-0.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold cursor-pointer"
+                                      >
+                                        취소 승인
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          onResolveCancelRequest(
+                                            ord.id,
+                                            'reject'
+                                          )
+                                        }
+                                        className="min-h-[28px] px-2.5 py-0.5 rounded-lg bg-white border border-[#D4E1C5] text-[#3D5720] text-[11px] font-bold cursor-pointer"
+                                      >
+                                        반려
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              )}
                           </div>
                         </div>
 
@@ -3258,104 +3530,159 @@ export function OwnerDashboardView({
           </section>
 
           <section className="os-card rounded-3xl p-6 space-y-4">
-            <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-[#4E6E2A]" />
-              <span>고객 리뷰 · 답글 관리</span>
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <h2 className="text-base font-bold text-[#1A1D1A] flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#4E6E2A]" />
+                <span>고객 리뷰 · 답글 관리 ({reviews.length}건)</span>
+              </h2>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={crmReviewQuery}
+                  onChange={(e) => setCrmReviewQuery(e.target.value)}
+                  placeholder="매장·메뉴·리뷰 검색"
+                  className="min-h-[38px] px-3 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-xs text-[#1A1D1A]"
+                />
+                {!crmReviewQuery.trim() && reviews.length > 20 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllCrmReviews((prev) => !prev)}
+                    className="text-xs font-bold text-[#4E6E2A] whitespace-nowrap cursor-pointer"
+                  >
+                    {showAllCrmReviews ? '최근 20건만' : '전체 보기'}
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div className="divide-y divide-[#E8ECE4]">
-              {reviews.map((rev) => {
-                const menu = menus.find((m) => m.id === rev.menuId);
-                const existingReply = reviewReplies[rev.id];
-                const draftVal = replyDrafts[rev.id] ?? existingReply?.text ?? '';
-                const isFlagged = Boolean(existingReply?.flaggedForReview);
+              {(() => {
+                const rq = crmReviewQuery.trim().toLowerCase();
+                const filteredReviews = reviews.filter((rev) => {
+                  if (!rq) return true;
+                  const m = menus.find((item) => item.id === rev.menuId);
+                  const st = m ? ownerStoreMap.get(m.storeId) : undefined;
+                  const hay = `${st?.name ?? ''} ${m?.name ?? ''} ${rev.author} ${rev.content}`.toLowerCase();
+                  return hay.includes(rq);
+                });
+                const visibleReviews =
+                  rq || showAllCrmReviews
+                    ? filteredReviews
+                    : filteredReviews.slice(0, 20);
+                return visibleReviews.map((rev) => {
+                  const menu = menus.find((m) => m.id === rev.menuId);
+                  const stName = menu
+                    ? ownerStoreMap.get(menu.storeId)?.name
+                    : undefined;
+                  const existingReply = reviewReplies[rev.id];
+                  const draftVal =
+                    replyDrafts[rev.id] ?? existingReply?.text ?? '';
+                  const isFlagged = Boolean(existingReply?.flaggedForReview);
 
-                return (
-                  <div key={rev.id} className="py-4 first:pt-1 last:pb-1 space-y-2.5 text-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold text-[#1A1D1A]">
-                        {menu?.name ?? rev.menuId} · {rev.author}
-                        {rev.isComplaint && (
-                          <span className="text-[#687064] ml-1.5">· 개선 요청</span>
-                        )}
-                        {isFlagged && (
-                          <span className="text-[#4E6E2A] ml-1.5">· 확인 요청됨</span>
-                        )}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono tabular-nums text-[#687064]">
-                          <span className="text-[#82B440]">★</span> {rev.rating} · {rev.date}
+                  return (
+                    <div
+                      key={rev.id}
+                      className="py-4 first:pt-1 last:pb-1 space-y-2.5 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-[#1A1D1A]">
+                          {stName ? `${stName} · ` : ''}
+                          {menu?.name ?? rev.menuId} · {rev.author}
+                          {rev.isComplaint && (
+                            <span className="text-[#687064] ml-1.5">
+                              · 개선 요청
+                            </span>
+                          )}
+                          {isFlagged && (
+                            <span className="text-[#4E6E2A] ml-1.5">
+                              · 확인 요청됨
+                            </span>
+                          )}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onToggleReviewFlag(rev.id, '사실확인 검토 요청')
-                          }
-                          className={`min-h-[30px] px-2.5 py-0.5 rounded-lg border font-medium flex items-center gap-1 cursor-pointer ${
-                            isFlagged
-                              ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
-                              : 'bg-white border-[#E8ECE4] text-[#687064]'
-                          }`}
-                        >
-                          <Flag className="w-3 h-3" />
-                          <span>{isFlagged ? '요청됨' : '확인 요청'}</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono tabular-nums text-[#687064]">
+                            <span className="text-[#82B440]">★</span>{' '}
+                            {rev.rating} · {rev.date}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onToggleReviewFlag(rev.id, '사실확인 검토 요청')
+                            }
+                            className={`min-h-[30px] px-2.5 py-0.5 rounded-lg border font-medium flex items-center gap-1 cursor-pointer ${
+                              isFlagged
+                                ? 'bg-[#EAF1E2] border-[#82B440] text-[#3D5720]'
+                                : 'bg-white border-[#E8ECE4] text-[#687064]'
+                            }`}
+                          >
+                            <Flag className="w-3 h-3" />
+                            <span>{isFlagged ? '요청됨' : '확인 요청'}</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-sm text-[#1A1D1A] leading-relaxed">
-                      {rev.content}
-                    </p>
+                      <p className="text-sm text-[#1A1D1A] leading-relaxed">
+                        {rev.content}
+                      </p>
 
-                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                      <input
-                        type="text"
-                        value={draftVal}
-                        onChange={(e) =>
-                          setReplyDrafts((prev) => ({
-                            ...prev,
-                            [rev.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="고객에게 남길 답글을 입력하세요"
-                        className="flex-1 min-h-[38px] px-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-xs text-[#1A1D1A]"
-                      />
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const template = rev.isComplaint
-                              ? '이용에 불편을 드려 죄송합니다. 남겨주신 의견은 조리와 포장에 즉시 반영하겠습니다.'
-                              : '소중한 후기 감사합니다! 다음 주문에서도 정성껏 준비하겠습니다.';
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={draftVal}
+                          onChange={(e) =>
                             setReplyDrafts((prev) => ({
                               ...prev,
-                              [rev.id]: template,
-                            }));
-                          }}
-                          className="min-h-[38px] px-3 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] font-semibold rounded-xl cursor-pointer"
-                        >
-                          초안
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!draftVal.trim()) return;
-                            onSaveReviewReply(rev.id, draftVal.trim());
-                            setSavedReplyId(rev.id);
-                            window.setTimeout(() => setSavedReplyId(null), 2000);
-                          }}
-                          className="min-h-[38px] px-3.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-semibold rounded-xl cursor-pointer"
-                        >
-                          {savedReplyId === rev.id ? '저장됨' : '등록'}
-                        </button>
+                              [rev.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="고객에게 남길 답글을 입력하세요"
+                          className="flex-1 min-h-[38px] px-3.5 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-xs text-[#1A1D1A]"
+                        />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const template = rev.isComplaint
+                                ? '이용에 불편을 드려 죄송합니다. 남겨주신 의견은 조리와 포장에 즉시 반영하겠습니다.'
+                                : '소중한 후기 감사합니다! 다음 주문에서도 정성껏 준비하겠습니다.';
+                              setReplyDrafts((prev) => ({
+                                ...prev,
+                                [rev.id]: template,
+                              }));
+                            }}
+                            className="min-h-[38px] px-3 py-1 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#4E6E2A] font-semibold rounded-xl cursor-pointer"
+                          >
+                            초안
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!draftVal.trim()) return;
+                              onSaveReviewReply(rev.id, draftVal.trim());
+                              setSavedReplyId(rev.id);
+                              window.setTimeout(
+                                () => setSavedReplyId(null),
+                                2000
+                              );
+                            }}
+                            className="min-h-[38px] px-3.5 py-1 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-semibold rounded-xl cursor-pointer"
+                          >
+                            {savedReplyId === rev.id ? '저장됨' : '등록'}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </section>
         </div>
       )}
+
+      <B2BStatementModal
+        order={statementOrder}
+        onClose={() => setStatementOrder(null)}
+      />
 
       {csLightboxPhoto && (
         <div

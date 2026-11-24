@@ -9,6 +9,7 @@ import {
   Clock,
   CreditCard,
   Heart,
+  Loader2,
   MessageSquare,
   Mic,
   MicOff,
@@ -123,11 +124,11 @@ interface AiChatOrderViewProps {
   walletBalance?: number;
   stampCount?: number;
   defaultNote?: string;
+  hasOverlayOpen?: boolean;
   storePromotions?: StorePromotion[];
   storeCoupons?: StoreCoupon[];
   onToggleWishlist: (menuId: string) => void;
   onBackToHome: () => void;
-  onOpenAiSettings?: () => void;
   onOpenB2BMeal?: () => void;
   onOpenErrand?: () => void;
   onUseRelayCoupon?: (menuId: string) => void;
@@ -417,11 +418,11 @@ export function AiChatOrderView({
   walletBalance = 0,
   stampCount = 0,
   defaultNote = '',
+  hasOverlayOpen = false,
   storePromotions = [],
   storeCoupons = [],
   onToggleWishlist,
   onBackToHome,
-  onOpenAiSettings: _onOpenAiSettings,
   onOpenB2BMeal,
   onOpenErrand,
   onUseRelayCoupon,
@@ -3131,80 +3132,126 @@ export function AiChatOrderView({
     startListening();
   };
 
-  const renderVoiceStatusBar = (placement: 'under_results' | 'bottom') => {
-    if (isSpeaking) {
-      return (
-        <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-xs font-bold rounded-2xl">
-          <span className="inline-flex items-center gap-2 min-w-0">
-            <Volume2 className="w-4 h-4 animate-pulse shrink-0" />
-            <span className="truncate">
-              바로가 설명 중 · 끝나면 마이크가 자동으로 켜져요
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={handleInterruptToListen}
-            className="easy-compact px-3 py-1.5 rounded-xl bg-white border border-[#D4E1C5] text-[#1A1D1A] text-[12px] font-bold hover:bg-[#F7F8F5] cursor-pointer shrink-0"
-          >
-            정지하고 말하기
-          </button>
-        </div>
-      );
-    }
+  const renderPinnedVoiceTurnBar = () => {
+    const isPopupOpen = Boolean(recommendedSpotlight || hasOverlayOpen);
+    const positionClass = isPopupOpen
+      ? 'top-2.5 sm:top-3'
+      : 'top-[70px] sm:top-[76px]';
+
+    let containerStyle =
+      'bg-white/95 border-[#0F6B46]/50 text-[#111827] shadow-[0_10px_28px_-8px_rgba(15,23,42,0.18)]';
+    let badgeText = '내 차례';
+    let badgeClass = 'bg-[#EAF6F0] text-[#0B4F34]';
+    let headline = '지금 말씀하셔도 돼요';
+    let subline = '대답하거나 메뉴를 골라주세요';
 
     if (isListening) {
-      return (
-        <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 text-red-800 text-xs font-bold rounded-2xl">
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-              <Mic className="w-4 h-4 shrink-0" />
-              <span className="truncate">
-                마이크가 자동으로 켜져 있어요 · 말씀해 주세요
-              </span>
+      containerStyle =
+        'bg-[#FEF2F2]/95 border-[#DC2626] text-[#7F1D1D] shadow-[0_10px_28px_-8px_rgba(220,38,38,0.25)]';
+      badgeText = '듣는 중';
+      badgeClass = 'bg-[#DC2626] text-white';
+      headline = '지금 말씀해 주세요';
+      subline = interimTranscript
+        ? `“${interimTranscript}”`
+        : '원하시는 메뉴나 조건을 편하게 말씀하세요';
+    } else if (isSpeaking) {
+      containerStyle =
+        'bg-[#EAF6F0]/95 border-[#0F6B46] text-[#0B4F34] shadow-[0_10px_28px_-8px_rgba(15,107,70,0.2)]';
+      badgeText = '바로 설명 중';
+      badgeClass = 'bg-[#0F6B46] text-white';
+      headline = '바로가 말하고 있어요';
+      subline = '끝나면 바로 말할 차례가 돼요';
+    } else if (isAnalyzing) {
+      containerStyle =
+        'bg-[#FFFBEB]/95 border-[#D97706] text-[#92400E] shadow-[0_10px_28px_-8px_rgba(217,119,6,0.18)]';
+      badgeText = '찾는 중';
+      badgeClass = 'bg-[#FEF3C7] text-[#92400E]';
+      headline = '잠시만요, 메뉴를 찾고 있어요';
+      subline = '금방 결과를 읽어드릴게요';
+    }
+
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className={`fixed ${positionClass} left-1/2 -translate-x-1/2 z-[80] w-[calc(100%-24px)] max-w-3xl transition-all`}
+      >
+        <div
+          className={`backdrop-blur-md border-2 rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2.5 ${containerStyle}`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                isListening
+                  ? 'bg-[#DC2626] text-white baro-voice-pulse'
+                  : isSpeaking
+                    ? 'bg-[#0F6B46] text-white'
+                    : isAnalyzing
+                      ? 'bg-[#F59E0B] text-white'
+                      : 'bg-[#EAF6F0] text-[#0F6B46]'
+              }`}
+            >
+              {isListening ? (
+                <Mic className="w-4.5 h-4.5" />
+              ) : isSpeaking ? (
+                <Volume2 className="w-4.5 h-4.5 animate-pulse" />
+              ) : isAnalyzing ? (
+                <Loader2 className="w-4.5 h-4.5 animate-spin" />
+              ) : (
+                <Mic className="w-4.5 h-4.5" />
+              )}
             </div>
-            {interimTranscript && (
-              <p className="text-[12px] font-medium text-red-900 truncate pl-5">
-                “{interimTranscript}”
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold shrink-0 ${badgeClass}`}
+                >
+                  {badgeText}
+                </span>
+                <span className="text-[14.5px] sm:text-[15.5px] font-extrabold truncate">
+                  {headline}
+                </span>
+              </div>
+              <p className="text-[12.5px] sm:text-[13px] font-medium opacity-90 truncate mt-0.5">
+                {subline}
               </p>
-            )}
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleMicToggle}
-            className="easy-compact px-3 py-1.5 rounded-xl bg-white border border-red-200 text-red-700 text-[12px] font-bold hover:bg-red-100/60 cursor-pointer shrink-0"
-          >
-            끄기
-          </button>
-        </div>
-      );
-    }
 
-    if (placement === 'under_results' && !isAnalyzing) {
-      return (
-        <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-white border border-[#DCE7CF] text-[#444D42] text-xs font-semibold rounded-2xl">
-          <span className="inline-flex items-center gap-2 min-w-0">
-            <Mic className="w-4 h-4 text-[#4E6E2A] shrink-0" />
-            <span className="truncate">
-              대답하거나 메뉴를 고르려면 말씀해 주세요
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={handleMicToggle}
-            className="easy-compact px-3 py-1.5 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[12px] font-bold cursor-pointer shrink-0"
-          >
-            마이크 켜기
-          </button>
+          {isSpeaking ? (
+            <button
+              type="button"
+              onClick={handleInterruptToListen}
+              className="easy-compact min-h-[40px] px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#F3FBF7] border border-[#0F6B46] text-[#0B4F34] text-[13.5px] font-extrabold whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            >
+              끊고 말하기
+            </button>
+          ) : isListening ? (
+            <button
+              type="button"
+              onClick={handleMicToggle}
+              className="easy-compact min-h-[40px] px-3.5 py-1.5 rounded-xl bg-white hover:bg-red-50 border border-[#DC2626] text-[#B91C1C] text-[13.5px] font-extrabold whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            >
+              마이크 끄기
+            </button>
+          ) : !isAnalyzing ? (
+            <button
+              type="button"
+              onClick={handleMicToggle}
+              className="easy-compact min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[#0F6B46] hover:bg-[#0B5638] text-white text-[13.5px] font-extrabold whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+            >
+              마이크 켜기
+            </button>
+          ) : null}
         </div>
-      );
-    }
-
-    return null;
+      </div>
+    );
   };
 
   return (
-    <div className="max-w-3xl mx-auto os-card rounded-2xl overflow-hidden flex flex-col min-h-[76vh]">
+    <>
+      {renderPinnedVoiceTurnBar()}
+      <div className="max-w-3xl mx-auto mt-[66px] sm:mt-[72px] os-card rounded-2xl overflow-hidden flex flex-col min-h-[72vh]">
       {/* Simple 1-Row Easy AI Header */}
       <div className="px-4 sm:px-6 py-3.5 bg-white border-b border-[#E8ECE4] flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -3593,12 +3640,6 @@ export function AiChatOrderView({
                       </div>
                     );
                   })}
-                </div>
-              )}
-
-              {msg.id === latestBotMessageId && matchedMenus.length > 0 && (
-                <div className="pl-1 sm:pl-12">
-                  {renderVoiceStatusBar('under_results')}
                 </div>
               )}
 
@@ -4274,8 +4315,6 @@ export function AiChatOrderView({
           </div>
         )}
 
-        {!latestBotHasMatchedMenus && renderVoiceStatusBar('bottom')}
-
         {showVoiceTips && (
           <div className="bg-white border border-[#D4E1C5] rounded-2xl p-4 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-[#1A1D1A]">
@@ -4408,7 +4447,7 @@ export function AiChatOrderView({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${spotMenu.name} 바로 추천 설명`}
-                className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
+                className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center pt-16 sm:pt-20 px-0 sm:px-4 pb-0 sm:pb-4 overscroll-none touch-none"
               >
                 <motion.div
                   initial={{ y: 28, opacity: 0, scale: 0.97 }}
@@ -4416,7 +4455,7 @@ export function AiChatOrderView({
                   exit={{ y: 20, opacity: 0, scale: 0.97 }}
                   transition={{ duration: 0.22, ease: 'easeOut' }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full sm:max-w-lg max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#DCE7CF] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
+                  className="w-full sm:max-w-lg max-h-[78vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#DCE7CF] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
                 >
                   {/* Top Switcher Bar: Switch Between Top Recommendations */}
                   {recommendedSpotlight.menuIds.length > 1 && (
@@ -4932,5 +4971,6 @@ export function AiChatOrderView({
           })()}
       </AnimatePresence>
     </div>
+    </>
   );
 }

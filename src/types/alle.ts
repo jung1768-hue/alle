@@ -391,6 +391,17 @@ export interface SavedLocation {
 
 export type PartnerPlanTier = 'trial' | 'basic' | 'pro' | 'premium';
 
+export type WeekdayId = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export interface ZeroClickRoutine {
+  enabled: boolean;
+  days: WeekdayId[];
+  hour: number;
+  minute: number;
+  leadMinutes: number;
+  title: string;
+}
+
 export interface AllePersistedState {
   stores: Store[];
   menus: MenuItem[];
@@ -400,6 +411,7 @@ export interface AllePersistedState {
   walletBalance: number;
   wishlistIds: string[];
   preferences: UserPreferences;
+  zeroClickRoutine?: ZeroClickRoutine;
   ownerSaasSubscribed?: boolean;
   ownerSaasPlan?: PartnerPlanTier;
   lastConditionInput: string;

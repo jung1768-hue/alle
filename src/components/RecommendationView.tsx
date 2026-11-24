@@ -30,7 +30,7 @@ import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import { estimateCompetitorSavings } from '../utils/pricing';
 import {
   buildRuleReviewSummary,
-  hasGeminiApiKey,
+  checkServerGeminiAvailable,
   ReviewAiSummary,
   summarizeReviewsWithAI,
 } from '../utils/gemini';
@@ -141,19 +141,20 @@ export function RecommendationView({
     const fallback = buildRuleReviewSummary(activeReviews);
     setAiReviewSummary(fallback);
 
-    if (!hasGeminiApiKey()) return;
-
     let cancelled = false;
-    setIsSummarizingReviews(true);
-    summarizeReviewsWithAI(
-      activeMatch.menu.name,
-      activeMatch.store.name,
-      activeReviews
-    ).then((res) => {
-      if (!cancelled) {
-        setAiReviewSummary(res);
-        setIsSummarizingReviews(false);
-      }
+    void checkServerGeminiAvailable().then((available) => {
+      if (!available || cancelled) return;
+      setIsSummarizingReviews(true);
+      summarizeReviewsWithAI(
+        activeMatch.menu.name,
+        activeMatch.store.name,
+        activeReviews
+      ).then((res) => {
+        if (!cancelled) {
+          setAiReviewSummary(res);
+          setIsSummarizingReviews(false);
+        }
+      });
     });
 
     return () => {

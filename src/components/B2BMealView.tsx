@@ -27,7 +27,10 @@ import {
   getEffectiveMenuPrice,
   isStoreDeliverableToLocation,
 } from '../utils/parser';
-import { B2B_SERVICE_FEE_RATE } from '../utils/pricing';
+import {
+  B2B_SERVICE_FEE_RATE,
+  calculateStoreDeliveryFee,
+} from '../utils/pricing';
 import { B2BStatementModal } from './B2BStatementModal';
 import { FoodImage } from './FoodImage';
 import { MenuDetailReviewModal } from './MenuDetailReviewModal';
@@ -87,7 +90,9 @@ export function B2BMealView({
     () =>
       menus.filter((m) => {
         const st = storeMap.get(m.storeId);
-        return Boolean(st?.isOpen && !m.isSoldOut && m.stock >= 1);
+        return Boolean(
+          st?.isOpen && !m.isSoldOut && m.stock >= 1 && m.pricePerPerson > 0
+        );
       }),
     [menus, storeMap]
   );
@@ -191,7 +196,10 @@ export function B2BMealView({
   const b2bSubtotal = selectedB2bMenu
     ? getEffectiveMenuPrice(selectedB2bMenu) * b2bServings
     : 0;
-  const b2bDeliveryFee = selectedB2bStore?.deliveryFee ?? 0;
+  const b2bDeliveryFee = selectedB2bStore
+    ? calculateStoreDeliveryFee(selectedB2bStore, b2bSubtotal, 'partner_direct')
+        .finalDeliveryFee
+    : 0;
   const b2bServiceFee = Math.round(b2bSubtotal * B2B_SERVICE_FEE_RATE);
   const b2bTotal = b2bSubtotal + b2bDeliveryFee + b2bServiceFee;
 

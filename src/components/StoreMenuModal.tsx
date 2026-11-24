@@ -475,11 +475,11 @@ export function StoreMenuModal({
       aria-modal="true"
       aria-label={`${store.name} 전체 메뉴`}
       onClick={onClose}
-      className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
+      className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-[2px] flex items-end sm:items-center justify-center pt-20 sm:pt-24 px-0 sm:px-4 pb-0 sm:pb-4 overscroll-none touch-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-2xl max-h-[90vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
+        className="w-full sm:max-w-2xl max-h-[78vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
       >
         {/* Store Header */}
         <div className="px-5 py-4 bg-white border-b border-[#E8ECE4] space-y-2.5 shrink-0">

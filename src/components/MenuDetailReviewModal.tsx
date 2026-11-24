@@ -297,10 +297,10 @@ export function MenuDetailReviewModal({
                     <p className="text-[#1A1D1A] leading-relaxed">
                       {review.content}
                     </p>
-                    {reply && (
+                    {reply && reply.text.trim() && (
                       <div className="p-2.5 bg-white border border-[#D4E1C5] rounded-xl text-[#3D5720]">
                         <span className="font-bold">점주 답글:</span>{' '}
-                        {reply.text}
+                        {reply.text.trim().replace(/^\[점주 답글\]\s*/, '')}
                       </div>
                     )}
                   </div>

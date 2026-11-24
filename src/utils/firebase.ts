@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAnalytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
 import {
   doc,
-  getFirestore,
+  initializeFirestore,
   onSnapshot,
   setDoc,
 } from 'firebase/firestore';
@@ -38,7 +38,9 @@ const firebaseConfig = {
 };
 
 export const firebaseApp = initializeApp(firebaseConfig);
-export const db = getFirestore(firebaseApp);
+export const db = initializeFirestore(firebaseApp, {
+  ignoreUndefinedProperties: true,
+});
 
 if (typeof window !== 'undefined') {
   void isAnalyticsSupported().then((supported) => {
@@ -58,7 +60,49 @@ export interface SharedOperationalState {
   priceReports: PriceReport[];
   storePromotions: StorePromotion[];
   storeCoupons: StoreCoupon[];
+  ownerSaasPlan?: AllePersistedState['ownerSaasPlan'];
+  ownerSaasSubscribed?: boolean;
   updatedAt?: number;
+}
+
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefinedDeep(item)) as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v !== undefined) {
+        out[k] = stripUndefinedDeep(v);
+      }
+    }
+    return out as T;
+  }
+  return value;
+}
+
+function compactPhotosIfOversized(
+  shared: SharedOperationalState
+): SharedOperationalState {
+  const cleaned = stripUndefinedDeep(shared);
+  if (JSON.stringify(cleaned).length <= 900_000) {
+    return cleaned;
+  }
+  return stripUndefinedDeep({
+    ...cleaned,
+    orders: cleaned.orders.map((ord) => ({
+      ...ord,
+      ownerPackagingPhotos: undefined,
+      riderDeliveryPhotos: undefined,
+      evidenceRecord: ord.evidenceRecord
+        ? { ...ord.evidenceRecord, evidencePhotos: undefined }
+        : ord.evidenceRecord,
+    })),
+    errands: cleaned.errands.map((err) => ({
+      ...err,
+      receiptPhoto: undefined,
+    })),
+  });
 }
 
 export type FirebaseSyncStatus = 'connecting' | 'synced' | 'local-fallback';
@@ -80,6 +124,8 @@ export function extractSharedState(
     priceReports: state.priceReports,
     storePromotions: state.storePromotions,
     storeCoupons: state.storeCoupons,
+    ownerSaasPlan: state.ownerSaasPlan,
+    ownerSaasSubscribed: state.ownerSaasSubscribed,
   };
 }
 
@@ -156,6 +202,8 @@ function normalizeRemoteSharedState(
     storeCoupons: Array.isArray(raw.storeCoupons)
       ? raw.storeCoupons
       : structuredClone(INITIAL_STORE_COUPONS),
+    ownerSaasPlan: raw.ownerSaasPlan,
+    ownerSaasSubscribed: raw.ownerSaasSubscribed,
     updatedAt: raw.updatedAt,
   };
 }
@@ -171,8 +219,9 @@ export function subscribeSharedState(
     SHARED_DOC_REF,
     (snapshot) => {
       if (!snapshot.exists()) {
+        const sanitized = compactPhotosIfOversized(seedState);
         void setDoc(SHARED_DOC_REF, {
-          ...seedState,
+          ...sanitized,
           updatedAt: Date.now(),
         })
           .then(() => onStatusChange?.('synced'))
@@ -203,8 +252,9 @@ export async function pushSharedState(
   shared: SharedOperationalState
 ): Promise<boolean> {
   try {
+    const sanitized = compactPhotosIfOversized(shared);
     await setDoc(SHARED_DOC_REF, {
-      ...shared,
+      ...sanitized,
       updatedAt: Date.now(),
     });
     return true;

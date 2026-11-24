@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  AlertCircle,
   Bike,
   Camera,
   CheckCircle2,
@@ -64,10 +65,16 @@ export function PartnerDashboardView({
   const [errandReceiptPhotos, setErrandReceiptPhotos] = useState<
     Record<string, EvidencePhoto>
   >({});
+  const [errandReceiptErrors, setErrandReceiptErrors] = useState<
+    Record<string, string>
+  >({});
 
   const getEffectiveOrderMethod = (order: Order): DeliveryMethod =>
     order.deliveryMethod ??
     (order.sharedDeliveryApplied ? 'auto_bundle' : 'partner_direct');
+
+  const getOrderDeliveryPayout = (order: Order): number =>
+    order.deliveryFee > 0 ? order.deliveryFee : 2000;
 
   const deliveryQueue = useMemo(
     () =>
@@ -115,9 +122,22 @@ export function PartnerDashboardView({
     [errands]
   );
 
-  const grossReward = completedDeliveries.length * 2000;
-  const totalMatchingFee = completedDeliveries.length * MATCHING_FEE_PER_CASE;
-  const estimatedMockReward = Math.max(0, grossReward - totalMatchingFee);
+  const completedErrands = useMemo(
+    () => errands.filter((e) => e.status === ErrandStatus.COMPLETED),
+    [errands]
+  );
+
+  const grossDeliveryReward = completedDeliveries.reduce(
+    (sum, o) => sum + getOrderDeliveryPayout(o),
+    0
+  );
+  const netErrandReward = completedErrands.reduce(
+    (sum, e) => sum + Math.max(0, e.errandFee - MATCHING_FEE_PER_CASE),
+    0
+  );
+  const deliveryMatchingFees = completedDeliveries.length * MATCHING_FEE_PER_CASE;
+  const estimatedMockReward =
+    Math.max(0, grossDeliveryReward - deliveryMatchingFees) + netErrandReward;
 
   return (
     <div className="space-y-6">
@@ -179,7 +199,7 @@ export function PartnerDashboardView({
             {formatWon(estimatedMockReward)}
           </div>
           <div className="text-xs text-[#687064] tabular-nums mt-0.5">
-            완료 {completedDeliveries.length}건 · 건당 2,000원 - 매칭 수수료 {formatWon(MATCHING_FEE_PER_CASE)}/건
+            배달 {completedDeliveries.length}건 · 심부름 {completedErrands.length}건 · 매칭 수수료 {formatWon(MATCHING_FEE_PER_CASE)}/건 제외
           </div>
         </div>
       </div>
@@ -261,6 +281,8 @@ export function PartnerDashboardView({
             const isCooking = order.status === OrderStatus.COOKING;
             const isPickup = order.status === OrderStatus.PICKUP;
             const isAcceptedOnly = order.status === OrderStatus.ACCEPTED;
+            const basePayout = getOrderDeliveryPayout(order);
+            const netPayout = Math.max(0, basePayout - MATCHING_FEE_PER_CASE);
 
             return (
               <article
@@ -268,11 +290,21 @@ export function PartnerDashboardView({
                 className="bg-white border border-[#E8ECE4] rounded-3xl p-5 space-y-4 shadow-[0_2px_10px_rgba(26,29,26,0.03)]"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5 mb-1">
                       <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
                         {getDeliveryMethodMeta(getEffectiveOrderMethod(order)).label}
                       </span>
+                      {order.isB2B && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#EEF4FC] text-[#1D4ED8] text-[11px] font-bold">
+                          B2B 단체
+                        </span>
+                      )}
+                      {order.reservationSlot && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-bold">
+                          예약 {order.reservationSlot}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs font-medium text-[#687064]">
                       <span className="font-mono font-bold text-[#1A1D1A]">
@@ -286,21 +318,37 @@ export function PartnerDashboardView({
                     <h3 className="text-base font-bold text-[#1A1D1A] mt-1">
                       {order.menuName} ({order.servings}인)
                     </h3>
-                    <p className="text-xs text-[#555E52] mt-0.5 flex items-center gap-1">
+                    {order.items && order.items.length > 1 && (
+                      <p className="text-xs text-[#555E52] mt-0.5">
+                        구성:{' '}
+                        {order.items
+                          .map((it) => `${it.menuName}×${it.quantity}`)
+                          .join(', ')}
+                      </p>
+                    )}
+                    {order.customerNote && (
+                      <p className="text-xs font-semibold text-[#3D5720] bg-[#F7F8F5] border border-[#E8ECE4] rounded-lg px-2.5 py-1.5 mt-1.5">
+                        요청사항: {order.customerNote}
+                      </p>
+                    )}
+                    <p className="text-xs text-[#555E52] mt-1 flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-[#4E6E2A]" />
                       <span>
                         {order.dispatchMode === DispatchMode.AGENCY_RIDER
-                          ? '전문 라이더 배차'
-                          : '이웃 도보 파트너'}
+                          ? `전문 라이더 배차${order.riderName ? ` (${order.riderName})` : ''}`
+                          : order.dispatchMode === DispatchMode.NEIGHBOR_WALK
+                            ? `이웃 도보 파트너${order.riderName ? ` (${order.riderName})` : ''}`
+                            : '배차 대기 (픽업 수락 시 방식 선택)'}
                       </span>
                     </p>
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-sm font-bold text-[#4E6E2A] font-mono tabular-nums">
-                      배달비 2,000원
+                      배달료 {formatWon(basePayout)}
                     </div>
                     <div className="text-[11px] text-[#687064] tabular-nums">
-                      매칭·보험비 350원 제외 실수령 1,650원
+                      매칭 수수료 {formatWon(MATCHING_FEE_PER_CASE)} 제외 실수령{' '}
+                      {formatWon(netPayout)}
                     </div>
                     <div className="text-xs text-[#687064] mt-0.5">
                       {isAcceptedOnly
@@ -319,6 +367,9 @@ export function PartnerDashboardView({
                     addressAlias={order.addressAlias}
                     status={order.status}
                     dispatchMode={order.dispatchMode}
+                    deliveryStage={order.deliveryStage}
+                    riderName={order.riderName}
+                    remainingMinutes={order.remainingMinutes}
                   />
                 )}
 
@@ -458,7 +509,8 @@ export function PartnerDashboardView({
 
         {openErrands.length === 0 &&
         matchedErrands.length === 0 &&
-        awaitingCustomerErrands.length === 0 ? (
+        awaitingCustomerErrands.length === 0 &&
+        completedErrands.length === 0 ? (
           <div className="bg-white border border-[#E8ECE4] rounded-2xl p-6 text-center text-xs text-[#687064]">
             현재 대기 중이거나 진행 중인 생활 심부름 요청이 없습니다.
           </div>
@@ -488,8 +540,8 @@ export function PartnerDashboardView({
                         </div>
                         <div className="text-xs font-bold text-[#4E6E2A] font-mono tabular-nums mt-0.5">
                           심부름 보수 {formatWon(err.errandFee)} · 매칭 수수료{' '}
-                          {formatWon(MATCHING_FEE_PER_CASE)} (실수령{' '}
-                          {formatWon(Math.max(0, err.errandFee - MATCHING_FEE_PER_CASE))})
+                          {formatWon(MATCHING_FEE_PER_CASE)} 제외 실수령{' '}
+                          {formatWon(Math.max(0, err.errandFee - MATCHING_FEE_PER_CASE))}
                         </div>
                       </div>
                       <button
@@ -566,12 +618,24 @@ export function PartnerDashboardView({
                                       ...prev,
                                       [err.id]: loaded[0],
                                     }));
+                                    setErrandReceiptErrors((prev) => {
+                                      const next = { ...prev };
+                                      delete next[err.id];
+                                      return next;
+                                    });
                                   }
                                 }}
                                 className="hidden"
                               />
                             </label>
                           </div>
+
+                          {errandReceiptErrors[err.id] && (
+                            <p className="text-xs font-semibold text-red-700 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{errandReceiptErrors[err.id]}</span>
+                            </p>
+                          )}
 
                           {photo && (
                             <div className="flex items-center gap-2 p-2 rounded-xl bg-[#F7F8F5] border border-[#D4E1C5]">
@@ -586,7 +650,7 @@ export function PartnerDashboardView({
                             </div>
                           )}
 
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <input
                               type="number"
                               min={0}
@@ -602,21 +666,38 @@ export function PartnerDashboardView({
                                   ),
                                 }))
                               }
-                              className="flex-1 min-h-[38px] px-3 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl font-mono tabular-nums"
+                              className="flex-1 min-w-[100px] min-h-[38px] px-3 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl font-mono tabular-nums"
                             />
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                if (err.estimatedItemCost > 0 && !photo) {
+                                  setErrandReceiptErrors((prev) => ({
+                                    ...prev,
+                                    [err.id]:
+                                      '물품 구매 심부름은 영수증 사진을 먼저 첨부해 주세요.',
+                                  }));
+                                  return;
+                                }
                                 onAdvanceErrand(
                                   err.id,
                                   ErrandStatus.RECEIPT_CHECKED,
                                   receiptVal,
                                   photo
-                                )
-                              }
+                                );
+                              }}
                               className="min-h-[38px] px-4 py-1.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white font-bold rounded-xl whitespace-nowrap cursor-pointer"
                             >
                               영수증 첨부 · 배송 완료
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onAdvanceErrand(err.id, ErrandStatus.OPEN)
+                              }
+                              className="min-h-[38px] px-3 py-1.5 bg-white hover:bg-red-50 border border-[#E8ECE4] hover:border-red-200 text-[#687064] hover:text-red-700 font-bold rounded-xl whitespace-nowrap cursor-pointer"
+                            >
+                              수락 취소
                             </button>
                           </div>
                         </div>
@@ -660,6 +741,35 @@ export function PartnerDashboardView({
                           className="w-12 h-12 rounded-lg object-cover border border-[#D4E1C5]"
                         />
                       )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Completed errands */}
+            {completedErrands.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold text-[#4E6E2A]">
+                  4. 정산 완료 심부름 ({completedErrands.length}건)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {completedErrands.map((err) => (
+                    <div
+                      key={err.id}
+                      className="bg-white border border-[#D4E1C5] rounded-2xl p-4 flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold text-[#1A1D1A] truncate">
+                          {err.title}
+                        </div>
+                        <div className="text-[#687064] mt-0.5">
+                          실비 {formatWon(err.actualReceiptCost ?? 0)} · 정산 완료
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-[#4E6E2A] shrink-0">
+                        +{formatWon(Math.max(0, err.errandFee - MATCHING_FEE_PER_CASE))}
+                      </span>
                     </div>
                   ))}
                 </div>
