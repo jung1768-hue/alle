@@ -2403,8 +2403,11 @@ export default function App() {
       step === ConsumerStep.RECOMMEND ||
       step === ConsumerStep.WISHLIST);
 
+  const containerWidthClass =
+    role === DemoRole.CONSUMER ? 'max-w-4xl' : 'max-w-5xl';
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F8F5] text-[#1A1D1A] alle-easy-mode">
+    <div className="min-h-screen flex flex-col bg-[#FAFBFA] text-[#111411] alle-easy-mode">
       {/* Contextual Role Strip (Only visible in Owner / Partner mode) */}
       {role !== DemoRole.CONSUMER && (
         <div className="bg-[#1A1D1A] text-white border-b border-white/10">
@@ -2436,10 +2439,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Clean Single-Row Header: Brand Logo + Current Location + Easy Mode + Notification Bell */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-[#E8ECE4]">
-        <div className="max-w-5xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+      {/* Clean Single-Row Header: Brand Logo + Current Location + Search + Notification Bell */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-black/[0.05]">
+        <div className={`${containerWidthClass} mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2`}>
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
             <button
               type="button"
               onClick={() => {
@@ -2452,38 +2455,35 @@ export default function App() {
               <AlleLogo />
             </button>
 
-            <span
-              aria-hidden="true"
-              className="h-4 w-px bg-[#E8ECE4] shrink-0"
-            />
-
             <button
               type="button"
               onClick={() => setShowLocationPicker(true)}
               aria-label="등록된 위치 변경하기"
-              className="inline-flex min-w-0 min-h-[34px] max-w-full sm:max-w-[260px] px-1.5 sm:px-2.5 py-1 rounded-xl hover:bg-[#EAF1E2]/70 text-xs sm:text-sm font-semibold text-[#1A1D1A] items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer"
+              className="easy-compact inline-flex min-w-0 min-h-[34px] max-w-full sm:max-w-[260px] px-2.5 py-1.5 rounded-full bg-[#F3F5F1] hover:bg-[#E9EFE4] text-[13px] sm:text-sm font-semibold text-[#111411] items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer"
             >
-              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4E6E2A] shrink-0" />
+              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#3B5B1E] shrink-0" />
               <span className="truncate">{activeLocation.areaName}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-[#687064] shrink-0" />
+              <ChevronDown className="w-3.5 h-3.5 text-[#646C62] shrink-0" />
             </button>
           </div>
 
-          {/* Right Search + Easy Mode Toggle + Presenter Demo Switcher + Notification Bell */}
+          {/* Right Search + Presenter Demo Switcher + Notification Bell */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => handleOpenBrowse()}
-              aria-label="카테고리·가게 검색"
-              className={`easy-compact min-h-[34px] px-2 sm:px-2.5 py-1 rounded-xl text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
-                role === DemoRole.CONSUMER && step === ConsumerStep.BROWSE
-                  ? 'bg-[#4E6E2A] text-white border-[#4E6E2A]'
-                  : 'bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#1A1D1A] border-[#E8ECE4]'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">카테고리 검색</span>
-            </button>
+            {!(role === DemoRole.CONSUMER && step === ConsumerStep.HOME) && (
+              <button
+                type="button"
+                onClick={() => handleOpenBrowse()}
+                aria-label="카테고리·가게 검색"
+                className={`easy-compact min-h-[34px] px-2.5 sm:px-3 py-1 rounded-full text-[11px] font-semibold border inline-flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer ${
+                  role === DemoRole.CONSUMER && step === ConsumerStep.BROWSE
+                    ? 'bg-[#3B5B1E] text-white border-transparent'
+                    : 'bg-[#F3F5F1] hover:bg-[#E9EFE4] text-[#111411] border-transparent'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">카테고리 검색</span>
+              </button>
+            )}
 
             {showPresenterMode && (
               <div className="relative">
@@ -2664,7 +2664,7 @@ export default function App() {
                 }}
                 aria-expanded={showNotifications}
                 aria-label="알림 보기"
-                className="easy-compact relative w-10 h-10 rounded-xl hover:bg-[#F7F8F5] text-[#1A1D1A] flex items-center justify-center transition-colors cursor-pointer"
+                className="easy-compact relative w-10 h-10 rounded-full hover:bg-[#F3F5F1] text-[#111411] flex items-center justify-center transition-colors cursor-pointer"
               >
               <Bell className="w-5 h-5" strokeWidth={1.9} />
               {deliveryNotifications.some((n) => !n.read) ? (
@@ -2851,7 +2851,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 pt-6 pb-28 md:pt-8 md:pb-28">
+      <main className={`flex-1 ${containerWidthClass} w-full mx-auto px-4 sm:px-6 pt-4 pb-28 sm:pt-6 md:pb-28`}>
         {role === DemoRole.OWNER ? (
           <OwnerDashboardView
             stores={appState.stores}
@@ -3154,8 +3154,8 @@ export default function App() {
         )}
       </main>
 
-      <footer className="hidden md:block border-t border-[#E8ECE4] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#687064]">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <footer className="hidden md:block border-t border-black/[0.05] bg-white pt-5 pb-24 px-4 sm:px-6 text-xs text-[#646C62]">
+        <div className={`${containerWidthClass} mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
           <span>Baro · 바른 가격, 바로 오는 우리 동네</span>
           <div className="flex items-center gap-5">
             <button
@@ -3233,31 +3233,39 @@ export default function App() {
           </div>
         )}
 
-      {/* Bottom Navigation Bar: 홈 / AI 주문 / 주문내역 / 찜 / MY */}
+      {/* Bottom Navigation Bar: 홈 / 바로 주문 / 주문내역 / 찜 / MY */}
       <nav
         aria-label="하단 탭 네비게이션"
-        className="fixed bottom-0 left-0 right-0 z-40 h-[68px] bg-[#FFFFFF] border-t border-[#E8ECE4]"
+        className="fixed bottom-0 left-0 right-0 z-40 h-[66px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] shadow-[0_-4px_20px_rgba(17,20,17,0.03)]"
       >
-        <div className="max-w-5xl mx-auto h-full grid grid-cols-5 items-center px-2">
+        <div className={`${containerWidthClass} mx-auto h-full grid grid-cols-5 items-center px-2`}>
           <button
             type="button"
             onClick={() => {
               setRole(DemoRole.CONSUMER);
               setStep(ConsumerStep.HOME);
             }}
-            className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
+            className={`min-h-[48px] flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.HOME
-                ? 'text-[#3B551F] font-bold'
-                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
+                ? 'text-[#142014] font-bold'
+                : 'text-[#8B9389] font-medium hover:text-[#2F362E]'
             }`}
           >
-            <Home
-              className="w-5 h-5"
-              strokeWidth={
-                role === DemoRole.CONSUMER && step === ConsumerStep.HOME ? 2.2 : 1.75
-              }
-            />
-            <span className="text-xs leading-none">홈</span>
+            <span
+              className={`px-3.5 py-1 rounded-full transition-colors flex items-center justify-center ${
+                role === DemoRole.CONSUMER && step === ConsumerStep.HOME
+                  ? 'bg-[#EAF2E2] text-[#284A16]'
+                  : 'bg-transparent'
+              }`}
+            >
+              <Home
+                className="w-[19px] h-[19px]"
+                strokeWidth={
+                  role === DemoRole.CONSUMER && step === ConsumerStep.HOME ? 2.25 : 1.75
+                }
+              />
+            </span>
+            <span className="text-[11px] leading-none">홈</span>
           </button>
 
           <button
@@ -3267,27 +3275,38 @@ export default function App() {
               setRole(DemoRole.CONSUMER);
               setStep(ConsumerStep.AI_CHAT);
             }}
-            className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
+            className={`min-h-[48px] flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER &&
               (step === ConsumerStep.AI_CHAT ||
                 step === ConsumerStep.RECOMMEND ||
                 step === ConsumerStep.CONFIRM)
-                ? 'text-[#3B551F] font-bold'
-                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
+                ? 'text-[#142014] font-bold'
+                : 'text-[#8B9389] font-medium hover:text-[#2F362E]'
             }`}
           >
-            <Sparkles
-              className="w-5 h-5"
-              strokeWidth={
+            <span
+              className={`px-3.5 py-1 rounded-full transition-colors flex items-center justify-center ${
                 role === DemoRole.CONSUMER &&
                 (step === ConsumerStep.AI_CHAT ||
                   step === ConsumerStep.RECOMMEND ||
                   step === ConsumerStep.CONFIRM)
-                  ? 2.2
-                  : 1.75
-              }
-            />
-            <span className="text-xs leading-none">바로 주문</span>
+                  ? 'bg-[#EAF2E2] text-[#284A16]'
+                  : 'bg-transparent'
+              }`}
+            >
+              <Sparkles
+                className="w-[19px] h-[19px]"
+                strokeWidth={
+                  role === DemoRole.CONSUMER &&
+                  (step === ConsumerStep.AI_CHAT ||
+                    step === ConsumerStep.RECOMMEND ||
+                    step === ConsumerStep.CONFIRM)
+                    ? 2.25
+                    : 1.75
+                }
+              />
+            </span>
+            <span className="text-[11px] leading-none">바로 주문</span>
           </button>
 
           <button
@@ -3296,21 +3315,29 @@ export default function App() {
               setRole(DemoRole.CONSUMER);
               setStep(ConsumerStep.STATUS);
             }}
-            className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
+            className={`min-h-[48px] flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.STATUS
-                ? 'text-[#3B551F] font-bold'
-                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
+                ? 'text-[#142014] font-bold'
+                : 'text-[#8B9389] font-medium hover:text-[#2F362E]'
             }`}
           >
-            <ClipboardList
-              className="w-5 h-5"
-              strokeWidth={
+            <span
+              className={`px-3.5 py-1 rounded-full transition-colors flex items-center justify-center ${
                 role === DemoRole.CONSUMER && step === ConsumerStep.STATUS
-                  ? 2.2
-                  : 1.75
-              }
-            />
-            <span className="text-xs leading-none">주문내역</span>
+                  ? 'bg-[#EAF2E2] text-[#284A16]'
+                  : 'bg-transparent'
+              }`}
+            >
+              <ClipboardList
+                className="w-[19px] h-[19px]"
+                strokeWidth={
+                  role === DemoRole.CONSUMER && step === ConsumerStep.STATUS
+                    ? 2.25
+                    : 1.75
+                }
+              />
+            </span>
+            <span className="text-[11px] leading-none">주문내역</span>
           </button>
 
           <button
@@ -3319,21 +3346,29 @@ export default function App() {
               setRole(DemoRole.CONSUMER);
               setStep(ConsumerStep.WISHLIST);
             }}
-            className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
+            className={`min-h-[48px] flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.WISHLIST
-                ? 'text-[#3B551F] font-bold'
-                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
+                ? 'text-[#142014] font-bold'
+                : 'text-[#8B9389] font-medium hover:text-[#2F362E]'
             }`}
           >
-            <Heart
-              className="w-5 h-5"
-              strokeWidth={
+            <span
+              className={`px-3.5 py-1 rounded-full transition-colors flex items-center justify-center ${
                 role === DemoRole.CONSUMER && step === ConsumerStep.WISHLIST
-                  ? 2.2
-                  : 1.75
-              }
-            />
-            <span className="text-xs leading-none">찜</span>
+                  ? 'bg-[#EAF2E2] text-[#284A16]'
+                  : 'bg-transparent'
+              }`}
+            >
+              <Heart
+                className="w-[19px] h-[19px]"
+                strokeWidth={
+                  role === DemoRole.CONSUMER && step === ConsumerStep.WISHLIST
+                    ? 2.25
+                    : 1.75
+                }
+              />
+            </span>
+            <span className="text-[11px] leading-none">찜</span>
           </button>
 
           <button
@@ -3342,21 +3377,29 @@ export default function App() {
               setRole(DemoRole.CONSUMER);
               setStep(ConsumerStep.MY);
             }}
-            className={`min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
+            className={`min-h-[48px] flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.MY
-                ? 'text-[#3B551F] font-bold'
-                : 'text-[#3D453B] font-semibold hover:text-[#111411]'
+                ? 'text-[#142014] font-bold'
+                : 'text-[#8B9389] font-medium hover:text-[#2F362E]'
             }`}
           >
-            <User
-              className="w-5 h-5"
-              strokeWidth={
+            <span
+              className={`px-3.5 py-1 rounded-full transition-colors flex items-center justify-center ${
                 role === DemoRole.CONSUMER && step === ConsumerStep.MY
-                  ? 2.2
-                  : 1.75
-              }
-            />
-            <span className="text-xs leading-none">MY</span>
+                  ? 'bg-[#EAF2E2] text-[#284A16]'
+                  : 'bg-transparent'
+              }`}
+            >
+              <User
+                className="w-[19px] h-[19px]"
+                strokeWidth={
+                  role === DemoRole.CONSUMER && step === ConsumerStep.MY
+                    ? 2.25
+                    : 1.75
+                }
+              />
+            </span>
+            <span className="text-[11px] leading-none">MY</span>
           </button>
         </div>
       </nav>

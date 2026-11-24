@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 export const ALLE_ICON_SRC = '/assets/aistudio/IMG_8626_97d5135f.PNG';
 
 interface AlleLogoProps {
@@ -5,17 +7,34 @@ interface AlleLogoProps {
 }
 
 export function AlleLogo({ className = '' }: AlleLogoProps) {
+  const gradId = useId();
   return (
     <span className={`inline-flex items-center gap-1.5 select-none ${className}`}>
-      <img
-        src={ALLE_ICON_SRC}
-        alt="Baro 아이콘"
-        className="w-8 h-8 object-contain mix-blend-multiply -mt-1 shrink-0"
-      />
-      <span className="font-display text-[24px] font-extrabold tracking-[-0.045em] text-[#1A1D1A] leading-none">
+      <svg
+        viewBox="0 0 40 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        className="w-7 h-7 sm:w-8 sm:h-8 shrink-0"
+      >
+        <defs>
+          <linearGradient id={gradId} x1="6" y1="16" x2="34" y2="28" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#4A9132" />
+            <stop offset="100%" stopColor="#8EC73F" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M8.5 16.5C8.5 25.2 13.8 30.2 20.5 30.2C27.2 30.2 31.8 25.4 32.4 18.8"
+          stroke={`url(#${gradId})`}
+          strokeWidth="5.4"
+          strokeLinecap="round"
+        />
+        <circle cx="32.2" cy="8.8" r="3.4" fill="#497226" />
+      </svg>
+      <span className="font-display text-[21px] sm:text-[23px] font-extrabold tracking-[-0.045em] text-[#111411] leading-none">
         Baro
       </span>
-      <span className="text-xs font-extrabold text-[#4E6E2A] tracking-tight leading-none mt-1">
+      <span className="text-[11.5px] font-bold text-[#3B5B1E] tracking-[-0.02em] leading-none mt-0.5">
         바로
       </span>
     </span>

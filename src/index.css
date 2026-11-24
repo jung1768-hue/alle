@@ -53,12 +53,12 @@
   --font-display: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "Pretendard Variable", "Pretendard", ui-monospace, SFMono-Regular, monospace;
 
-  --color-os-bg: #F7F8F5;
+  --color-os-bg: #FAFBFA;
   --color-os-surface: #FFFFFF;
-  --color-os-subtle: #F0F3EC;
-  --color-os-border: #E8ECE4;
-  --color-os-ink: #1A1D1A;
-  --color-os-muted: #555D51;
+  --color-os-subtle: #F3F5F1;
+  --color-os-border: #EAEDE8;
+  --color-os-ink: #111411;
+  --color-os-muted: #5F675D;
   --color-os-accent: #4E6E2A;
   --color-os-accent-hover: #3F5A21;
   --color-os-lime: #82B440;
@@ -77,10 +77,10 @@
   }
 
   html {
-    font-size: 17px;
-    background-color: #F7F8F5;
+    font-size: 16px;
+    background-color: #FAFBFA;
     color: #111411;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
     overflow-x: clip;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -89,12 +89,12 @@
 
   body {
     overflow-x: clip;
-    font-weight: 500;
+    font-weight: 400;
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #4A5348;
+    color: #767E74;
     opacity: 1;
   }
 
@@ -132,20 +132,20 @@
 
 .os-card {
   background-color: #FFFFFF;
-  border: 1px solid #E8ECE4;
-  box-shadow: 0 1px 2px rgba(26, 29, 26, 0.04), 0 6px 16px -4px rgba(26, 29, 26, 0.04);
+  border: 1px solid rgba(17, 20, 17, 0.07);
+  box-shadow: 0 2px 10px rgba(17, 20, 17, 0.03);
 }
 
 .os-card-interactive {
   background-color: #FFFFFF;
-  border: 1px solid #E8ECE4;
-  box-shadow: 0 1px 2px rgba(26, 29, 26, 0.04), 0 6px 16px -4px rgba(26, 29, 26, 0.04);
-  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  border: 1px solid rgba(17, 20, 17, 0.07);
+  box-shadow: 0 2px 10px rgba(17, 20, 17, 0.03);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
 .os-card-interactive:hover {
-  border-color: #C7D7B5;
-  box-shadow: 0 4px 14px -2px rgba(26, 29, 26, 0.07);
+  border-color: rgba(59, 91, 30, 0.28);
+  box-shadow: 0 8px 22px -6px rgba(17, 20, 17, 0.08);
 }
 
 .os-kpi {
@@ -202,29 +202,29 @@
 .alle-easy-mode .text-\[10px\],
 .alle-easy-mode .text-\[10\.5px\],
 .alle-easy-mode .text-\[11px\] {
-  font-size: 0.78rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .alle-easy-mode .text-xs {
-  font-size: 0.85rem;
-  line-height: 1.45;
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
 .alle-easy-mode .text-sm {
-  font-size: 0.94rem;
-  line-height: 1.5;
+  font-size: 0.90625rem;
+  line-height: 1.45;
 }
 
 @media (min-width: 640px) {
   .alle-easy-mode .sm\:text-xs {
-    font-size: 0.85rem;
-    line-height: 1.45;
+    font-size: 0.8125rem;
+    line-height: 1.4;
   }
 
   .alle-easy-mode .sm\:text-sm {
-    font-size: 0.94rem;
-    line-height: 1.5;
+    font-size: 0.90625rem;
+    line-height: 1.45;
   }
 
   .alle-easy-mode .sm\:text-base {
@@ -234,12 +234,12 @@
 
   .alle-easy-mode .sm\:text-lg {
     font-size: 1.125rem;
-    line-height: 1.55;
+    line-height: 1.5;
   }
 
   .alle-easy-mode .sm\:text-xl {
     font-size: 1.25rem;
-    line-height: 1.4;
+    line-height: 1.35;
   }
 }
 
@@ -250,15 +250,28 @@
 
   .text-\[\#555E52\],
   .text-\[\#434B40\] {
-    color: #2B3229;
+    color: #4A5248;
   }
 
   .text-\[\#687064\],
   .text-\[\#919A8D\] {
-    color: #444D42;
+    color: #646C62;
   }
 
   .text-\[\#4E6E2A\] {
-    color: #3B551F;
+    color: #3B5B1E;
   }
+}
+
+@keyframes baro-voice-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(229, 72, 77, 0);
+  }
+}
+
+.baro-voice-pulse {
+  animation: baro-voice-pulse 1.6s ease-in-out infinite;
 }

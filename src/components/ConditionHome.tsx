@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bike,
   Building2,
-  CheckCircle2,
   ChevronRight,
   CloudRain,
+  Flame,
   LayoutGrid,
-  MapPin,
   Megaphone,
   Mic,
   MicOff,
@@ -17,6 +16,14 @@ import {
   Wind,
   Zap,
 } from 'lucide-react';
+import IMG_CAT_PIZZA from '../assets/images/bulgogi_pizza_slice_1795098714888.jpg';
+import IMG_CAT_CAFE from '../assets/images/cafe_coffee_shortcake_1795098713535.jpg';
+import IMG_CAT_JAPANESE from '../assets/images/crispy_pork_tonkatsu_1794615613679.jpg';
+import IMG_CAT_MARKET from '../assets/images/dongindong_galbi_jjim_1795098714219.jpg';
+import IMG_CAT_CHINESE from '../assets/images/jjajangmyeon_tangsuyuk_1795098713541.jpg';
+import IMG_CAT_KOREAN from '../assets/images/korean_beef_haejangguk_1794615612924.jpg';
+import IMG_CAT_CHICKEN from '../assets/images/korean_fried_chicken_1795098714090.jpg';
+import IMG_CAT_SNACK from '../assets/images/tteokbokki_flat_mandu_1795098714486.jpg';
 import {
   INITIAL_REVIEWS,
   VOICE_TRANSCRIPT_SAMPLES,
@@ -99,20 +106,35 @@ interface ConditionHomeProps {
 
 const EASY_GRID_CATEGORIES: Array<{
   id: PlatformCategoryId;
-  emoji: string;
   label: string;
+  image?: string;
 }> = [
-  { id: 'korean', emoji: '🍲', label: '한식·국밥' },
-  { id: 'chicken', emoji: '🍗', label: '치킨' },
-  { id: 'chinese', emoji: '🥟', label: '중식·마라' },
-  { id: 'japanese', emoji: '🍱', label: '일식·돈까스' },
-  { id: 'western', emoji: '🍕', label: '피자·양식' },
-  { id: 'snack', emoji: '🌶️', label: '분식·야식' },
-  { id: 'cafe', emoji: '☕', label: '카페·디저트' },
-  { id: 'market', emoji: '🧺', label: '전통시장' },
-  { id: 'closing', emoji: '🔥', label: '마감특가' },
-  { id: 'all', emoji: '🔍', label: '전체 검색' },
+  { id: 'korean', label: '한식·국밥', image: IMG_CAT_KOREAN },
+  { id: 'chicken', label: '치킨', image: IMG_CAT_CHICKEN },
+  { id: 'chinese', label: '중식·마라', image: IMG_CAT_CHINESE },
+  { id: 'japanese', label: '일식·돈까스', image: IMG_CAT_JAPANESE },
+  { id: 'western', label: '피자·양식', image: IMG_CAT_PIZZA },
+  { id: 'snack', label: '분식·야식', image: IMG_CAT_SNACK },
+  { id: 'cafe', label: '카페·디저트', image: IMG_CAT_CAFE },
+  { id: 'market', label: '전통시장', image: IMG_CAT_MARKET },
+  { id: 'closing', label: '마감특가' },
+  { id: 'all', label: '전체보기' },
 ];
+
+function getHeroHeadline(shortSlot: string): string {
+  switch (shortSlot) {
+    case '아침':
+      return '오늘 아침, 말 한마디로 바로 주문';
+    case '점심':
+      return '오늘 점심, 뭐 드실래요?';
+    case '오후':
+      return '출출한 오후, 말만 하면 바로 와요';
+    case '저녁':
+      return '오늘 저녁, 뭐 드실래요?';
+    default:
+      return '오늘 야식, 고민 없이 말로 주문';
+  }
+}
 
 type WeatherMode = 'chilly' | 'rainy' | 'clear';
 
@@ -784,113 +806,137 @@ export function ConditionHome({
   );
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Hero: Value Strip + Voice CTA + Manual Search */}
-      <section className="os-card rounded-2xl p-5 sm:p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#3D5720]">
-            <CheckCircle2 className="w-4 h-4 text-[#4E6E2A] shrink-0" />
+    <div className="w-full space-y-8 sm:space-y-10">
+      {/* Section 1: Deep-Botanical Editorial Zero-UI Hero */}
+      <section className="relative overflow-hidden rounded-[28px] bg-[#142014] text-white p-5 sm:p-7 shadow-[0_16px_40px_-16px_rgba(16,32,16,0.38)]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#82B440]/20 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-[#4E6E2A]/15 blur-3xl"
+        />
+
+        <div className="relative z-10">
+          <span className="inline-flex items-center gap-2 bg-white/[0.08] border border-white/[0.1] text-[#D5E6C3] text-[12px] font-medium px-3 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#92C84B] shrink-0" />
             <span>수수료 0% · 매장 동일가 · 최소주문 없음</span>
           </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F7F8F5] border border-[#E8ECE4] text-xs font-medium text-[#555E52]">
-            <MapPin className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
-            <span>{activeLocation?.areaName ?? '대구 북구 산격동'}</span>
-          </span>
-        </div>
 
-        <button
-          type="button"
-          onClick={handleVoiceTrigger}
-          className={`w-full min-h-[60px] px-5 py-3.5 rounded-xl font-bold text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-sm transition-colors cursor-pointer ${
-            isListening
-              ? 'bg-red-600 text-white'
-              : 'bg-[#4E6E2A] hover:bg-[#3F5A21] text-white'
-          }`}
-        >
-          {isListening ? (
-            <MicOff className="w-5 h-5 shrink-0" />
-          ) : (
-            <Mic className="w-5 h-5 shrink-0" />
-          )}
-          <span>
-            {isListening
-              ? '말씀하세요... 듣고 있어요 (누르면 중지)'
-              : '누르고 먹고 싶은 음식을 말하세요'}
-          </span>
-        </button>
+          <h1 className="text-[22px] sm:text-[28px] font-extrabold tracking-[-0.035em] leading-[1.22] text-white mt-3.5">
+            {getHeroHeadline(timeSlot.shortSlot)}
+          </h1>
 
-        {/* Direct Manual Search Bar */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (onOpenBrowse) {
-              onOpenBrowse({ category: 'all', query: easySearchQuery.trim() });
-            } else if (easySearchQuery.trim()) {
-              onOpenAiChat(easySearchQuery.trim());
-            }
-          }}
-          className="flex gap-2"
-        >
-          <div className="relative flex-1 flex items-center">
-            <Search className="w-4 h-4 text-[#4E6E2A] absolute left-3.5 pointer-events-none" />
-            <input
-              type="text"
-              value={easySearchQuery}
-              onChange={(e) => setEasySearchQuery(e.target.value)}
-              placeholder="가게명·메뉴명 직접 검색 (예: 국밥, 치킨)"
-              className="w-full min-h-[46px] pl-10 pr-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl text-sm sm:text-base text-[#1A1D1A] placeholder:text-[#4A5348]"
-            />
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-[1.05fr_1fr] gap-2.5 sm:gap-3">
+            <button
+              type="button"
+              onClick={handleVoiceTrigger}
+              className={`easy-compact w-full min-h-[54px] px-5 rounded-2xl text-[15px] sm:text-base font-extrabold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+                isListening
+                  ? 'bg-[#E5484D] hover:bg-[#D43D42] text-white baro-voice-pulse'
+                  : 'bg-[#92C84B] hover:bg-[#9FD458] text-[#0E180E] shadow-[0_6px_20px_-4px_rgba(146,200,75,0.45)]'
+              }`}
+            >
+              {isListening ? (
+                <MicOff className="w-5 h-5 shrink-0" />
+              ) : (
+                <Mic className="w-5 h-5 shrink-0" />
+              )}
+              <span>
+                {isListening
+                  ? '듣고 있어요 · 누르면 중지'
+                  : '말해서 바로 주문하기'}
+              </span>
+            </button>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (onOpenBrowse) {
+                  onOpenBrowse({ category: 'all', query: easySearchQuery.trim() });
+                } else if (easySearchQuery.trim()) {
+                  onOpenAiChat(easySearchQuery.trim());
+                }
+              }}
+              className="min-h-[54px] rounded-2xl bg-white/[0.09] hover:bg-white/[0.12] focus-within:bg-white/[0.14] border border-white/[0.14] focus-within:border-[#92C84B]/70 px-3.5 flex items-center gap-2 transition-colors"
+            >
+              <Search className="w-4 h-4 text-[#B7C9AE] shrink-0" />
+              <input
+                type="text"
+                value={easySearchQuery}
+                onChange={(e) => setEasySearchQuery(e.target.value)}
+                placeholder="가게·메뉴 검색 (예: 국밥, 치킨)"
+                className="w-full bg-transparent border-0 text-white placeholder:text-[#A8B8A2] text-[13.5px] sm:text-[14.5px] focus:outline-none !min-h-0 py-2"
+              />
+              <button
+                type="submit"
+                className="easy-compact shrink-0 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[13px] font-bold whitespace-nowrap cursor-pointer transition-colors"
+              >
+                검색
+              </button>
+            </form>
           </div>
-          <button
-            type="submit"
-            className="min-h-[46px] px-5 rounded-xl bg-[#1A1D1A] hover:bg-[#2F352F] text-white text-sm sm:text-base font-semibold whitespace-nowrap cursor-pointer shrink-0 transition-colors"
-          >
-            검색
-          </button>
-        </form>
 
-        {showVoiceFallback && (
-          <div className="p-4 bg-[#F7F8F5] border border-[#E8ECE4] rounded-xl space-y-2.5">
-            <p className="text-xs sm:text-sm font-semibold text-[#1A1D1A]">
-              마이크 대신 아래 문장을 눌러도 바로가 찾아드려요
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
-                <button
-                  key={sample.label}
-                  type="button"
-                  onClick={() => {
-                    setShowVoiceFallback(false);
-                    onOpenAiChat(sample.text);
-                  }}
-                  className="w-full px-4 py-2.5 bg-white hover:bg-[#EAF1E2] border border-[#E8ECE4] rounded-xl text-left text-sm font-medium text-[#1A1D1A] cursor-pointer transition-colors"
-                >
-                  “{sample.text}”
-                </button>
-              ))}
+          <div className="mt-3.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="text-[11.5px] font-semibold text-[#9CB094] shrink-0">
+              예시
+            </span>
+            {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
+              <button
+                key={sample.label}
+                type="button"
+                onClick={() => onOpenAiChat(sample.text)}
+                className="easy-compact shrink-0 px-3 py-1 rounded-full bg-white/[0.08] hover:bg-white/[0.16] border border-white/[0.1] text-[12px] font-medium text-[#E5F0DC] whitespace-nowrap cursor-pointer transition-colors"
+              >
+                “{sample.label}”
+              </button>
+            ))}
+          </div>
+
+          {showVoiceFallback && (
+            <div className="p-3.5 mt-3.5 bg-white/[0.1] border border-[#92C84B]/40 rounded-2xl space-y-2.5">
+              <p className="text-xs sm:text-sm font-semibold text-[#E5F0DC]">
+                마이크 대신 아래 문장을 눌러도 바로가 찾아드려요
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {VOICE_TRANSCRIPT_SAMPLES.slice(0, 3).map((sample) => (
+                  <button
+                    key={sample.label}
+                    type="button"
+                    onClick={() => {
+                      setShowVoiceFallback(false);
+                      onOpenAiChat(sample.text);
+                    }}
+                    className="easy-compact w-full px-3.5 py-2.5 bg-white/10 hover:bg-white/18 border border-white/10 rounded-xl text-left text-[13px] sm:text-sm font-medium text-white cursor-pointer transition-colors"
+                  >
+                    “{sample.text}”
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
-      {/* Separated Category Grid */}
-      <section className="space-y-3">
+      {/* Section 2: Visual Food-Photo Category Grid (5x2) */}
+      <section className="space-y-3.5">
         <div className="flex items-center justify-between px-0.5">
-          <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
+          <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-[-0.03em] text-[#111411]">
             카테고리
           </h2>
           {onOpenBrowse && (
             <button
               type="button"
               onClick={() => onOpenBrowse({ category: 'all' })}
-              className="easy-compact inline-flex items-center gap-0.5 text-xs sm:text-sm font-semibold text-[#4E6E2A] hover:text-[#3D5720] cursor-pointer"
+              className="easy-compact inline-flex items-center gap-0.5 text-[12.5px] sm:text-[13.5px] font-semibold text-[#3B5B1E] hover:text-[#244214] cursor-pointer"
             >
               <span>전체 보기</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-5 gap-x-2 gap-y-4 sm:gap-x-5 sm:gap-y-5">
           {EASY_GRID_CATEGORIES.map((cat) => {
             const isSelected = !onOpenBrowse && activeCategoryChip === cat.id;
             return (
@@ -906,132 +952,55 @@ export function ConditionHome({
                     );
                   }
                 }}
-                className={`os-card-interactive min-h-[64px] px-3 py-2.5 rounded-xl text-sm sm:text-base font-bold flex items-center sm:flex-col justify-center gap-2 sm:gap-1.5 cursor-pointer ${
-                  isSelected
-                    ? '!border-[#4E6E2A] !bg-[#EAF1E2]/70 text-[#3D5720]'
-                    : 'text-[#1A1D1A]'
-                }`}
+                className="easy-compact group flex flex-col items-center gap-1.5 sm:gap-2 cursor-pointer"
               >
-                {cat.id === 'all' ? (
-                  <LayoutGrid className="w-5 h-5 text-[#4E6E2A] shrink-0" />
-                ) : (
-                  <span className="text-xl leading-none">{cat.emoji}</span>
-                )}
-                <span className="truncate">{cat.label}</span>
+                <div
+                  className={`w-[52px] h-[52px] sm:w-[68px] sm:h-[68px] rounded-[18px] sm:rounded-[22px] overflow-hidden shadow-[0_2px_8px_rgba(17,20,17,0.05)] group-hover:shadow-[0_6px_16px_rgba(17,20,17,0.1)] group-hover:-translate-y-0.5 transition-all flex items-center justify-center ${
+                    isSelected
+                      ? 'ring-2 ring-[#3B5B1E] ring-offset-2 ring-offset-[#FAFBFA]'
+                      : 'ring-1 ring-black/[0.06]'
+                  }`}
+                >
+                  {cat.image ? (
+                    <img
+                      src={cat.image}
+                      alt={cat.label}
+                      className="w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-200"
+                    />
+                  ) : cat.id === 'closing' ? (
+                    <div className="w-full h-full bg-[#FFF1E6] text-[#D9551E] flex items-center justify-center">
+                      <Flame className="w-6 h-6 sm:w-7 sm:h-7" strokeWidth={2.1} />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-[#EEF2EB] text-[#2A4919] flex items-center justify-center">
+                      <LayoutGrid
+                        className="w-6 h-6 sm:w-7 sm:h-7"
+                        strokeWidth={2.1}
+                      />
+                    </div>
+                  )}
+                </div>
+                <span
+                  className={`text-[11.5px] sm:text-[13px] tracking-[-0.02em] whitespace-nowrap ${
+                    isSelected
+                      ? 'font-bold text-[#284A16]'
+                      : 'font-semibold text-[#1D221D]'
+                  }`}
+                >
+                  {cat.label}
+                </span>
               </button>
             );
           })}
         </div>
       </section>
 
-      {/* Simple Horizontal Banners: B2B Enterprise Group Order & Life Errands */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={onOpenB2BMeal}
-          className="os-card-interactive min-h-[72px] w-full p-4 rounded-2xl flex items-center justify-between gap-3 text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-[#EAF1E2] text-[#4E6E2A] flex items-center justify-center shrink-0">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
-                B2B 기업 단체 선주문
-              </div>
-              <div className="text-xs text-[#444D42] mt-0.5 truncate">
-                원하는 시간 예약 · 카드/계좌 결제 · 거래명세표
-              </div>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#444D42] shrink-0" />
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenErrand}
-          className="os-card-interactive min-h-[72px] w-full p-4 rounded-2xl flex items-center justify-between gap-3 text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-[#EAF1E2] text-[#4E6E2A] flex items-center justify-center shrink-0">
-              <Bike className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm sm:text-base font-bold text-[#1A1D1A] truncate">
-                생활 심부름
-              </div>
-              <div className="text-xs text-[#444D42] mt-0.5 truncate">
-                동네 장보기 · 세탁물 · 픽업 대행 (매칭 100원)
-              </div>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#444D42] shrink-0" />
-        </button>
-      </section>
-
-      {/* Owner Store Events & Coupons Slim Banner Strip */}
-      {featuredStoreEvents.length > 0 && (
-        <section className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm sm:text-base font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
-              <Megaphone className="w-4 h-4 text-[#4E6E2A] shrink-0" />
-              <span>우리 동네 가게 이벤트 · 쿠폰</span>
-            </h2>
-            {onOpenBrowse && (
-              <button
-                type="button"
-                onClick={() => onOpenBrowse({ category: 'all' })}
-                className="easy-compact inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#4E6E2A] hover:text-[#3D5720] cursor-pointer"
-              >
-                <span>더 보기</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-0.5">
-            {featuredStoreEvents.map(({ store, promo, coupon, isNearby }) => {
-              const headline = coupon?.label ?? promo?.title ?? '';
-              return (
-                <button
-                  key={store.id}
-                  type="button"
-                  onClick={() => onOpenStoreMenu?.(store.id)}
-                  className="easy-compact shrink-0 w-[86%] sm:w-[calc(50%-4px)] snap-start px-3 py-2 rounded-xl bg-gradient-to-r from-[#EFF5E7] via-[#F7FAF3] to-[#FFF9EC] border border-[#D8E5C8] hover:border-[#4E6E2A]/60 flex items-center justify-between gap-2 text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="px-1.5 py-1 rounded-md bg-[#4E6E2A] text-white text-[11.5px] leading-none font-bold shrink-0">
-                      {promo?.badgeText ?? '쿠폰'}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 text-[11.5px] leading-tight text-[#4E6E2A] font-semibold">
-                        <span className="truncate">{store.name}</span>
-                        {isNearby && (
-                          <span className="shrink-0 text-[#3D5720]">· 주변</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-[12.5px] leading-tight font-bold text-[#1A1D1A] mt-0.5">
-                        {coupon && (
-                          <Ticket className="w-3.5 h-3.5 text-[#4E6E2A] shrink-0" />
-                        )}
-                        <span className="truncate">{headline}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#4E6E2A] shrink-0" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Weather & Time Contextual Quick Reorder (2-Card Row) */}
+      {/* Section 3: Contextual Quick Reorder (Moved Above Services & Events) */}
       {contextualQuickPicks.length > 0 && (
-        <section className="space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm sm:text-base font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
-              <Zap className="w-4 h-4 fill-[#82B440] text-[#4E6E2A] shrink-0" />
-              <span>자주 시키던 메뉴 바로 시키기</span>
+        <section className="space-y-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+            <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-[-0.03em] text-[#111411]">
+              자주 시키던 메뉴 바로 시키기
             </h2>
             <button
               type="button"
@@ -1042,7 +1011,7 @@ export function ConditionHome({
                 })
               }
               title="날씨 조건 전환하기"
-              className="easy-compact inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-[11.5px] font-semibold cursor-pointer transition-colors"
+              className="easy-compact inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F1F4EE] hover:bg-[#E5ECE0] text-[#284517] text-[12px] font-semibold cursor-pointer transition-colors"
             >
               {weatherMode === 'chilly' ? (
                 <Wind className="w-3.5 h-3.5 shrink-0" />
@@ -1057,13 +1026,13 @@ export function ConditionHome({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {contextualQuickPicks.map((pick) => {
               const totalWithDelivery = pick.subtotal + pick.finalDeliveryFee;
               return (
                 <article
                   key={pick.menu.id}
-                  className="os-card rounded-2xl overflow-hidden flex flex-col"
+                  className="bg-white rounded-[22px] overflow-hidden ring-1 ring-black/[0.06] shadow-[0_2px_12px_rgba(17,20,17,0.04)] hover:shadow-[0_10px_28px_rgba(17,20,17,0.08)] transition-shadow flex flex-col"
                 >
                   <div
                     role="button"
@@ -1076,22 +1045,22 @@ export function ConditionHome({
                       }
                     }}
                     aria-label={`${pick.menu.name} 상세 보기`}
-                    className="relative h-24 sm:h-32 w-full overflow-hidden cursor-pointer group shrink-0"
+                    className="relative h-28 sm:h-40 w-full overflow-hidden cursor-pointer group shrink-0 bg-[#F3F5F1]"
                   >
                     <FoodImage
                       src={pick.menu.image}
                       alt={pick.menu.name}
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200"
                     />
-                    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-white/95 backdrop-blur-sm text-[#3D5720] text-[11.5px] font-bold shadow-sm max-w-[calc(100%-12px)] truncate">
+                    <span className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-[#111411]/65 backdrop-blur-md text-white text-[11px] font-semibold max-w-[calc(100%-16px)] truncate">
                       {pick.reasonBadge}
                     </span>
-                    <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/65 text-white text-[11.5px] font-semibold tabular-nums">
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-[#111411]/65 backdrop-blur-md text-white text-[11px] font-semibold tabular-nums">
                       {pick.effectiveMinutes}분
                     </span>
                   </div>
 
-                  <div className="p-2.5 sm:p-3 flex-1 flex flex-col justify-between gap-2">
+                  <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between gap-2.5">
                     <div
                       role="button"
                       tabIndex={0}
@@ -1104,15 +1073,15 @@ export function ConditionHome({
                       }}
                       className="min-w-0 cursor-pointer space-y-0.5"
                     >
-                      <p className="text-[11.5px] font-semibold text-[#4E6E2A] truncate">
+                      <p className="text-[11.5px] sm:text-[12px] font-medium text-[#646C62] truncate">
                         {pick.store.name}
                       </p>
-                      <h3 className="text-[13.5px] sm:text-[14.5px] font-bold text-[#1A1D1A] truncate">
+                      <h3 className="text-[14px] sm:text-[15.5px] font-bold text-[#111411] truncate tracking-[-0.02em]">
                         {pick.menu.name}
                       </h3>
-                      <p className="text-[12px] font-bold text-[#1A1D1A] tabular-nums truncate">
+                      <p className="text-[13px] sm:text-[14px] font-extrabold text-[#111411] tabular-nums truncate pt-0.5">
                         {formatWon(totalWithDelivery)}
-                        <span className="text-[#555E52] font-medium">
+                        <span className="text-[#646C62] font-medium text-[12px]">
                           {' '}
                           ·{' '}
                           {pick.finalDeliveryFee === 0
@@ -1133,7 +1102,7 @@ export function ConditionHome({
                           customerNote: pick.customerNote,
                         })
                       }
-                      className="easy-compact w-full py-1.5 sm:py-2 px-2.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-[12px] font-semibold rounded-xl inline-flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      className="easy-compact w-full py-2 sm:py-2.5 px-3 bg-[#EDF3E7] hover:bg-[#3B5B1E] text-[#244214] hover:text-white text-[13px] font-bold rounded-xl inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <Zap className="w-3.5 h-3.5 shrink-0" />
                       <span>바로 주문</span>
@@ -1146,17 +1115,129 @@ export function ConditionHome({
         </section>
       )}
 
-      {/* Nearby Affordable-Price Stores (Compact 2-Column Food Collage Grid) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base sm:text-lg font-bold text-[#1A1D1A]">
+      {/* Section 4: Local Services Bento (B2B Enterprise Group Order & Life Errands) */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={onOpenB2BMeal}
+          className="easy-compact group rounded-[22px] bg-[#F2F5EE] hover:bg-[#E8EFE1] p-4 sm:p-5 flex items-center justify-between gap-3.5 text-left cursor-pointer transition-colors"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-white shadow-[0_2px_8px_rgba(17,20,17,0.05)] text-[#2E521C] flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-[#3B5B1E] tracking-tight">
+                법인 · 단체 예약
+              </div>
+              <div className="text-[15px] sm:text-[16px] font-extrabold text-[#111411] tracking-[-0.02em] truncate mt-0.5">
+                B2B 기업 단체 선주문
+              </div>
+              <div className="text-[12px] text-[#5B6359] mt-0.5 truncate">
+                시간 예약 · 카드/계좌 결제 · 거래명세표
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#5B6359] group-hover:translate-x-0.5 transition-transform shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenErrand}
+          className="easy-compact group rounded-[22px] bg-[#F6F4EF] hover:bg-[#EDE9E0] p-4 sm:p-5 flex items-center justify-between gap-3.5 text-left cursor-pointer transition-colors"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-white shadow-[0_2px_8px_rgba(17,20,17,0.05)] text-[#9A5B13] flex items-center justify-center shrink-0">
+              <Bike className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-[#9A5B13] tracking-tight">
+                매칭 수수료 100원
+              </div>
+              <div className="text-[15px] sm:text-[16px] font-extrabold text-[#111411] tracking-[-0.02em] truncate mt-0.5">
+                우리 동네 생활 심부름
+              </div>
+              <div className="text-[12px] text-[#5B6359] mt-0.5 truncate">
+                동네 장보기 · 세탁물 · 가까운 픽업 대행
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#5B6359] group-hover:translate-x-0.5 transition-transform shrink-0" />
+        </button>
+      </section>
+
+      {/* Section 5: Clean White Editorial Store Events & Coupons */}
+      {featuredStoreEvents.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-[-0.03em] text-[#111411]">
+              우리 동네 가게 혜택
+            </h2>
+            {onOpenBrowse && (
+              <button
+                type="button"
+                onClick={() => onOpenBrowse({ category: 'all' })}
+                className="easy-compact inline-flex items-center gap-0.5 text-[12.5px] sm:text-[13.5px] font-semibold text-[#3B5B1E] hover:text-[#244214] cursor-pointer"
+              >
+                <span>더 보기</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
+            {featuredStoreEvents.map(({ store, promo, coupon, isNearby }) => {
+              const headline = coupon?.label ?? promo?.title ?? '';
+              return (
+                <button
+                  key={store.id}
+                  type="button"
+                  onClick={() => onOpenStoreMenu?.(store.id)}
+                  className="easy-compact shrink-0 w-[82%] sm:w-[calc(50%-6px)] snap-start p-3.5 rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-[0_2px_8px_rgba(17,20,17,0.03)] hover:ring-[#3B5B1E]/35 flex items-center justify-between gap-3 text-left cursor-pointer transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-[#EEF4E7] text-[#2E521C] flex items-center justify-center shrink-0">
+                      {coupon ? (
+                        <Ticket className="w-5 h-5" />
+                      ) : (
+                        <Megaphone className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-[11.5px] leading-tight text-[#646C62] font-medium">
+                        <span className="px-1.5 py-0.5 rounded bg-[#EAF2E2] text-[#284A16] text-[10.5px] font-bold shrink-0">
+                          {promo?.badgeText ?? '쿠폰'}
+                        </span>
+                        <span className="truncate font-semibold text-[#3B5B1E]">
+                          {store.name}
+                        </span>
+                        {isNearby && (
+                          <span className="shrink-0 text-[#646C62]">· 주변</span>
+                        )}
+                      </div>
+                      <div className="text-[13.5px] leading-snug font-bold text-[#111411] truncate mt-1">
+                        {headline}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#646C62] shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Section 6: Nearby Affordable-Price Stores (Full-Bleed Food Collage Grid) */}
+      <section className="space-y-3.5">
+        <div className="flex items-center justify-between gap-2 px-0.5">
+          <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-[-0.03em] text-[#111411]">
             지금 바로 배달되는 착한가격 맛집
           </h2>
           {onOpenBrowse && (
             <button
               type="button"
               onClick={() => onOpenBrowse({ category: 'all' })}
-              className="easy-compact inline-flex items-center gap-0.5 text-[12px] sm:text-sm font-semibold text-[#4E6E2A] hover:text-[#3D5720] cursor-pointer shrink-0"
+              className="easy-compact inline-flex items-center gap-0.5 text-[12.5px] sm:text-[13.5px] font-semibold text-[#3B5B1E] hover:text-[#244214] cursor-pointer shrink-0"
             >
               <span>더 찾아보기</span>
               <ChevronRight className="w-4 h-4" />
@@ -1165,14 +1246,25 @@ export function ConditionHome({
         </div>
 
         {affordableStoreCards.length === 0 ? (
-          <div className="os-card rounded-2xl p-6 text-center text-sm text-[#555E52]">
+          <div className="os-card rounded-[22px] p-6 text-center text-sm text-[#646C62]">
             선택한 조건에 맞는 배달 가능 매장을 찾지 못했어요.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5">
             {affordableStoreCards.map((card) => {
               const storeRating = card.store.rating ?? 4.8;
               const storeReviewCount = card.store.reviewCount ?? 120;
+              let photoBadgeText: string | null = null;
+              if (card.store.deliveryFee === 0) {
+                photoBadgeText = '배달 0원';
+              } else if (card.storeCoupon) {
+                photoBadgeText = formatCouponShort(card.storeCoupon);
+              } else if (card.hasFreeDeliveryTier) {
+                photoBadgeText = '배달 0원~';
+              } else if (card.storePromo?.badgeText) {
+                photoBadgeText = card.storePromo.badgeText;
+              }
+
               return (
                 <article
                   key={card.store.id}
@@ -1200,17 +1292,17 @@ export function ConditionHome({
                     }
                   }}
                   aria-label={`${card.store.name} 메뉴 및 혜택 보기`}
-                  className="bg-white rounded-2xl p-1.5 sm:p-2 border border-[#E8ECE4]/90 shadow-[0_1px_3px_rgba(26,29,26,0.04)] hover:border-[#C7D7B5] hover:shadow-[0_6px_16px_-4px_rgba(26,29,26,0.08)] transition-all cursor-pointer group flex flex-col"
+                  className="bg-white rounded-[22px] overflow-hidden ring-1 ring-black/[0.06] shadow-[0_2px_12px_rgba(17,20,17,0.04)] hover:shadow-[0_12px_30px_rgba(17,20,17,0.09)] transition-all cursor-pointer group flex flex-col"
                 >
-                  {/* Asymmetric Food Photo Collage */}
-                  <div className="h-[108px] sm:h-[148px] w-full rounded-xl overflow-hidden bg-white">
+                  {/* Edge-to-Edge Food Photo Collage */}
+                  <div className="relative h-[126px] sm:h-[172px] w-full overflow-hidden bg-[#F3F5F1]">
                     {card.collageImages.length >= 3 ? (
                       <div className="grid grid-cols-[2.1fr_1fr] gap-[2px] w-full h-full bg-white">
                         <div className="w-full h-full overflow-hidden">
                           <FoodImage
                             src={card.collageImages[0]}
                             alt={card.primaryMenu.name}
-                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
+                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200"
                           />
                         </div>
                         <div className="grid grid-rows-2 gap-[2px] w-full h-full bg-white">
@@ -1236,7 +1328,7 @@ export function ConditionHome({
                           <FoodImage
                             src={card.collageImages[0]}
                             alt={card.primaryMenu.name}
-                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
+                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200"
                           />
                         </div>
                         <div className="w-full h-full overflow-hidden">
@@ -1252,61 +1344,55 @@ export function ConditionHome({
                         <FoodImage
                           src={card.collageImages[0] ?? card.store.image}
                           alt={card.primaryMenu.name}
-                          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
+                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200"
                         />
                       </div>
                     )}
+
+                    {photoBadgeText && (
+                      <span className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-white/92 backdrop-blur-md text-[#1E3B10] text-[11px] font-bold shadow-sm max-w-[calc(100%-16px)] truncate">
+                        {photoBadgeText}
+                      </span>
+                    )}
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-[#111411]/65 backdrop-blur-md text-white text-[11px] font-semibold tabular-nums">
+                      {card.effectiveMinutes}분
+                    </span>
                   </div>
 
-                  {/* Overlapping Baro Gradient Benefit Pill */}
-                  <div className="-mt-3 sm:-mt-3.5 relative z-10 mx-1 sm:mx-2">
-                    <div className="rounded-full bg-gradient-to-r from-[#2D4715] via-[#4E6E2A] to-[#6B9B34] px-2 sm:px-3 py-0.5 sm:py-1 shadow-sm flex items-center justify-center gap-1">
-                      <span className="text-[11.5px] font-extrabold text-[#DFF2B8] tracking-tight shrink-0">
-                        Baro
-                      </span>
-                      <span className="text-[11.5px] font-bold text-white truncate">
-                        {card.benefitPillText}
-                      </span>
-                    </div>
-                  </div>
+                  {/* Clean Store Metadata */}
+                  <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between gap-2">
+                    <div>
+                      <h3 className="text-[14.5px] sm:text-[16px] font-extrabold text-[#111411] group-hover:text-[#2E521C] transition-colors truncate tracking-[-0.02em]">
+                        {card.store.name}
+                      </h3>
 
-                  {/* Compact Store Metadata */}
-                  <div className="pt-2 px-0.5 sm:px-1 pb-0.5 space-y-1 flex-1 flex flex-col justify-between">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <h3 className="text-[13.5px] sm:text-[15px] font-extrabold text-[#1A1D1A] group-hover:text-[#3D5720] transition-colors truncate">
-                          {card.store.name}
-                        </h3>
-                        {card.storeCoupon && (
-                          <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 text-[11.5px] font-bold shrink-0">
-                            +쿠폰
-                          </span>
-                        )}
+                      <div className="flex items-center gap-1 text-[12px] text-[#646C62] mt-1 truncate">
+                        <Star className="w-3.5 h-3.5 fill-[#F5A623] text-[#F5A623] shrink-0" />
+                        <span className="font-bold text-[#111411] tabular-nums">
+                          {storeRating.toFixed(1)}
+                        </span>
+                        <span className="tabular-nums">
+                          ({storeReviewCount.toLocaleString('ko-KR')})
+                        </span>
+                        <span>·</span>
+                        <span className="truncate">{card.distanceOrDong}</span>
                       </div>
-                      <span className="text-[12px] font-semibold text-[#555E52] shrink-0 tabular-nums">
-                        {card.effectiveMinutes}분
-                      </span>
+
+                      <div className="flex items-center justify-between gap-1.5 mt-1.5 text-[12px]">
+                        <span className="font-semibold text-[#111411] truncate">
+                          {card.deliveryFeeText}
+                        </span>
+                        <span className="font-medium text-[#646C62] shrink-0 tabular-nums">
+                          {formatWon(card.minMenuPrice)}~
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[11.5px] sm:text-[12.5px] text-[#444D42] truncate">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
-                      <span className="font-bold text-[#1A1D1A] tabular-nums">
-                        {storeRating.toFixed(1)}
-                      </span>
-                      <span className="tabular-nums">
-                        ({storeReviewCount.toLocaleString('ko-KR')})
-                      </span>
-                      <span>·</span>
-                      <span className="truncate">{card.distanceOrDong}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-1.5 pt-0.5">
-                      <span className="text-[11.5px] sm:text-[12px] font-bold text-[#1A1D1A] truncate">
-                        {card.deliveryFeeText}
-                      </span>
-                      <span className="text-[11.5px] sm:text-[12px] font-semibold text-[#444D42] shrink-0 tabular-nums">
-                        {formatWon(card.minMenuPrice)}~
-                      </span>
+                    <div className="rounded-lg bg-[#F2F5EE] text-[#2C4D1B] px-2.5 py-1 text-[11.5px] font-semibold flex items-center gap-1.5 truncate">
+                      {card.storeCoupon && (
+                        <Ticket className="w-3.5 h-3.5 shrink-0 text-[#3B5B1E]" />
+                      )}
+                      <span className="truncate">{card.benefitPillText}</span>
                     </div>
                   </div>
                 </article>
@@ -1319,7 +1405,7 @@ export function ConditionHome({
           <button
             type="button"
             onClick={() => onOpenBrowse({ category: 'all' })}
-            className="w-full min-h-[48px] px-5 py-3 bg-white hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-sm sm:text-base font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            className="easy-compact w-full min-h-[50px] px-5 py-3 bg-[#F1F4EE] hover:bg-[#E5ECE0] text-[#1A211A] text-sm sm:text-base font-bold rounded-2xl inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
           >
             <span>전체 카테고리 · 맛집 더 찾아보기</span>
             <ChevronRight className="w-4 h-4" />
