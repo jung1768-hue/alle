@@ -53,17 +53,17 @@
   --font-display: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "Pretendard Variable", "Pretendard", ui-monospace, SFMono-Regular, monospace;
 
-  --color-os-bg: #FAFBFA;
+  --color-os-bg: #F6F7F8;
   --color-os-surface: #FFFFFF;
-  --color-os-subtle: #F3F5F1;
-  --color-os-border: #EAEDE8;
-  --color-os-ink: #111411;
-  --color-os-muted: #5F675D;
-  --color-os-accent: #4E6E2A;
-  --color-os-accent-hover: #3F5A21;
-  --color-os-lime: #82B440;
-  --color-os-accent-soft: #EAF1E2;
-  --color-os-accent-soft-ink: #3D5720;
+  --color-os-subtle: #EFF2F5;
+  --color-os-border: #E5E8EC;
+  --color-os-ink: #111827;
+  --color-os-muted: #4B5563;
+  --color-os-accent: #0F6B46;
+  --color-os-accent-hover: #0B5638;
+  --color-os-lime: #10A366;
+  --color-os-accent-soft: #EAF6F0;
+  --color-os-accent-soft-ink: #0B4F34;
 }
 
 @layer base {
@@ -77,9 +77,9 @@
   }
 
   html {
-    font-size: 16px;
-    background-color: #FAFBFA;
-    color: #111411;
+    font-size: 17px;
+    background-color: #F6F7F8;
+    color: #111827;
     letter-spacing: -0.015em;
     overflow-x: clip;
     -webkit-font-smoothing: antialiased;
@@ -89,12 +89,12 @@
 
   body {
     overflow-x: clip;
-    font-weight: 400;
+    font-weight: 450;
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #767E74;
+    color: #6B7280;
     opacity: 1;
   }
 
@@ -125,27 +125,27 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid #4E6E2A;
+    outline: 2px solid #0F6B46;
     outline-offset: 2px;
   }
 }
 
 .os-card {
   background-color: #FFFFFF;
-  border: 1px solid rgba(17, 20, 17, 0.07);
-  box-shadow: 0 2px 10px rgba(17, 20, 17, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 .os-card-interactive {
   background-color: #FFFFFF;
-  border: 1px solid rgba(17, 20, 17, 0.07);
-  box-shadow: 0 2px 10px rgba(17, 20, 17, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
 .os-card-interactive:hover {
-  border-color: rgba(59, 91, 30, 0.28);
-  box-shadow: 0 8px 22px -6px rgba(17, 20, 17, 0.08);
+  border-color: rgba(15, 107, 70, 0.3);
+  box-shadow: 0 8px 22px -6px rgba(15, 23, 42, 0.09);
 }
 
 .os-kpi {
@@ -202,64 +202,64 @@
 .alle-easy-mode .text-\[10px\],
 .alle-easy-mode .text-\[10\.5px\],
 .alle-easy-mode .text-\[11px\] {
-  font-size: 0.75rem;
-  line-height: 1.35;
-}
-
-.alle-easy-mode .text-xs {
-  font-size: 0.8125rem;
+  font-size: 0.85rem;
   line-height: 1.4;
 }
 
-.alle-easy-mode .text-sm {
-  font-size: 0.90625rem;
+.alle-easy-mode .text-xs {
+  font-size: 0.9rem;
   line-height: 1.45;
+}
+
+.alle-easy-mode .text-sm {
+  font-size: 0.97rem;
+  line-height: 1.5;
 }
 
 @media (min-width: 640px) {
   .alle-easy-mode .sm\:text-xs {
-    font-size: 0.8125rem;
-    line-height: 1.4;
-  }
-
-  .alle-easy-mode .sm\:text-sm {
-    font-size: 0.90625rem;
+    font-size: 0.9rem;
     line-height: 1.45;
   }
 
+  .alle-easy-mode .sm\:text-sm {
+    font-size: 0.97rem;
+    line-height: 1.5;
+  }
+
   .alle-easy-mode .sm\:text-base {
-    font-size: 1rem;
+    font-size: 1.06rem;
     line-height: 1.5;
   }
 
   .alle-easy-mode .sm\:text-lg {
-    font-size: 1.125rem;
+    font-size: 1.18rem;
     line-height: 1.5;
   }
 
   .alle-easy-mode .sm\:text-xl {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     line-height: 1.35;
   }
 }
 
 @layer utilities {
   .text-\[\#1A1D1A\] {
-    color: #111411;
+    color: #111827;
   }
 
   .text-\[\#555E52\],
   .text-\[\#434B40\] {
-    color: #4A5248;
+    color: #374151;
   }
 
   .text-\[\#687064\],
   .text-\[\#919A8D\] {
-    color: #646C62;
+    color: #4B5563;
   }
 
   .text-\[\#4E6E2A\] {
-    color: #3B5B1E;
+    color: #0F6B46;
   }
 }
 

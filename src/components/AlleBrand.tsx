@@ -19,8 +19,8 @@ export function AlleLogo({ className = '' }: AlleLogoProps) {
       >
         <defs>
           <linearGradient id={gradId} x1="6" y1="16" x2="34" y2="28" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#4A9132" />
-            <stop offset="100%" stopColor="#8EC73F" />
+            <stop offset="0%" stopColor="#0F6B46" />
+            <stop offset="100%" stopColor="#1DB978" />
           </linearGradient>
         </defs>
         <path
@@ -29,12 +29,12 @@ export function AlleLogo({ className = '' }: AlleLogoProps) {
           strokeWidth="5.4"
           strokeLinecap="round"
         />
-        <circle cx="32.2" cy="8.8" r="3.4" fill="#497226" />
+        <circle cx="32.2" cy="8.8" r="3.4" fill="#0B4F34" />
       </svg>
-      <span className="font-display text-[21px] sm:text-[23px] font-extrabold tracking-[-0.045em] text-[#111411] leading-none">
+      <span className="font-display text-[22px] sm:text-[26px] font-extrabold tracking-[-0.045em] text-[#111827] leading-none">
         Baro
       </span>
-      <span className="text-[11.5px] font-bold text-[#3B5B1E] tracking-[-0.02em] leading-none mt-0.5">
+      <span className="text-[13px] sm:text-[14px] font-bold text-[#0F6B46] tracking-[-0.02em] leading-none mt-0.5">
         바로
       </span>
     </span>
