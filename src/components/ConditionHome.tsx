@@ -754,22 +754,23 @@ export function ConditionHome({
         />
 
         <div className="relative z-10">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center gap-2 bg-white/[0.1] border border-white/[0.14] text-[#D1F5E5] text-[14px] sm:text-[15px] font-semibold px-3.5 py-1.5 rounded-full">
+          <div className="relative">
+            <div className="pr-16 sm:pr-24">
+              <span className="inline-flex items-center gap-2 bg-white/[0.1] border border-white/[0.14] text-[#D1F5E5] text-[13px] sm:text-[15px] font-semibold px-3 sm:px-3.5 py-1.5 rounded-full">
                 <span className="w-2 h-2 rounded-full bg-[#34D399] shrink-0" />
                 <span>수수료 0% · 매장 동일가 · 최소주문 없음</span>
               </span>
-
-              <h1 className="!text-[26px] sm:!text-[34px] font-extrabold tracking-[-0.03em] leading-[1.25] break-keep text-white mt-4">
-                가격은 바르게, 주문은 말로 바로
-              </h1>
             </div>
+
             <AlleBotIllustration
               size="md"
               variant="wave-light"
-              className="drop-shadow-[0_6px_16px_rgba(0,0,0,0.22)] shrink-0 mt-0.5"
+              className="absolute -top-2 right-0 sm:-top-2.5 !w-14 !h-14 sm:!w-20 sm:!h-20 drop-shadow-[0_6px_16px_rgba(0,0,0,0.22)] shrink-0"
             />
+
+            <h1 className="whitespace-nowrap !text-[clamp(18.5px,5.1vw,34px)] sm:!text-[34px] font-extrabold tracking-[-0.035em] leading-[1.2] text-white mt-3.5 sm:mt-4">
+              가격은 바르게, 주문은 말로 바로
+            </h1>
           </div>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-[1.08fr_1fr] gap-3">
