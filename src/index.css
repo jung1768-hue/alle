@@ -2,10 +2,10 @@
 
 @font-face {
   font-family: "Pretendard Variable";
-  font-weight: 45 920;
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  src: url("/fonts/PretendardVariable.woff2") format("woff2-variations");
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
 }
 
 @font-face {
@@ -49,9 +49,9 @@
 }
 
 @theme {
-  --font-sans: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --font-display: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: "Pretendard Variable", "Pretendard", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Pretendard", "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-display: "Pretendard", "Pretendard Variable", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Pretendard", "Pretendard Variable", ui-monospace, SFMono-Regular, monospace;
 
   --color-os-bg: #F6F7F8;
   --color-os-surface: #FFFFFF;
@@ -89,7 +89,7 @@
 
   body {
     overflow-x: clip;
-    font-weight: 450;
+    font-weight: 400;
   }
 
   input::placeholder,
