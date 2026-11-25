@@ -3216,11 +3216,7 @@ export default function App() {
       )}
 
       <main
-        className={`flex-1 ${containerWidthClass} w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 ${
-          role === DemoRole.CONSUMER && step === ConsumerStep.AI_CHAT
-            ? 'pb-28 md:pb-32'
-            : 'pb-8 sm:pb-10'
-        }`}
+        className={`flex-1 ${containerWidthClass} w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-8 sm:pb-10`}
       >
         {role === DemoRole.OWNER ? (
           <OwnerDashboardView
@@ -3534,37 +3530,35 @@ export default function App() {
         )}
       </main>
 
-      {!(role === DemoRole.CONSUMER && step === ConsumerStep.AI_CHAT) && (
-        <footer className="border-t border-slate-900/[0.06] bg-[#F6F7F8] pt-5 pb-28 px-4 sm:px-6 text-[#6B7280]">
-          <div className={`${containerWidthClass} mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 text-center md:text-left`}>
-            <div className="space-y-0.5">
-              <p className="text-xs sm:text-sm font-semibold text-[#4B5563]">
-                © 2026 올이. All rights reserved.
-              </p>
-              <p className="text-xs sm:text-sm text-[#6B7280] break-keep leading-relaxed">
-                본 화면은 경북대학교 경영대학원 경영정보세미나 프로젝트 시연용 서비스입니다.
-              </p>
-            </div>
-            <div className="hidden md:flex items-center gap-5 shrink-0 text-sm">
-              <button
-                type="button"
-                onClick={() => setShowFutureModal(true)}
-                className="font-medium text-[#4B5563] hover:text-[#111827] transition-colors cursor-pointer"
-              >
-                서비스 안내
-              </button>
-              <button
-                type="button"
-                onClick={handleResetDemo}
-                className="font-medium text-[#4B5563] hover:text-[#0F6B46] transition-colors inline-flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>데이터 초기화</span>
-              </button>
-            </div>
+      <footer className="border-t border-slate-900/[0.06] bg-[#F6F7F8] pt-5 pb-28 px-4 sm:px-6 text-[#6B7280]">
+        <div className={`${containerWidthClass} mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 text-center md:text-left`}>
+          <div className="space-y-0.5">
+            <p className="text-xs sm:text-sm font-semibold text-[#4B5563]">
+              © 2026 올이. All rights reserved.
+            </p>
+            <p className="text-xs sm:text-sm text-[#6B7280] break-keep leading-relaxed">
+              본 화면은 경북대학교 경영대학원 경영정보세미나 프로젝트 시연용 서비스입니다.
+            </p>
           </div>
-        </footer>
-      )}
+          <div className="hidden md:flex items-center gap-5 shrink-0 text-sm">
+            <button
+              type="button"
+              onClick={() => setShowFutureModal(true)}
+              className="font-medium text-[#4B5563] hover:text-[#111827] transition-colors cursor-pointer"
+            >
+              서비스 안내
+            </button>
+            <button
+              type="button"
+              onClick={handleResetDemo}
+              className="font-medium text-[#4B5563] hover:text-[#0F6B46] transition-colors inline-flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>데이터 초기화</span>
+            </button>
+          </div>
+        </div>
+      </footer>
 
       {/* Floating Cart Bar (same-store multi-item cart) */}
       {showFloatingCartBar && cart && cartStore && (
