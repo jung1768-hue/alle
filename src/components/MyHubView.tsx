@@ -35,6 +35,7 @@ import {
 } from '../types/alle';
 import { formatWon } from '../utils/parser';
 import { calculateMonthlySavings } from '../utils/pricing';
+import { BARO_PARTNER_KIT_SRC } from './AlleBrand';
 
 interface MyHubViewProps {
   role: DemoRole;
@@ -1170,6 +1171,35 @@ export function MyHubView({
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Baro Partner / Errand Rider Application Card */}
+      <section className="os-card rounded-2xl overflow-hidden bg-[#FDF7EE] border-[#E8DFC8] p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4">
+        <img
+          src={BARO_PARTNER_KIT_SRC}
+          alt="Baro 모자와 보온 배달 가방"
+          className="w-full sm:w-44 h-28 rounded-2xl object-cover border border-[#E8DFC8] shrink-0"
+        />
+        <div className="min-w-0 flex-1 space-y-2 text-center sm:text-left">
+          <div>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
+              바로 배달 · 심부름 파트너
+            </span>
+            <h2 className="text-base font-extrabold text-[#1A1D1A] mt-1">
+              바로 배달원 · 심부름 파트너 신청
+            </h2>
+            <p className="text-xs sm:text-sm text-[#555E52] mt-0.5 break-keep leading-relaxed">
+              Baro 공식 모자와 보온 가방을 매고 우리 동네 배달·심부름 파트너로 활동해 보세요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onChangeRole(DemoRole.PARTNER)}
+            className="easy-compact min-h-[40px] px-4 py-2 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
+          >
+            배달 파트너 · 심부름 신청하기
+          </button>
         </div>
       </section>
 

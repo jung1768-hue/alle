@@ -12,6 +12,7 @@ import {
   DispatchMode,
   OrderStatus,
 } from '../types/alle';
+import { BARO_PARTNER_GEAR_SRC } from './AlleBrand';
 
 interface LiveDeliveryMapCardProps {
   orderCode: string;
@@ -108,13 +109,25 @@ export function LiveDeliveryMapCard({
 
       {/* Prominent AI Dispatch & Live ETA Banner */}
       <div className="px-3.5 py-2.5 bg-[#EAF1E2] border border-[#DCE7CF] text-[#3D5720] rounded-xl flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-bold">
-          <Sparkles className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
-          <span>
-            {dispatchMode
-              ? `${activeRiderLabel} 배정 완료`
-              : '라이더 최적 동선 매칭 완료'}
-          </span>
+        <div className="flex items-center gap-2.5 text-xs font-bold min-w-0">
+          <img
+            src={BARO_PARTNER_GEAR_SRC}
+            alt="Baro 모자와 보온 가방"
+            className="w-12 h-9 rounded-lg object-cover border border-[#D4E1C5] shrink-0"
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#82B440] shrink-0" />
+              <span className="truncate">
+                {dispatchMode
+                  ? `${activeRiderLabel} 배정 완료`
+                  : '라이더 최적 동선 매칭 완료'}
+              </span>
+            </div>
+            <div className="text-[10.5px] font-semibold text-[#555E52]">
+              Baro 모자 · 보온 가방 착용
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 text-xs font-bold text-[#4E6E2A] font-mono tabular-nums">
           {effectiveStep >= 3 ? (

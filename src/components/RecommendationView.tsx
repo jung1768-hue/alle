@@ -339,7 +339,7 @@ export function RecommendationView({
         </div>
 
         <div className="flex items-center gap-3">
-          <AlleBotIllustration size="sm" />
+          <AlleBotIllustration size="sm" variant="bowl" />
           <div className="bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm text-[#1A1D1A]">
             {matches.length > 0 ? (
               <span>

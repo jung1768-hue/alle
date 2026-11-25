@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bike,
   Building2,
   ChevronRight,
   CloudRain,
@@ -50,6 +49,7 @@ import {
 } from '../utils/parser';
 import { calculateStoreDeliveryFee } from '../utils/pricing';
 import { startKoreanVoiceInput } from '../utils/voice';
+import { AlleBotIllustration, BARO_PARTNER_GEAR_SRC } from './AlleBrand';
 import { FoodImage } from './FoodImage';
 import { MenuDetailReviewModal } from './MenuDetailReviewModal';
 
@@ -754,14 +754,23 @@ export function ConditionHome({
         />
 
         <div className="relative z-10">
-          <span className="inline-flex items-center gap-2 bg-white/[0.1] border border-white/[0.14] text-[#D1F5E5] text-[14px] sm:text-[15px] font-semibold px-3.5 py-1.5 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-[#34D399] shrink-0" />
-            <span>수수료 0% · 매장 동일가 · 최소주문 없음</span>
-          </span>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="inline-flex items-center gap-2 bg-white/[0.1] border border-white/[0.14] text-[#D1F5E5] text-[14px] sm:text-[15px] font-semibold px-3.5 py-1.5 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-[#34D399] shrink-0" />
+                <span>수수료 0% · 매장 동일가 · 최소주문 없음</span>
+              </span>
 
-          <h1 className="!text-[26px] sm:!text-[34px] font-extrabold tracking-[-0.03em] leading-[1.25] break-keep text-white mt-4">
-            가격은 바르게, 주문은 말로 바로
-          </h1>
+              <h1 className="!text-[26px] sm:!text-[34px] font-extrabold tracking-[-0.03em] leading-[1.25] break-keep text-white mt-4">
+                가격은 바르게, 주문은 말로 바로
+              </h1>
+            </div>
+            <AlleBotIllustration
+              size="md"
+              variant="wave"
+              className="rounded-2xl shadow-lg ring-2 ring-white/25 shrink-0 mt-0.5"
+            />
+          </div>
 
           <div className="mt-5 grid grid-cols-1 md:grid-cols-[1.08fr_1fr] gap-3">
             <button
@@ -1090,8 +1099,12 @@ export function ConditionHome({
           className="easy-compact group rounded-[24px] bg-[#EEF4FC] hover:bg-[#E1ECFA] p-5 flex items-center justify-between gap-4 text-left cursor-pointer transition-colors"
         >
           <div className="flex items-center gap-4 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm text-[#1D4ED8] flex items-center justify-center shrink-0">
-              <Bike className="w-6 h-6" />
+            <div className="w-16 h-14 rounded-2xl overflow-hidden bg-[#F8E7D5] shadow-sm border border-white shrink-0">
+              <img
+                src={BARO_PARTNER_GEAR_SRC}
+                alt="Baro 모자와 보온 가방"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="min-w-0">
               <div className="text-[14px] font-bold text-[#1D4ED8] tracking-tight">
@@ -1101,7 +1114,7 @@ export function ConditionHome({
                 우리 동네 생활 심부름
               </div>
               <div className="text-[15px] font-medium text-[#374151] mt-1 leading-snug">
-                동네 장보기 · 세탁물 · 가까운 픽업 대행
+                Baro 모자·보온 가방 착용 파트너가 장보기·픽업 대행
               </div>
             </div>
           </div>

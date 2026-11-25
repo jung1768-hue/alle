@@ -28,6 +28,7 @@ import {
   getDeliveryMethodMeta,
   MATCHING_FEE_PER_CASE,
 } from '../utils/pricing';
+import { BARO_PARTNER_KIT_SRC } from './AlleBrand';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
 interface PartnerDashboardViewProps {
@@ -170,6 +171,28 @@ export function PartnerDashboardView({
           >
             점주 · 관리자
           </button>
+        </div>
+      </div>
+
+      {/* Baro Official Partner Kit Showcase */}
+      <div className="bg-[#FDF7EE] border border-[#E8DFC8] rounded-3xl p-4 sm:p-5 grid grid-cols-1 md:grid-cols-[1.15fr_1fr] gap-4 items-center">
+        <div className="rounded-2xl overflow-hidden border border-[#E8DFC8] bg-[#F4DEC9]">
+          <img
+            src={BARO_PARTNER_KIT_SRC}
+            alt="Baro 공식 파트너 앱, 모자, 보온 배달 가방 킷"
+            className="w-full h-44 sm:h-52 object-cover block"
+          />
+        </div>
+        <div className="space-y-2">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-xs font-bold">
+            Baro 공식 배달 · 심부름 킷
+          </span>
+          <h2 className="text-base sm:text-lg font-extrabold text-[#1A1D1A] tracking-tight">
+            바로 모자 · 보온 가방 착용 배송
+          </h2>
+          <p className="text-xs sm:text-sm text-[#4B5548] leading-relaxed break-keep">
+            일반 음식 배달과 바로 심부름 파트너로 활동할 때 Baro 공식 모자와 야간 반사띠 보온 가방을 착용하고 안전하게 배송합니다.
+          </p>
         </div>
       </div>
 

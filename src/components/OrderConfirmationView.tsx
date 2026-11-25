@@ -29,6 +29,7 @@ import {
   StoreCoupon,
   StorePromotion,
 } from '../types/alle';
+import { BARO_PARTNER_GEAR_SRC } from './AlleBrand';
 import { formatWon, getEffectiveMenuPrice } from '../utils/parser';
 import {
   calculateStoreDeliveryFee,
@@ -836,6 +837,22 @@ export function OrderConfirmationView({
                 </button>
               );
             })}
+          </div>
+
+          <div className="p-3 rounded-2xl bg-[#FDF7EE] border border-[#E8DFC8] flex items-center gap-3">
+            <img
+              src={BARO_PARTNER_GEAR_SRC}
+              alt="Baro 모자와 보온 배달 가방"
+              className="w-20 h-14 rounded-xl object-cover shrink-0 border border-[#E8DFC8]"
+            />
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-xs sm:text-sm font-bold text-[#3D5720]">
+                Baro 공식 모자 · 보온 가방 착용 파트너 배송
+              </p>
+              <p className="text-[11px] sm:text-xs text-[#555E52] leading-snug break-keep">
+                일반 배달 신청 시 Baro 전용 보온 가방으로 음식을 따뜻하고 안전하게 전해드려요.
+              </p>
+            </div>
           </div>
         </div>
 

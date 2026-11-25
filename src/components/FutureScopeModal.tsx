@@ -1,4 +1,5 @@
 import { Cpu, Lock, ShieldCheck, Wallet, X } from 'lucide-react';
+import { BARO_APP_ICON_SRC } from './AlleBrand';
 
 interface FutureScopeModalProps {
   isOpen: boolean;
@@ -17,13 +18,20 @@ export function FutureScopeModal({ isOpen, onClose }: FutureScopeModalProps) {
     >
       <div className="w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] p-6 max-h-[88vh] overflow-y-auto space-y-5">
         <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 id="future-scope-title" className="text-lg font-bold text-[#1A1D1A]">
-              Baro · 바른 가격, 바로 오는 우리 동네
-            </h2>
-            <p className="text-xs font-medium text-[#687064] mt-0.5">
-              검색에서 제안으로, 일회성에서 반복으로 · 중개수수료 0% · 개인정보 안심 보호
-            </p>
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src={BARO_APP_ICON_SRC}
+              alt="Baro 앱 아이콘"
+              className="w-11 h-11 rounded-2xl shadow-sm shrink-0 object-cover"
+            />
+            <div className="min-w-0">
+              <h2 id="future-scope-title" className="text-lg font-bold text-[#1A1D1A]">
+                Baro · 바른 가격, 바로 오는 우리 동네
+              </h2>
+              <p className="text-xs font-medium text-[#687064] mt-0.5">
+                검색에서 제안으로, 일회성에서 반복으로 · 중개수수료 0% · 개인정보 안심 보호
+              </p>
+            </div>
           </div>
           <button
             type="button"

@@ -205,6 +205,40 @@ function detectPaymentMethodFromSpeech(rawText: string): PaymentMethod | null {
   return null;
 }
 
+function detectDeliveryMethodFromSpeech(rawText: string): DeliveryMethod | null {
+  const t = rawText.toLowerCase().trim();
+  if (/(동네\s*파트너|파트너\s*배송|이웃\s*파트너|기본\s*배송|일반\s*배송)/.test(t)) {
+    return 'partner_direct';
+  }
+  if (/(자동\s*묶음|묶음\s*배송|알뜰\s*배송|알뜰|묶음|절약)/.test(t)) {
+    return 'auto_bundle';
+  }
+  if (/(한\s*집|한집\s*빠른|빠른\s*배송|직행|단건)/.test(t)) {
+    return 'single_express';
+  }
+  return null;
+}
+
+function extractOrdinalIndex(rawText: string, max: number): number | null {
+  if (max <= 0) return null;
+  const trimmed = rawText.trim();
+  const numMatch = trimmed.match(/^(?:제?\s*)?(\d+)\s*번?(?:째|으로|로|요)?$/);
+  if (numMatch) {
+    const idx = parseInt(numMatch[1], 10) - 1;
+    if (idx >= 0 && idx < max) return idx;
+  }
+  const ordinals: Array<[RegExp, number]> = [
+    [/^(?:첫\s*번?\s*째?|맨\s*앞|맨\s*위|하나)(?:으로|로|요)?$/, 0],
+    [/^(?:두\s*번?\s*째?|둘\s*째)(?:으로|로|요)?$/, 1],
+    [/^(?:세\s*번?\s*째?|셋\s*째)(?:으로|로|요)?$/, 2],
+    [/^(?:네\s*번?\s*째?|넷\s*째)(?:으로|로|요)?$/, 3],
+  ];
+  for (const [re, idx] of ordinals) {
+    if (re.test(trimmed) && idx < max) return idx;
+  }
+  return null;
+}
+
 function extractExplicitQuantity(rawText: string): number | null {
   const trimmed = rawText.trim();
   const numeric = trimmed.match(/(\d+)\s*(?:인분|개|명|잔|그릇|마리)/);
@@ -472,6 +506,7 @@ export function AiChatOrderView({
   const [recommendedSpotlight, setRecommendedSpotlight] =
     useState<RecommendedSpotlightState | null>(null);
   const spotlightPillRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const checkoutEditPanelRef = useRef<HTMLDivElement | null>(null);
   const stopVoiceRef = useRef<(() => void) | null>(null);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const latestTurnStartRef = useRef<HTMLDivElement | null>(null);
@@ -979,6 +1014,17 @@ export function AiChatOrderView({
   }, [voiceCheckoutDraft]);
 
   useEffect(() => {
+    if (!voiceCheckoutDraft || activeCheckoutEditPanel === 'none') return;
+    const timer = window.setTimeout(() => {
+      const panelEl = checkoutEditPanelRef.current;
+      if (!panelEl) return;
+      panelEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      panelEl.focus({ preventScroll: true });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [activeCheckoutEditPanel, voiceCheckoutDraft]);
+
+  useEffect(() => {
     if (!recommendedSpotlight) return;
     const activePill =
       spotlightPillRefs.current[recommendedSpotlight.activeIndex];
@@ -1223,8 +1269,8 @@ export function AiChatOrderView({
         id: `b-checkout-${Date.now() + 1}`,
         sender: 'bot',
         text: leadPrefix
-          ? `${leadPrefix} 아래 내용으로 바로 결제할까요?`
-          : '네! 아래 내용으로 바로 결제할까요?',
+          ? `${leadPrefix} 아래 내용으로 바로 결제할까요? (예: "네, 결제해줘", "배송방식", "결제 수단", "수량", "옵션", "메뉴 추가")`
+          : '네! 아래 내용으로 바로 결제할까요? (예: "네, 결제해줘", "배송방식", "결제 수단", "수량", "옵션", "메뉴 추가")',
         spokenText: spoken,
         stagedMenuId: draft.menuId,
         checkoutDraftSnapshot: draft,
@@ -1526,6 +1572,425 @@ export function AiChatOrderView({
     const activeStore = activeMenu
       ? storeMap.get(activeMenu.storeId)
       : undefined;
+
+    const replyWithCheckoutDraft = (
+      draft: VoiceCheckoutDraft,
+      text: string,
+      spokenText: string,
+      panel: CheckoutEditPanel = 'none'
+    ) => {
+      setVoiceCheckoutDraft(draft);
+      setActiveCheckoutEditPanel(panel);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `b-checkout-turn-${Date.now() + 1}`,
+          sender: 'bot',
+          text,
+          spokenText,
+          stagedMenuId: draft.menuId,
+          checkoutDraftSnapshot: draft,
+          aiSource: 'rule',
+        },
+      ]);
+    };
+
+    // Conversational focus & selection for checkout fields (수량, 옵션, 결제수단, 배송방식, 메뉴 추가)
+    if (voiceCheckoutDraft) {
+      const curSummary = buildVoiceCheckoutSummary(voiceCheckoutDraft);
+      if (curSummary) {
+        const otherStoreMenus = (
+          menusByStore.get(curSummary.store.id) ?? []
+        ).filter(
+          (m) =>
+            m.id !== curSummary.menu.id && !m.isSoldOut && m.stock >= 1
+        );
+        const cleanInput = trimmed.replace(/\s+/g, '').toLowerCase();
+        const isSearchIntent = /(추천|찾아|검색|보여\s*줘|다른\s*음식)/.test(trimmed);
+
+        // A. Close active inline panel
+        if (
+          activeCheckoutEditPanel !== 'none' &&
+          /^(완료|다\s*골랐|됐어|닫아|그만|확인)$/.test(trimmed)
+        ) {
+          const spoken = `네, 반영된 내용으로 총 ${formatWon(curSummary.finalTotal)} 바로 결제할까요?`;
+          replyWithCheckoutDraft(
+            voiceCheckoutDraft,
+            `${spoken} (예: "네, 결제해줘", "결제 수단", "배송방식")`,
+            spoken,
+            'none'
+          );
+          return;
+        }
+
+        // B. 배송방식 (select or focus)
+        const directDelivery = detectDeliveryMethodFromSpeech(trimmed);
+        const ordinalDeliveryIdx =
+          activeCheckoutEditPanel === 'delivery'
+            ? extractOrdinalIndex(trimmed, DELIVERY_METHOD_OPTIONS.length)
+            : null;
+        const chosenDelivery =
+          directDelivery ??
+          (ordinalDeliveryIdx !== null
+            ? DELIVERY_METHOD_OPTIONS[ordinalDeliveryIdx].id
+            : null);
+
+        if (chosenDelivery) {
+          const updated: VoiceCheckoutDraft = {
+            ...voiceCheckoutDraft,
+            deliveryMethod: chosenDelivery,
+          };
+          const nextSummary = buildVoiceCheckoutSummary(updated);
+          const meta = getDeliveryMethodMeta(chosenDelivery);
+          const totalText = nextSummary
+            ? formatWon(nextSummary.finalTotal)
+            : formatWon(curSummary.finalTotal);
+          const spoken = `${meta.label}(으)로 바꿨어요. 배달비 포함 총 ${totalText}입니다. 이대로 바로 결제할까요?`;
+          replyWithCheckoutDraft(
+            updated,
+            `${spoken} (예: "네, 결제해줘", "결제 수단", "수량")`,
+            spoken,
+            'none'
+          );
+          return;
+        }
+        if (/(배송\s*방식|배달\s*방식|배송\s*바꿔|배송\s*변경|배달\s*바꿔|배송\s*선택)/.test(trimmed)) {
+          const text =
+            '배송 방식을 열어드렸어요. 예: "동네 파트너", "자동 묶음배송", "한집 빠른배송" 또는 "2번"처럼 말씀해 보세요.';
+          const spoken =
+            '배송 방식을 열어드렸어요. 동네 파트너 배송, 자동 묶음배송, 한집 빠른배송 중 어떤 걸로 하실까요?';
+          replyWithCheckoutDraft(voiceCheckoutDraft, text, spoken, 'delivery');
+          return;
+        }
+
+        // C. 결제 수단 (select or focus)
+        const directPayment = detectPaymentMethodFromSpeech(trimmed);
+        const ordinalPaymentIdx =
+          activeCheckoutEditPanel === 'payment'
+            ? extractOrdinalIndex(trimmed, paymentOptions.length)
+            : null;
+        const chosenPayment =
+          directPayment ??
+          (ordinalPaymentIdx !== null
+            ? paymentOptions[ordinalPaymentIdx].id
+            : null);
+
+        if (chosenPayment) {
+          const updated: VoiceCheckoutDraft = {
+            ...voiceCheckoutDraft,
+            paymentMethod: chosenPayment,
+          };
+          if (/(결제\s*해|결제\s*완료|주문\s*해|진행\s*해)/.test(trimmed)) {
+            executeVoiceOrder(updated);
+            return;
+          }
+          const nextSummary = buildVoiceCheckoutSummary(updated);
+          const payOpt =
+            paymentOptions.find((p) => p.id === chosenPayment) ??
+            paymentOptions[0];
+          const totalText = nextSummary
+            ? formatWon(nextSummary.finalTotal)
+            : formatWon(curSummary.finalTotal);
+          const spoken = `${payOpt.label}(으)로 바꿨어요. 총 ${totalText} 바로 결제할까요?`;
+          replyWithCheckoutDraft(
+            updated,
+            `${spoken} (예: "네, 결제해줘", "배송방식", "수량")`,
+            spoken,
+            'none'
+          );
+          return;
+        }
+        if (/(결제\s*수단|결제\s*방법|결제\s*방식|결제\s*바꿔|결제\s*변경)/.test(trimmed)) {
+          const text =
+            '결제 수단을 열어드렸어요. 예: "토스페이", "네이버페이", "등록카드" 또는 "2번"처럼 말씀해 보세요.';
+          const spoken =
+            '결제 수단을 열어드렸어요. 카카오페이, 토스페이, 네이버페이, 등록카드 중에서 편한 걸 말씀해 주세요.';
+          replyWithCheckoutDraft(voiceCheckoutDraft, text, spoken, 'payment');
+          return;
+        }
+
+        // D. 메뉴 추가 (select or focus)
+        const ordinalExtraIdx =
+          activeCheckoutEditPanel === 'extras'
+            ? extractOrdinalIndex(trimmed, Math.min(4, otherStoreMenus.length))
+            : null;
+        const namedExtra =
+          ordinalExtraIdx !== null
+            ? otherStoreMenus[ordinalExtraIdx]
+            : otherStoreMenus.find((m) => {
+                const cleanName = m.name.replace(/\s+/g, '').toLowerCase();
+                return (
+                  cleanInput.includes(cleanName) ||
+                  (cleanInput.length >= 2 && cleanName.includes(cleanInput))
+                );
+              });
+
+        if (namedExtra && !isSearchIntent) {
+          const isRemove = /(빼|제외|취소|삭제)/.test(trimmed);
+          const list = voiceCheckoutDraft.extraItems ?? [];
+          const existingIdx = list.findIndex((it) => it.menuId === namedExtra.id);
+          let nextExtras: CartLineItem[];
+          if (isRemove) {
+            nextExtras =
+              existingIdx === -1
+                ? list
+                : list
+                    .map((it, idx) =>
+                      idx === existingIdx
+                        ? { ...it, quantity: it.quantity - 1 }
+                        : it
+                    )
+                    .filter((it) => it.quantity > 0);
+          } else {
+            nextExtras =
+              existingIdx === -1
+                ? [
+                    ...list,
+                    {
+                      menuId: namedExtra.id,
+                      quantity: 1,
+                      selectedOptionIds: [],
+                    },
+                  ]
+                : list.map((it, idx) =>
+                    idx === existingIdx
+                      ? {
+                          ...it,
+                          quantity: Math.min(namedExtra.stock, it.quantity + 1),
+                        }
+                      : it
+                  );
+          }
+          const updated: VoiceCheckoutDraft = {
+            ...voiceCheckoutDraft,
+            extraItems: nextExtras,
+          };
+          const nextSummary = buildVoiceCheckoutSummary(updated);
+          const totalText = nextSummary
+            ? formatWon(nextSummary.finalTotal)
+            : formatWon(curSummary.finalTotal);
+          const lineCount = nextSummary?.resolvedLines.length ?? 1;
+          const spoken = isRemove
+            ? `${namedExtra.name}을(를) 뺐어요. 총 ${totalText} 바로 결제할까요?`
+            : `${namedExtra.name}을(를) 함께 담았어요. 총 ${lineCount}종 ${totalText}입니다. 더 추가할까요, 바로 결제할까요?`;
+          replyWithCheckoutDraft(
+            updated,
+            `${spoken} (예: "네, 결제해줘", "메뉴 추가")`,
+            spoken,
+            'none'
+          );
+          return;
+        }
+        if (/(메뉴\s*추가|다른\s*메뉴|추가\s*메뉴|사이드\s*추가|더\s*담)/.test(trimmed)) {
+          if (otherStoreMenus.length > 0) {
+            const topNames = otherStoreMenus
+              .slice(0, 3)
+              .map((m) => m.name)
+              .join(', ');
+            const text = `${curSummary.store.name}의 추가 메뉴를 열어드렸어요. 예: "${otherStoreMenus[0].name}", "1번"처럼 말씀해 보세요.`;
+            const spoken = `${curSummary.store.name}의 추가 메뉴를 열어드렸어요. ${topNames} 중에서 어떤 메뉴를 담을까요?`;
+            replyWithCheckoutDraft(voiceCheckoutDraft, text, spoken, 'extras');
+          } else {
+            const spoken = `${curSummary.store.name}에 함께 추가할 다른 메뉴가 없어요. 이대로 바로 결제할까요?`;
+            replyWithCheckoutDraft(
+              voiceCheckoutDraft,
+              `${spoken} (예: "네, 결제해줘", "배송방식")`,
+              spoken,
+              'none'
+            );
+          }
+          return;
+        }
+
+        // E. 수량 & 옵션 (select or focus)
+        if (!isSearchIntent) {
+          const explicitQty = extractExplicitQuantity(trimmed);
+          const bareQtyMatch =
+            activeCheckoutEditPanel === 'options'
+              ? trimmed.match(/^(\d{1,2})$/)
+              : null;
+          const isStepUp =
+            /(수량\s*늘|수량\s*올|하나\s*더|한\s*개\s*더|1인분\s*더)/.test(trimmed) ||
+            (activeCheckoutEditPanel === 'options' && /^(더|늘려|추가|\+)$/.test(trimmed));
+          const isStepDown =
+            /(수량\s*줄|수량\s*내|하나\s*빼|한\s*개\s*빼|하나\s*줄)/.test(trimmed) ||
+            (activeCheckoutEditPanel === 'options' && /^(줄여|빼|-)$/.test(trimmed));
+
+          const targetQty =
+            explicitQty ??
+            (bareQtyMatch ? parseInt(bareQtyMatch[1], 10) : null) ??
+            (isStepUp
+              ? voiceCheckoutDraft.servings + 1
+              : isStepDown
+                ? voiceCheckoutDraft.servings - 1
+                : null);
+
+          if (targetQty !== null && targetQty >= 1 && targetQty <= 20) {
+            const clampedQty = Math.min(
+              Math.max(1, targetQty),
+              Math.max(1, curSummary.menu.stock)
+            );
+            setStagedServings((prev) => ({
+              ...prev,
+              [curSummary.menu.id]: clampedQty,
+            }));
+            const updated: VoiceCheckoutDraft = {
+              ...voiceCheckoutDraft,
+              servings: clampedQty,
+            };
+            const nextSummary = buildVoiceCheckoutSummary(updated);
+            const totalText = nextSummary
+              ? formatWon(nextSummary.finalTotal)
+              : formatWon(curSummary.finalTotal);
+            const spoken = `${curSummary.menu.name} ${clampedQty}인분으로 변경했어요. 총 ${totalText} 바로 결제할까요?`;
+            replyWithCheckoutDraft(
+              updated,
+              `${spoken} (예: "네, 결제해줘", "결제 수단", "배송방식")`,
+              spoken,
+              'none'
+            );
+            return;
+          }
+
+          const clearOptions = /(옵션\s*빼|옵션\s*없|기본으로|옵션\s*초기화)/.test(
+            trimmed
+          );
+          const ordinalOptionIdx =
+            activeCheckoutEditPanel === 'options'
+              ? extractOrdinalIndex(trimmed, curSummary.menu.options.length)
+              : null;
+          const matchedOptions = curSummary.menu.options.filter((opt, idx) => {
+            if (ordinalOptionIdx === idx) return true;
+            const cleanOpt = opt.name.replace(/\s+/g, '').toLowerCase();
+            return (
+              cleanInput.includes(cleanOpt) ||
+              (cleanInput.length >= 2 && cleanOpt.includes(cleanInput))
+            );
+          });
+
+          if (clearOptions || matchedOptions.length > 0) {
+            const isRemoveOpt = /(빼|제외|취소)/.test(trimmed);
+            let nextOptIds: string[];
+            let labelDesc: string;
+            if (clearOptions) {
+              nextOptIds = [];
+              labelDesc = '옵션 없이 기본 구성을';
+            } else if (isRemoveOpt) {
+              const removeSet = new Set(matchedOptions.map((o) => o.id));
+              nextOptIds = voiceCheckoutDraft.selectedOptionIds.filter(
+                (id) => !removeSet.has(id)
+              );
+              labelDesc = `${matchedOptions.map((o) => o.name).join(', ')} 옵션을 빼고`;
+            } else {
+              const set = new Set(voiceCheckoutDraft.selectedOptionIds);
+              for (const opt of matchedOptions) {
+                if (ordinalOptionIdx !== null && set.has(opt.id)) {
+                  set.delete(opt.id);
+                } else {
+                  set.add(opt.id);
+                }
+              }
+              nextOptIds = Array.from(set);
+              labelDesc = `${matchedOptions.map((o) => o.name).join(', ')} 옵션을`;
+            }
+            setStagedOptions((prev) => ({
+              ...prev,
+              [curSummary.menu.id]: nextOptIds,
+            }));
+            const updated: VoiceCheckoutDraft = {
+              ...voiceCheckoutDraft,
+              selectedOptionIds: nextOptIds,
+            };
+            const nextSummary = buildVoiceCheckoutSummary(updated);
+            const totalText = nextSummary
+              ? formatWon(nextSummary.finalTotal)
+              : formatWon(curSummary.finalTotal);
+            const spoken = `${labelDesc} 반영했어요. 총 ${totalText} 바로 결제할까요?`;
+            replyWithCheckoutDraft(
+              updated,
+              `${spoken} (예: "네, 결제해줘", "결제 수단", "배송방식")`,
+              spoken,
+              'none'
+            );
+            return;
+          }
+
+          if (/(수량|개수|인분\s*바꿔|인분\s*변경)/.test(trimmed)) {
+            const text = `수량·옵션 창을 열어드렸어요. 현재 ${voiceCheckoutDraft.servings}인분이에요. 예: "2인분", "하나 더", "하나 빼줘"처럼 말씀해 보세요.`;
+            const spoken = `수량·옵션 창을 열어드렸어요. 현재 ${voiceCheckoutDraft.servings}인분인데 몇 인분으로 바꿀까요?`;
+            replyWithCheckoutDraft(voiceCheckoutDraft, text, spoken, 'options');
+            return;
+          }
+
+          if (/(옵션|토핑)/.test(trimmed)) {
+            if (curSummary.menu.options.length > 0) {
+              const optNames = curSummary.menu.options
+                .map((o) => o.name)
+                .join(', ');
+              const text = `추가 옵션을 열어드렸어요. 예: "${curSummary.menu.options[0].name}", "옵션 빼줘", "1번"처럼 말씀해 보세요.`;
+              const spoken = `추가 옵션을 열어드렸어요. ${optNames} 중에서 원하시는 옵션을 말씀해 주세요.`;
+              replyWithCheckoutDraft(voiceCheckoutDraft, text, spoken, 'options');
+            } else {
+              const text =
+                '이 메뉴는 별도 추가 옵션이 없어요. 예: "2인분", "네, 결제해줘"처럼 말씀해 보세요.';
+              const spoken =
+                '이 메뉴는 별도 추가 옵션이 없어요. 수량을 바꾸시겠어요, 아니면 바로 결제할까요?';
+              replyWithCheckoutDraft(voiceCheckoutDraft, text, spoken, 'options');
+            }
+            return;
+          }
+        }
+      }
+    } else if (
+      activeMenu &&
+      activeStore &&
+      !/(추천|찾아|검색|보여\s*줘)/.test(trimmed) &&
+      /(배송\s*방식|배달\s*방식|결제\s*수단|결제\s*방법|메뉴\s*추가|수량|옵션)/.test(
+        trimmed
+      )
+    ) {
+      const targetPanel: CheckoutEditPanel = /(배송\s*방식|배달\s*방식)/.test(trimmed)
+        ? 'delivery'
+        : /(결제\s*수단|결제\s*방법)/.test(trimmed)
+          ? 'payment'
+          : /(메뉴\s*추가)/.test(trimmed)
+            ? 'extras'
+            : 'options';
+      const qty = Math.min(
+        Math.max(
+          1,
+          stagedServings[activeMenu.id] ?? activeCondition.servings ?? 1
+        ),
+        Math.max(1, activeMenu.stock)
+      );
+      const initialDraft: VoiceCheckoutDraft = {
+        menuId: activeMenu.id,
+        servings: qty,
+        selectedOptionIds: stagedOptions[activeMenu.id] ?? [],
+        paymentMethod: 'kakaopay',
+        customerNote: defaultNote ?? '',
+      };
+      const panelLabel =
+        targetPanel === 'delivery'
+          ? '배송 방식'
+          : targetPanel === 'payment'
+            ? '결제 수단'
+            : targetPanel === 'extras'
+              ? '메뉴 추가'
+              : '수량 및 옵션';
+      const panelExample =
+        targetPanel === 'delivery'
+          ? '예: "동네 파트너", "자동 묶음배송", "한집 빠른배송"'
+          : targetPanel === 'payment'
+            ? '예: "토스페이", "네이버페이", "등록카드"'
+            : targetPanel === 'extras'
+              ? '예: "1번", "공기밥 추가"'
+              : '예: "2인분", "하나 더"';
+      const text = `${activeMenu.name} 주문 확인과 함께 ${panelLabel} 선택을 열어드렸어요. (${panelExample})`;
+      const spoken = `${activeMenu.name} 주문 확인과 함께 ${panelLabel} 선택을 열어드렸어요. 원하시는 내용을 말씀해 주세요.`;
+      replyWithCheckoutDraft(initialDraft, text, spoken, targetPanel);
+      return;
+    }
 
     // Gemini-first conversational intent understanding (understands context & replies naturally; falls back to local rules if unavailable)
     if (
@@ -3333,8 +3798,11 @@ export function AiChatOrderView({
           return (
             <div key={msg.id} className="space-y-3">
               <div className="flex items-start gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-[#E8ECE4] shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
-                  <AlleBotIllustration size="sm" />
+                <div className="w-10 h-10 rounded-2xl bg-[#FDF2E4] border border-[#E8ECE4] shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+                  <AlleBotIllustration
+                    size="sm"
+                    variant={msg.id === 'welcome' ? 'wave' : 'main'}
+                  />
                 </div>
                 <div className="max-w-[90%] bg-white border border-[#E8ECE4] rounded-2xl rounded-tl-xs px-4 py-3.5 text-base sm:text-[17px] text-[#1A1D1A] leading-relaxed shadow-sm space-y-2.5">
                   {msg.aiSource === 'gemini' && (
@@ -3795,7 +4263,11 @@ export function AiChatOrderView({
 
                         {/* On-Demand Inline Edit Chip Panel */}
                         {activeCheckoutEditPanel !== 'none' && (
-                          <div className="bg-white border border-[#D4E1C5] rounded-2xl p-3.5 space-y-3 shadow-xs">
+                          <div
+                            ref={checkoutEditPanelRef}
+                            tabIndex={-1}
+                            className="bg-white border border-[#4E6E2A] ring-2 ring-[#4E6E2A]/25 rounded-2xl p-3.5 space-y-3 shadow-sm focus:outline-none"
+                          >
                             {activeCheckoutEditPanel === 'options' && (
                               <div className="space-y-3">
                                 <div className="flex items-center justify-between">
@@ -3883,6 +4355,13 @@ export function AiChatOrderView({
                                   </div>
                                 )}
 
+                                <p className="text-xs text-[#687064] bg-[#F7F8F5] rounded-lg px-2.5 py-1.5 break-keep">
+                                  말로 대답 · 예: &ldquo;2인분&rdquo;, &ldquo;하나 더&rdquo;
+                                  {summary.menu.options.length > 0
+                                    ? `, “${summary.menu.options[0].name}”, “옵션 빼줘”`
+                                    : ''}
+                                </p>
+
                                 <div className="flex justify-end">
                                   <button
                                     type="button"
@@ -3927,6 +4406,9 @@ export function AiChatOrderView({
                                     );
                                   })}
                                 </div>
+                                <p className="text-xs text-[#687064] bg-[#F7F8F5] rounded-lg px-2.5 py-1.5 break-keep">
+                                  말로 대답 · 예: &ldquo;토스페이&rdquo;, &ldquo;네이버페이&rdquo;, &ldquo;등록카드&rdquo;
+                                </p>
                               </div>
                             )}
 
@@ -3935,7 +4417,7 @@ export function AiChatOrderView({
                                 <div className="text-sm sm:text-[15px] font-bold text-[#3D5720]">
                                   배송 방식을 골라주세요
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="space-y-2">
                                   {DELIVERY_METHOD_OPTIONS.map((opt) => {
                                     const active =
                                       (activeDraft.deliveryMethod ?? 'partner_direct') ===
@@ -3952,18 +4434,34 @@ export function AiChatOrderView({
                                           );
                                           setActiveCheckoutEditPanel('none');
                                         }}
-                                        className={`easy-compact px-2.5 py-2 rounded-xl border text-center cursor-pointer transition-colors ${
+                                        className={`w-full easy-compact px-3.5 py-2.5 rounded-xl border text-left flex items-start justify-between gap-2.5 cursor-pointer transition-colors ${
                                           active
                                             ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
-                                            : 'bg-white border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
+                                            : 'bg-white border-[#E8ECE4] text-[#3F473D] hover:border-[#82B440]'
                                         }`}
                                       >
-                                        <div className="text-sm font-bold truncate">
-                                          {opt.shortLabel}
+                                        <div className="min-w-0 flex-1 space-y-0.5">
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="text-sm sm:text-[15px] font-bold break-keep">
+                                              {opt.label}
+                                            </span>
+                                            <span
+                                              className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                                                active
+                                                  ? 'bg-[#4E6E2A] text-white'
+                                                  : 'bg-[#F0F3EC] text-[#4E6E2A]'
+                                              }`}
+                                            >
+                                              {opt.badge}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs sm:text-sm text-[#555E52] break-keep leading-snug">
+                                            {opt.description}
+                                          </p>
                                         </div>
-                                        <div className="text-xs opacity-80 truncate">
-                                          {opt.badge}
-                                        </div>
+                                        {active && (
+                                          <CheckCircle2 className="w-5 h-5 text-[#4E6E2A] shrink-0 mt-0.5" />
+                                        )}
                                       </button>
                                     );
                                   })}
@@ -3973,6 +4471,9 @@ export function AiChatOrderView({
                                     {summary.deliveryFeeCalc.nextTierLabel}
                                   </p>
                                 )}
+                                <p className="text-xs text-[#687064] bg-[#F7F8F5] rounded-lg px-2.5 py-1.5 break-keep">
+                                  말로 대답 · 예: &ldquo;동네 파트너&rdquo;, &ldquo;자동 묶음배송&rdquo;, &ldquo;한집 빠른배송&rdquo;, &ldquo;2번&rdquo;
+                                </p>
                               </div>
                             )}
 
@@ -4073,6 +4574,9 @@ export function AiChatOrderView({
                                     );
                                   })}
                                 </div>
+                                <p className="text-xs text-[#687064] bg-[#F7F8F5] rounded-lg px-2.5 py-1.5 break-keep">
+                                  말로 대답 · 예: &ldquo;{otherStoreMenus[0]?.name ?? '메뉴명'}&rdquo;, &ldquo;1번&rdquo;, &ldquo;완료&rdquo;
+                                </p>
                                 <div className="flex justify-end">
                                   <button
                                     type="button"
@@ -4145,8 +4649,8 @@ export function AiChatOrderView({
 
         {isAnalyzing && (
           <div className="flex items-start gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white border border-[#E8ECE4] shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
-              <AlleBotIllustration size="sm" />
+            <div className="w-10 h-10 rounded-2xl bg-[#FDF2E4] border border-[#E8ECE4] shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+              <AlleBotIllustration size="sm" variant="bowl" />
             </div>
             <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse" />
