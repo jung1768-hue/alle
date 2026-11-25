@@ -3464,7 +3464,7 @@ export function AiChatOrderView({
                 }
 
                 return (
-                  <div className="pl-1 sm:pl-12 space-y-2 max-w-lg">
+                  <div className="pl-1 sm:pl-12 space-y-2 max-w-xl">
                     <div className="bg-white border border-[#E8ECE4] rounded-2xl divide-y divide-[#F0F3EC] overflow-hidden shadow-2xs">
                       {matchedMenus.slice(0, 4).map((item, idx) => {
                         const store = storeMap.get(item.storeId);
@@ -3506,22 +3506,25 @@ export function AiChatOrderView({
                                 });
                               }
                             }}
-                            className="px-3 py-2.5 flex items-center gap-3 hover:bg-[#FAFCF8] transition-colors cursor-pointer"
+                            className="px-3.5 py-3 flex items-start gap-3 hover:bg-[#FAFCF8] transition-colors cursor-pointer"
                           >
-                            <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                            <div className="w-12 h-12 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0 mt-0.5">
                               <FoodImage
                                 src={item.image}
                                 alt={item.name}
                                 className="w-full h-full object-cover"
                               />
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                                 <span className="px-1.5 py-0.5 rounded-md bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold shrink-0">
                                   {idx + 1}위
                                 </span>
-                                <span className="text-sm font-bold text-[#1A1D1A] truncate">
-                                  {item.name}
+                                <span className="text-xs font-semibold text-[#4E6E2A] break-keep">
+                                  {store.name}
+                                </span>
+                                <span className="text-xs text-[#687064] tabular-nums shrink-0">
+                                  ★{(store.rating ?? 4.9).toFixed(1)}
                                 </span>
                                 {hasClosingDiscount && (
                                   <span className="px-1.5 py-0.5 rounded-md bg-amber-600 text-white text-[10px] font-bold shrink-0">
@@ -3534,39 +3537,47 @@ export function AiChatOrderView({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-xs text-[#687064] truncate tabular-nums mt-0.5">
-                                {store.name} · ★{(store.rating ?? 4.9).toFixed(1)} ·{' '}
-                                <span className="font-semibold text-[#3D5720]">
-                                  {formatWon(total)}
-                                </span>{' '}
-                                · 약 {eta}분
+
+                              <div className="text-[14.5px] sm:text-[15px] font-bold text-[#1A1D1A] leading-snug break-keep">
+                                {item.name}
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2 pt-1">
+                                <div className="text-xs sm:text-sm tabular-nums">
+                                  <span className="font-bold text-[#3D5720]">
+                                    {formatWon(total)}
+                                  </span>
+                                  <span className="text-[#687064] ml-1.5">
+                                    · 약 {eta}분
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMessages((prev) => [
+                                      ...prev,
+                                      {
+                                        id: `u-quick-${Date.now()}`,
+                                        sender: 'user',
+                                        text: `${item.name} ${servings}인분 바로 주문할게요.`,
+                                      },
+                                    ]);
+                                    openCheckoutDraftMessage({
+                                      menuId: item.id,
+                                      servings,
+                                      selectedOptionIds: stagedOptions[item.id] ?? [],
+                                      paymentMethod: 'kakaopay',
+                                      customerNote: defaultNote ?? '',
+                                    });
+                                  }}
+                                  className="easy-compact min-h-[34px] px-3 py-1 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold shrink-0 inline-flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                                >
+                                  <Zap className="w-3.5 h-3.5 shrink-0" />
+                                  <span>바로 주문</span>
+                                </button>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMessages((prev) => [
-                                  ...prev,
-                                  {
-                                    id: `u-quick-${Date.now()}`,
-                                    sender: 'user',
-                                    text: `${item.name} ${servings}인분 바로 주문할게요.`,
-                                  },
-                                ]);
-                                openCheckoutDraftMessage({
-                                  menuId: item.id,
-                                  servings,
-                                  selectedOptionIds: stagedOptions[item.id] ?? [],
-                                  paymentMethod: 'kakaopay',
-                                  customerNote: defaultNote ?? '',
-                                });
-                              }}
-                              className="easy-compact min-h-[36px] px-3 py-1.5 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold shrink-0 inline-flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                              <Zap className="w-3.5 h-3.5 shrink-0" />
-                              <span>바로 주문</span>
-                            </button>
                           </div>
                         );
                       })}
