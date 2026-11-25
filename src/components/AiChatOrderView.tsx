@@ -7,13 +7,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  CreditCard,
   Heart,
   Loader2,
   MessageSquare,
   Mic,
   MicOff,
-  Plus,
   RotateCcw,
   Search,
   Send,
@@ -21,7 +19,6 @@ import {
   Sparkles,
   Star,
   Store as StoreIcon,
-  Ticket,
   Volume2,
   VolumeX,
   X,
@@ -466,7 +463,12 @@ export function AiChatOrderView({
   const [extraItemsByStore, setExtraItemsByStore] = useState<
     Record<string, CartLineItem[]>
   >({});
-  const [showCheckoutExtraMenus, setShowCheckoutExtraMenus] = useState(false);
+  type CheckoutEditPanel = 'none' | 'options' | 'payment' | 'delivery' | 'extras';
+  const [activeCheckoutEditPanel, setActiveCheckoutEditPanel] =
+    useState<CheckoutEditPanel>('none');
+  const [expandedOldListIds, setExpandedOldListIds] = useState<
+    Record<string, boolean>
+  >({});
   const [recommendedSpotlight, setRecommendedSpotlight] =
     useState<RecommendedSpotlightState | null>(null);
   const spotlightPillRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -677,6 +679,15 @@ export function AiChatOrderView({
   const latestCheckoutMsgId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i].checkoutDraftSnapshot) return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
+  const latestMatchedMsgId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].matchedMenuIds && messages[i].matchedMenuIds!.length > 0) {
+        return messages[i].id;
+      }
     }
     return null;
   }, [messages]);
@@ -962,6 +973,8 @@ export function AiChatOrderView({
   useEffect(() => {
     if (voiceCheckoutDraft) {
       setRecommendedSpotlight(null);
+    } else {
+      setActiveCheckoutEditPanel('none');
     }
   }, [voiceCheckoutDraft]);
 
@@ -1180,47 +1193,24 @@ export function AiChatOrderView({
     const summary = buildVoiceCheckoutSummary(draft);
     if (!summary) return;
     setVoiceCheckoutDraft(draft);
-    const feeText =
-      summary.deliveryFee === 0
-        ? '배달비 무료'
-        : `배달비 ${formatWon(summary.deliveryFee)}`;
-    const discountText =
-      summary.couponDiscount > 0 && summary.bestCoupon
-        ? ` · ${summary.bestCoupon.label} -${formatWon(summary.couponDiscount)}`
-        : '';
-    const notePart = draft.customerNote.trim()
-      ? ` · 요청 "${draft.customerNote.trim()}"`
-      : '';
+    setActiveCheckoutEditPanel('none');
 
     const availableOpts = summary.menu.options ?? [];
     const selectedOpts = summary.selectedOpts ?? [];
-    let optionQuestionText = '';
     let optionQuestionSpoken = '';
 
     if (availableOpts.length > 0 && selectedOpts.length === 0) {
-      const previewOpts = availableOpts
-        .slice(0, 3)
-        .map((o) => `${o.name}(+${formatWon(o.priceDelta)})`)
-        .join(', ');
-      optionQuestionText = `추가 옵션(${previewOpts})을 넣으실래요, 아니면 그대로 ${summary.paymentOption.label}로 결제할까요?`;
       optionQuestionSpoken = `추가 옵션으로 ${availableOpts
         .slice(0, 3)
         .map((o) => `${o.name} ${formatWon(o.priceDelta)}`)
         .join(', ')} 선택할 수 있어요. 추가할 옵션이 있나요, 아니면 그대로 ${summary.paymentOption.label}로 결제할까요?`;
     } else if (selectedOpts.length > 0) {
       const selectedNames = selectedOpts.map((o) => o.name).join(', ');
-      optionQuestionText = `선택 옵션(${selectedNames}) 반영 완료. 더 바꾸실 옵션이 있나요, 바로 ${summary.paymentOption.label}로 결제할까요?`;
       optionQuestionSpoken = `${selectedNames} 옵션 포함입니다. 더 바꾸실 옵션이 있나요, 바로 ${summary.paymentOption.label}로 결제할까요?`;
     } else {
-      optionQuestionText = `추가 옵션은 없고, 바로 ${summary.paymentOption.label}로 결제할까요?`;
       optionQuestionSpoken = `추가 옵션은 없고, 바로 ${summary.paymentOption.label}로 결제할까요?`;
     }
 
-    const priceHeadline = `${
-      summary.resolvedLines.length > 1
-        ? `${summary.resolvedLines.length}종 ${summary.totalQty}개`
-        : `${summary.qty}인분`
-    } 핵심 가격: 총 ${formatWon(summary.finalTotal)} (메뉴 ${formatWon(summary.menuSubtotal)} · ${feeText}${discountText}${notePart})`;
     const spoken = `${leadPrefix ? `${leadPrefix} ` : ''}${
       summary.resolvedLines.length > 1
         ? `${summary.resolvedLines.length}종 총 ${formatWon(summary.finalTotal)}`
@@ -1232,7 +1222,9 @@ export function AiChatOrderView({
       {
         id: `b-checkout-${Date.now() + 1}`,
         sender: 'bot',
-        text: `${leadPrefix ? `${leadPrefix} ` : ''}${priceHeadline}. ${optionQuestionText}`,
+        text: leadPrefix
+          ? `${leadPrefix} 아래 내용으로 바로 결제할까요?`
+          : '네! 아래 내용으로 바로 결제할까요?',
         spokenText: spoken,
         stagedMenuId: draft.menuId,
         checkoutDraftSnapshot: draft,
@@ -3337,13 +3329,6 @@ export function AiChatOrderView({
             .map((id) => menuMap.get(id))
             .filter((m): m is MenuItem => Boolean(m));
 
-          const stagedMenu = msg.stagedMenuId
-            ? menuMap.get(msg.stagedMenuId)
-            : undefined;
-          const stagedStore = stagedMenu
-            ? storeMap.get(stagedMenu.storeId)
-            : undefined;
-
           return (
             <div key={msg.id} className="space-y-3">
               <div className="flex items-start gap-2.5">
@@ -3452,156 +3437,66 @@ export function AiChatOrderView({
                 </div>
               )}
 
-              {/* Horizontal AI-Reason-First Recommended Cards */}
-              {matchedMenus.length > 0 && (
-                <div className="flex gap-3.5 overflow-x-auto pb-1.5 pl-1 sm:pl-12 no-scrollbar">
-                  {matchedMenus.map((item, idx) => {
-                    const store = storeMap.get(item.storeId);
-                    if (!store) return null;
-                    const wished = wishlistIds.includes(item.id);
-                    const servings = msg.servings ?? 2;
-                    const effectivePrice = getEffectiveMenuPrice(item);
-                    const total = effectivePrice * servings + store.deliveryFee;
-                    const isSameStore = item.storePrice === item.pricePerPerson;
-                    const hasClosingDiscount = (item.closingDiscountPercent ?? 0) > 0;
-                    const isSelectedCard = stagedMenu?.id === item.id;
+              {/* Slim Conversational Recommendation List */}
+              {matchedMenus.length > 0 && (() => {
+                const isLatestList =
+                  msg.id === latestMatchedMsgId && !voiceCheckoutDraft;
+                const isExpanded =
+                  isLatestList || Boolean(expandedOldListIds[msg.id]);
 
-                    const storeOtherCount = (
-                      menusByStore.get(store.id) ?? []
-                    ).filter(
-                      (m) =>
-                        m.id !== item.id && !m.isSoldOut && m.stock >= 1
-                    ).length;
-
-                    const storePromo = activePromoByStore.get(store.id);
-                    const storeCoupon = activeCouponByStore.get(store.id);
-
-                    return (
-                      <div
-                        key={item.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={isSelectedCard}
+                if (!isExpanded) {
+                  return (
+                    <div className="pl-1 sm:pl-12">
+                      <button
+                        type="button"
                         onClick={() =>
-                          selectRecommendedMenuForMessage(msg.id, item, servings)
+                          setExpandedOldListIds((prev) => ({
+                            ...prev,
+                            [msg.id]: true,
+                          }))
                         }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            selectRecommendedMenuForMessage(msg.id, item, servings);
-                          }
-                        }}
-                        className={`w-[304px] sm:w-[320px] shrink-0 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3.5 transition-all cursor-pointer ${
-                          isSelectedCard
-                            ? 'bg-[#F7FAF3] border border-[#4E6E2A] ring-1 ring-[#4E6E2A] shadow-sm'
-                            : 'bg-white border border-[#E8ECE4] hover:border-[#82B440] shadow-xs'
-                        }`}
+                        className="easy-compact px-3.5 py-2 rounded-full bg-white hover:bg-[#EAF1E2] border border-[#E8ECE4] text-xs font-semibold text-[#555E52] hover:text-[#3D5720] cursor-pointer transition-colors"
                       >
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-center justify-between gap-1.5">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                                isSelectedCard
-                                  ? 'bg-[#4E6E2A] text-white'
-                                  : 'bg-[#EAF1E2] text-[#3D5720]'
-                              }`}
-                            >
-                              <Sparkles className="w-3 h-3 shrink-0" />
-                              <span>
-                                {idx + 1}순위{isSelectedCard ? ' · 선택됨' : ''}
-                              </span>
-                            </span>
-                            <div className="flex items-center gap-1">
-                              {isSameStore && (
-                                <span className="px-2 py-0.5 rounded-full bg-[#F7F8F5] border border-[#D4E1C5] text-[#3D5720] text-xs font-semibold">
-                                  착한가격
-                                </span>
-                              )}
-                              {hasClosingDiscount && (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-600 text-white text-xs font-semibold">
-                                  -{item.closingDiscountPercent}%
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                        이전 추천 메뉴 {matchedMenus.length}곳 다시 보기
+                      </button>
+                    </div>
+                  );
+                }
 
-                          {(storePromo || storeCoupon) && (
-                            <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 truncate">
-                              <Ticket className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">
-                                {storeCoupon ? storeCoupon.label : storePromo?.title}
-                              </span>
-                            </p>
-                          )}
+                return (
+                  <div className="pl-1 sm:pl-12 space-y-2 max-w-lg">
+                    <div className="bg-white border border-[#E8ECE4] rounded-2xl divide-y divide-[#F0F3EC] overflow-hidden shadow-2xs">
+                      {matchedMenus.slice(0, 4).map((item, idx) => {
+                        const store = storeMap.get(item.storeId);
+                        if (!store) return null;
+                        const servings = msg.servings ?? 2;
+                        const effectivePrice = getEffectiveMenuPrice(item);
+                        const total = effectivePrice * servings + store.deliveryFee;
+                        const hasClosingDiscount =
+                          (item.closingDiscountPercent ?? 0) > 0;
+                        const storePromo = activePromoByStore.get(store.id);
+                        const storeCoupon = activeCouponByStore.get(store.id);
+                        const eta = item.estimatedMinutes + (store.extraPrepMinutes ?? 0);
 
-                          <div className="flex items-center gap-3.5">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
-                              <FoodImage
-                                src={item.image}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-1.5">
-                                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#4E6E2A] min-w-0">
-                                  <span className="truncate">{store.name}</span>
-                                  <span className="inline-flex items-center gap-0.5 text-[#1A1D1A] font-semibold shrink-0 tabular-nums">
-                                    <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
-                                    {(store.rating ?? 4.9).toFixed(1)}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleWishlist(item.id);
-                                  }}
-                                  aria-label={`${item.name} 찜하기`}
-                                  className="easy-compact p-1 cursor-pointer shrink-0"
-                                >
-                                  <Heart
-                                    className={`w-4 h-4 ${
-                                      wished
-                                        ? 'fill-red-500 text-red-500'
-                                        : 'text-[#919A8D]'
-                                    }`}
-                                  />
-                                </button>
-                              </div>
-                              <div className="text-base sm:text-lg font-bold text-[#1A1D1A] truncate mt-0.5">
-                                {item.name}
-                              </div>
-                              <div className="text-sm sm:text-base font-bold text-[#4E6E2A] tabular-nums mt-0.5">
-                                {formatWon(total)}{' '}
-                                <span className="font-medium text-xs sm:text-sm text-[#687064]">
-                                  · 약 {item.estimatedMinutes + (store.extraPrepMinutes ?? 0)}분
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {item.aiReason && (
-                            <p className="text-xs sm:text-sm text-[#4B5548] leading-snug line-clamp-1">
-                              {item.aiReason}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                        return (
+                          <div
+                            key={item.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
                               selectRecommendedMenuForMessage(msg.id, item, servings);
-                              if (onOpenStoreMenu) {
-                                onOpenStoreMenu(store.id, {
-                                  highlightMenuId: item.id,
-                                  initialServings: servings,
-                                  initialOptionIds: stagedOptions[item.id] ?? [],
-                                  preselectHighlight: true,
-                                });
-                              } else {
+                              switchSpotlightIndex(idx, {
+                                msgId: msg.id,
+                                menuIds: matchedMenus.map((m) => m.id),
+                                activeIndex: idx,
+                                explanation: msg.spokenText ?? msg.text,
+                                servings,
+                              });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                selectRecommendedMenuForMessage(msg.id, item, servings);
                                 switchSpotlightIndex(idx, {
                                   msgId: msg.id,
                                   menuIds: matchedMenus.map((m) => m.id),
@@ -3611,356 +3506,97 @@ export function AiChatOrderView({
                                 });
                               }
                             }}
-                            className="easy-compact min-h-[44px] px-3 py-2 bg-[#F7F8F5] hover:bg-[#EAF1E2] border border-[#D4E1C5] text-[#3D5720] text-sm font-semibold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
+                            className="px-3 py-2.5 flex items-center gap-3 hover:bg-[#FAFCF8] transition-colors cursor-pointer"
                           >
-                            {onOpenStoreMenu && storeOtherCount > 0
-                              ? `다른 메뉴 (+${storeOtherCount})`
-                              : onOpenStoreMenu
-                                ? '가게 메뉴'
-                                : '상세 · 리뷰'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openCheckoutDraftMessage({
-                                menuId: item.id,
-                                servings,
-                                selectedOptionIds: stagedOptions[item.id] ?? [],
-                                paymentMethod: 'kakaopay',
-                                customerNote: defaultNote ?? '',
-                              });
-                            }}
-                            className="easy-compact min-h-[44px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
-                          >
-                            <Zap className="w-4 h-4 shrink-0" />
-                            <span>바로 주문</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Conversational In-Chat Order Staging Card */}
-              {stagedMenu && stagedStore && (
-                <div className="pl-1 sm:pl-12">
-                  <div className="max-w-lg os-card rounded-2xl p-5 sm:p-6 space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-[#E8ECE4]">
-                          <FoodImage
-                            src={stagedMenu.image}
-                            alt={stagedMenu.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs sm:text-sm font-semibold text-[#4E6E2A] truncate">
-                            {stagedStore.name}
-                          </div>
-                          <div className="text-base sm:text-lg font-bold text-[#1A1D1A] truncate">
-                            {stagedMenu.name}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setStagedServings((prev) => ({
-                              ...prev,
-                              [stagedMenu.id]: Math.max(
-                                1,
-                                (prev[stagedMenu.id] ?? 1) - 1
-                              ),
-                            }))
-                          }
-                          aria-label="수량 감소"
-                          className="w-10 h-10 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] font-bold text-base cursor-pointer"
-                        >
-                          -
-                        </button>
-                        <span className="w-7 text-center font-mono tabular-nums text-base font-bold">
-                          {stagedServings[stagedMenu.id] ?? 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setStagedServings((prev) => ({
-                              ...prev,
-                              [stagedMenu.id]: Math.min(
-                                Math.max(1, stagedMenu.stock),
-                                (prev[stagedMenu.id] ?? 1) + 1
-                              ),
-                            }))
-                          }
-                          aria-label="수량 증가"
-                          className="w-10 h-10 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] font-bold text-base cursor-pointer"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    {stagedMenu.options.length > 0 && (
-                      <div className="space-y-2 pt-3 border-t border-[#E8ECE4]">
-                        <div className="text-sm font-bold text-[#3D5720]">
-                          추가 옵션 (원하실 때만 선택)
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {stagedMenu.options.map((opt) => {
-                            const selected = (
-                              stagedOptions[stagedMenu.id] ?? []
-                            ).includes(opt.id);
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() =>
-                                  setStagedOptions((prev) => {
-                                    const cur = prev[stagedMenu.id] ?? [];
-                                    return {
-                                      ...prev,
-                                      [stagedMenu.id]: selected
-                                        ? cur.filter((id) => id !== opt.id)
-                                        : [...cur, opt.id],
-                                    };
-                                  })
-                                }
-                                className={`min-h-[40px] px-3.5 py-2 rounded-xl border text-sm font-bold cursor-pointer transition-colors ${
-                                  selected
-                                    ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
-                                    : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#3F473D] hover:border-[#82B440]'
-                                }`}
-                              >
-                                {opt.name} +{formatWon(opt.priceDelta)}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {(() => {
-                      const qty = stagedServings[stagedMenu.id] ?? 1;
-                      const optIds = stagedOptions[stagedMenu.id] ?? [];
-                      const optSum =
-                        stagedMenu.options
-                          .filter((o) => optIds.includes(o.id))
-                          .reduce((s, o) => s + o.priceDelta, 0) * qty;
-                      const effectiveUnit = getEffectiveMenuPrice(stagedMenu);
-
-                      const storeOtherMenus = (
-                        menusByStore.get(stagedStore.id) ?? []
-                      ).filter(
-                        (m) =>
-                          m.id !== stagedMenu.id && !m.isSoldOut && m.stock >= 1
-                      );
-                      const storeExtras = (
-                        extraItemsByStore[stagedStore.id] ?? []
-                      ).filter((it) => it.menuId !== stagedMenu.id);
-                      const extrasSubtotal = storeExtras.reduce((sum, it) => {
-                        const m = menuMap.get(it.menuId);
-                        return m
-                          ? sum + getEffectiveMenuPrice(m) * it.quantity
-                          : sum;
-                      }, 0);
-
-                      const estTotal =
-                        effectiveUnit * qty +
-                        optSum +
-                        extrasSubtotal +
-                        stagedStore.deliveryFee;
-
-                      const combinedItems: CartLineItem[] = [
-                        {
-                          menuId: stagedMenu.id,
-                          quantity: qty,
-                          selectedOptionIds: optIds,
-                        },
-                        ...storeExtras,
-                      ];
-
-                      return (
-                        <div className="pt-3 border-t border-[#E8ECE4] space-y-3.5">
-                          {storeOtherMenus.length > 0 && (
-                            <div className="p-3.5 rounded-2xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-2.5">
-                              <div className="flex items-center justify-between gap-2 text-sm">
-                                <span className="font-bold text-[#1A1D1A] inline-flex items-center gap-1.5">
-                                  <StoreIcon className="w-4 h-4 text-[#4E6E2A] shrink-0" />
-                                  <span>이 가게 다른 메뉴 추가 ({storeOtherMenus.length}개)</span>
+                            <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+                              <FoodImage
+                                src={item.image}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="px-1.5 py-0.5 rounded-md bg-[#EAF1E2] text-[#3D5720] text-[10px] font-bold shrink-0">
+                                  {idx + 1}위
                                 </span>
-                                {onOpenStoreMenu && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      onOpenStoreMenu(stagedStore.id, {
-                                        highlightMenuId: stagedMenu.id,
-                                        initialServings: qty,
-                                        initialOptionIds: optIds,
-                                        preselectHighlight: true,
-                                      })
-                                    }
-                                    className="easy-compact text-[#4E6E2A] font-semibold hover:underline cursor-pointer"
-                                  >
-                                    전체 메뉴 →
-                                  </button>
+                                <span className="text-sm font-bold text-[#1A1D1A] truncate">
+                                  {item.name}
+                                </span>
+                                {hasClosingDiscount && (
+                                  <span className="px-1.5 py-0.5 rounded-md bg-amber-600 text-white text-[10px] font-bold shrink-0">
+                                    -{item.closingDiscountPercent}%
+                                  </span>
+                                )}
+                                {!hasClosingDiscount && (storeCoupon || storePromo) && (
+                                  <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold shrink-0">
+                                    쿠폰
+                                  </span>
                                 )}
                               </div>
-                              <div className="space-y-2">
-                                {storeOtherMenus.slice(0, 3).map((other) => {
-                                  const extraQty =
-                                    storeExtras.find(
-                                      (it) => it.menuId === other.id
-                                    )?.quantity ?? 0;
-                                  return (
-                                    <div
-                                      key={other.id}
-                                      className="flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-white border border-[#E8ECE4]"
-                                    >
-                                      <div className="min-w-0">
-                                        <p className="text-sm font-semibold text-[#1A1D1A] truncate">
-                                          {other.name}
-                                        </p>
-                                        <p className="text-xs sm:text-sm font-mono font-semibold text-[#4E6E2A]">
-                                          {formatWon(getEffectiveMenuPrice(other))}
-                                        </p>
-                                      </div>
-                                      {extraQty === 0 ? (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            adjustStoreExtraItem(
-                                              stagedStore.id,
-                                              other,
-                                              1
-                                            )
-                                          }
-                                          className="easy-compact min-h-[36px] px-3 py-1.5 rounded-xl bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-xs sm:text-sm font-semibold shrink-0 cursor-pointer"
-                                        >
-                                          + 추가
-                                        </button>
-                                      ) : (
-                                        <div className="inline-flex items-center gap-1.5 shrink-0">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              adjustStoreExtraItem(
-                                                stagedStore.id,
-                                                other,
-                                                -1
-                                              )
-                                            }
-                                            aria-label={`${other.name} 수량 감소`}
-                                            className="easy-compact w-8 h-8 rounded-lg border border-[#D4E1C5] bg-[#F7F8F5] text-sm font-bold cursor-pointer"
-                                          >
-                                            -
-                                          </button>
-                                          <span className="w-5 text-center font-mono text-sm font-bold">
-                                            {extraQty}
-                                          </span>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              adjustStoreExtraItem(
-                                                stagedStore.id,
-                                                other,
-                                                1
-                                              )
-                                            }
-                                            aria-label={`${other.name} 수량 증가`}
-                                            className="easy-compact w-8 h-8 rounded-lg bg-[#4E6E2A] text-white text-sm font-bold cursor-pointer"
-                                          >
-                                            +
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                              <div className="text-xs text-[#687064] truncate tabular-nums mt-0.5">
+                                {store.name} · ★{(store.rating ?? 4.9).toFixed(1)} ·{' '}
+                                <span className="font-semibold text-[#3D5720]">
+                                  {formatWon(total)}
+                                </span>{' '}
+                                · 약 {eta}분
                               </div>
                             </div>
-                          )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMessages((prev) => [
+                                  ...prev,
+                                  {
+                                    id: `u-quick-${Date.now()}`,
+                                    sender: 'user',
+                                    text: `${item.name} ${servings}인분 바로 주문할게요.`,
+                                  },
+                                ]);
+                                openCheckoutDraftMessage({
+                                  menuId: item.id,
+                                  servings,
+                                  selectedOptionIds: stagedOptions[item.id] ?? [],
+                                  paymentMethod: 'kakaopay',
+                                  customerNote: defaultNote ?? '',
+                                });
+                              }}
+                              className="easy-compact min-h-[36px] px-3 py-1.5 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs font-bold shrink-0 inline-flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                            >
+                              <Zap className="w-3.5 h-3.5 shrink-0" />
+                              <span>바로 주문</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm sm:text-base font-medium text-[#555E52]">
-                              배달비 포함 예상 금액
-                              {storeExtras.length > 0 && (
-                                <strong className="ml-1 text-[#3D5720]">
-                                  ({combinedItems.length}종)
-                                </strong>
-                              )}
-                              {(stagedMenu.closingDiscountPercent ?? 0) > 0 && (
-                                <strong className="ml-1 text-amber-800">
-                                  (마감 -{stagedMenu.closingDiscountPercent}%)
-                                </strong>
-                              )}
-                            </span>
-                            <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-[#4E6E2A]">
-                              {formatWon(estTotal)}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (storeExtras.length > 0 && onAddMultipleToCart) {
-                                  onAddMultipleToCart(stagedStore.id, combinedItems);
-                                } else if (onAddToCart) {
-                                  onAddToCart(stagedMenu.id, qty, optIds);
-                                } else {
-                                  onOpenRecommendationWithCondition(
-                                    activeCondition,
-                                    stagedMenu.id
-                                  );
-                                }
-                              }}
-                              className="min-h-[48px] px-3.5 py-2.5 bg-[#EAF1E2] hover:bg-[#DCE7CF] text-[#3D5720] text-sm sm:text-base font-semibold rounded-xl cursor-pointer transition-colors"
-                            >
-                              {onAddToCart
-                                ? storeExtras.length > 0
-                                  ? `장바구니 (${combinedItems.length}종)`
-                                  : '장바구니 담기'
-                                : '다른 메뉴 보기'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  storeExtras.length > 0 &&
-                                  onProceedToConfirmWithItems
-                                ) {
-                                  onProceedToConfirmWithItems({
-                                    storeId: stagedStore.id,
-                                    items: combinedItems,
-                                    couponCode: 'NONE',
-                                  });
-                                } else {
-                                  onProceedToConfirm({
-                                    menuId: stagedMenu.id,
-                                    servings: qty,
-                                    selectedOptionIds: optIds,
-                                    couponCode: 'NONE',
-                                  });
-                                }
-                              }}
-                              className="min-h-[48px] px-3.5 py-2.5 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-sm sm:text-base font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                            >
-                              <Zap className="w-4 h-4" />
-                              <span>바로 결제하기</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    {isLatestList && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: '더 빠른 메뉴', query: '더 빨리 오는 메뉴로 찾아줘' },
+                          { label: '더 저렴한 메뉴', query: '더 저렴한 메뉴로 찾아줘' },
+                          { label: '다른 메뉴 추천', query: '다른 메뉴 추천해줘' },
+                        ].map((chip) => (
+                          <button
+                            key={chip.label}
+                            type="button"
+                            onClick={() => runChatQuery(chip.query)}
+                            className="easy-compact min-h-[34px] px-3 py-1 rounded-full bg-white hover:bg-[#EAF1E2] border border-[#DCE7CF] text-xs font-semibold text-[#3D5720] cursor-pointer transition-colors"
+                          >
+                            {chip.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {/* Conversational Voice Checkout Confirmation Card */}
+
+
+              {/* Conversational 3-Line Receipt Bubble & On-Demand Edit Chips */}
               {msg.checkoutDraftSnapshot && (() => {
                 const isLiveCard =
                   Boolean(voiceCheckoutDraft) && msg.id === latestCheckoutMsgId;
@@ -3971,83 +3607,373 @@ export function AiChatOrderView({
                 const summary = buildVoiceCheckoutSummary(activeDraft);
                 if (!summary) return null;
 
+                const otherStoreMenus = (
+                  menusByStore.get(summary.store.id) ?? []
+                ).filter(
+                  (m) =>
+                    m.id !== summary.menu.id &&
+                    !m.isSoldOut &&
+                    m.stock >= 1
+                );
+
                 return (
                   <div className="pl-1 sm:pl-12">
                     {isLiveCard ? (
-                      <div className="max-w-md bg-white border border-[#4E6E2A] ring-1 ring-[#4E6E2A]/20 rounded-2xl p-4 space-y-3 shadow-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
-                            <CreditCard className="w-3.5 h-3.5" />
-                            <span>음성·대화 간편 결제 확인</span>
-                          </span>
-                          <span className="text-[11px] font-semibold text-[#687064] truncate">
-                            {summary.store.name}
-                          </span>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-[#F7F8F5] border border-[#E8ECE4] space-y-1.5 text-xs">
-                          {summary.resolvedLines.map((line, lIdx) => (
-                            <div
-                              key={`${line.menuId}-${lIdx}`}
-                              className="flex items-center justify-between gap-2 font-bold text-[#1A1D1A]"
-                            >
-                              <span className="truncate">
-                                {line.menuName} · {line.quantity}개
+                      <div className="max-w-md space-y-2.5">
+                        {/* 3-Line Receipt Bubble */}
+                        <div className="bg-white border border-[#4E6E2A]/60 rounded-2xl px-4 py-3 shadow-xs space-y-1.5">
+                          {/* Line 1: Menu + Store + Final Total */}
+                          <div className="flex items-baseline justify-between gap-2">
+                            <div className="min-w-0 truncate text-sm font-bold text-[#1A1D1A]">
+                              <span>
+                                {summary.menu.name} {summary.qty}인분
+                                {summary.resolvedLines.length > 1
+                                  ? ` 외 ${summary.resolvedLines.length - 1}종`
+                                  : ''}
                               </span>
-                              <span className="font-mono tabular-nums shrink-0">
-                                {formatWon(
-                                  line.lineSubtotal + line.optionsSubtotal
-                                )}
+                              <span className="font-medium text-xs text-[#687064] ml-1.5">
+                                · {summary.store.name}
                               </span>
                             </div>
-                          ))}
-                          {summary.selectedOpts.length > 0 && (
-                            <p className="text-[11px] text-[#687064]">
-                              옵션:{' '}
-                              {summary.selectedOpts.map((o) => o.name).join(', ')}
-                            </p>
-                          )}
-                          <p className="text-[11px] text-[#687064] truncate">
-                            배달: {activeLocation?.areaName ?? ''}{' '}
-                            {activeLocation?.detailAddress ?? '문 앞 배달'} · 약{' '}
-                            {summary.effectiveMinutes}분
-                          </p>
+                            <span className="font-mono tabular-nums text-base font-bold text-[#4E6E2A] shrink-0">
+                              {formatWon(summary.finalTotal)}
+                            </span>
+                          </div>
+
+                          {/* Line 2: Delivery + ETA + Fee + Coupon */}
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-[#555E52]">
+                            <span>
+                              {activeLocation?.detailAddress ||
+                                activeLocation?.areaName ||
+                                '문 앞 배달'}
+                            </span>
+                            <span>·</span>
+                            <span>
+                              {getDeliveryMethodMeta(summary.deliveryMethod).shortLabel}
+                            </span>
+                            <span>· 약 {summary.effectiveMinutes}분</span>
+                            <span>
+                              ·{' '}
+                              {summary.deliveryFee === 0
+                                ? '배달비 무료'
+                                : `배달비 +${formatWon(summary.deliveryFee)}`}
+                            </span>
+                            {summary.couponDiscount > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold">
+                                쿠폰 -{formatWon(summary.couponDiscount)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Line 3: Payment + Options + Note */}
+                          <div className="text-xs text-[#687064] truncate">
+                            결제: {summary.paymentOption.shortLabel}
+                            {summary.selectedOpts.length > 0 &&
+                              ` · 옵션: ${summary.selectedOpts.map((o) => o.name).join(', ')}`}
+                            {activeDraft.customerNote.trim() &&
+                              ` · 요청: ${activeDraft.customerNote.trim()}`}
+                          </div>
                         </div>
 
-                        {(() => {
-                          const otherStoreMenus = (
-                            menusByStore.get(summary.store.id) ?? []
-                          ).filter(
-                            (m) =>
-                              m.id !== summary.menu.id &&
-                              !m.isSoldOut &&
-                              m.stock >= 1
-                          );
-                          if (otherStoreMenus.length === 0) return null;
-                          const curExtras = activeDraft.extraItems ?? [];
-                          return (
-                            <div className="space-y-1.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setShowCheckoutExtraMenus((prev) => !prev)
-                                }
-                                className="easy-compact text-[11px] font-bold text-[#4E6E2A] hover:underline inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <Plus className="w-3 h-3" />
-                                <span>
-                                  {showCheckoutExtraMenus
-                                    ? '이 가게 추가 메뉴 접기'
-                                    : `${summary.store.name} 다른 메뉴 함께 추가 (${otherStoreMenus.length}개)`}
-                                </span>
-                              </button>
-                              {showCheckoutExtraMenus && (
-                                <div className="space-y-1.5 p-2 rounded-xl bg-[#FAFCF8] border border-[#E8ECE4]">
+                        {/* Quick Reply Chips */}
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => executeVoiceOrder(activeDraft)}
+                            className="easy-compact min-h-[40px] px-3.5 py-2 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>네, 바로 결제 ({formatWon(summary.finalTotal)})</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveCheckoutEditPanel((prev) =>
+                                prev === 'options' ? 'none' : 'options'
+                              )
+                            }
+                            className={`easy-compact min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                              activeCheckoutEditPanel === 'options'
+                                ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#F7F8F5]'
+                            }`}
+                          >
+                            수량 · 옵션
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveCheckoutEditPanel((prev) =>
+                                prev === 'payment' ? 'none' : 'payment'
+                              )
+                            }
+                            className={`easy-compact min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                              activeCheckoutEditPanel === 'payment'
+                                ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#F7F8F5]'
+                            }`}
+                          >
+                            결제수단 변경
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActiveCheckoutEditPanel((prev) =>
+                                prev === 'delivery' ? 'none' : 'delivery'
+                              )
+                            }
+                            className={`easy-compact min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                              activeCheckoutEditPanel === 'delivery'
+                                ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#F7F8F5]'
+                            }`}
+                          >
+                            배송방식
+                          </button>
+
+                          {otherStoreMenus.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActiveCheckoutEditPanel((prev) =>
+                                  prev === 'extras' ? 'none' : 'extras'
+                                )
+                              }
+                              className={`easy-compact min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                                activeCheckoutEditPanel === 'extras'
+                                  ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                  : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#F7F8F5]'
+                              }`}
+                            >
+                              메뉴 추가
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVoiceCheckoutDraft(null);
+                              setActiveCheckoutEditPanel('none');
+                              setMessages((prev) => [
+                                ...prev,
+                                {
+                                  id: `u-cancelbtn-${Date.now()}`,
+                                  sender: 'user',
+                                  text: '취소할게요',
+                                },
+                                {
+                                  id: `b-cancelbtn-${Date.now() + 1}`,
+                                  sender: 'bot',
+                                  text: '결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
+                                  spokenText:
+                                    '결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
+                                  aiSource: 'rule',
+                                },
+                              ]);
+                            }}
+                            className="easy-compact min-h-[38px] px-3 py-1.5 rounded-xl border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#E8ECE4] text-xs font-bold text-[#687064] cursor-pointer transition-colors"
+                          >
+                            취소
+                          </button>
+                        </div>
+
+                        {/* On-Demand Inline Edit Chip Panel */}
+                        {activeCheckoutEditPanel !== 'none' && (
+                          <div className="bg-white border border-[#D4E1C5] rounded-2xl p-3 space-y-2.5 shadow-xs">
+                            {activeCheckoutEditPanel === 'options' && (
+                              <div className="space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-[#3D5720]">
+                                    수량 및 추가 옵션
+                                  </span>
+                                  <div className="inline-flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setVoiceCheckoutDraft((prev) =>
+                                          prev
+                                            ? {
+                                                ...prev,
+                                                servings: Math.max(1, prev.servings - 1),
+                                              }
+                                            : prev
+                                        )
+                                      }
+                                      aria-label="수량 감소"
+                                      className="easy-compact w-8 h-8 rounded-lg border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] text-sm font-bold cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">
+                                      {activeDraft.servings}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setVoiceCheckoutDraft((prev) =>
+                                          prev
+                                            ? {
+                                                ...prev,
+                                                servings: Math.min(
+                                                  Math.max(1, summary.menu.stock),
+                                                  prev.servings + 1
+                                                ),
+                                              }
+                                            : prev
+                                        )
+                                      }
+                                      aria-label="수량 증가"
+                                      className="easy-compact w-8 h-8 rounded-lg border border-[#E8ECE4] bg-[#F7F8F5] hover:bg-[#EAF1E2] text-sm font-bold cursor-pointer"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {summary.menu.options.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {summary.menu.options.map((opt) => {
+                                      const selected =
+                                        activeDraft.selectedOptionIds.includes(opt.id);
+                                      return (
+                                        <button
+                                          key={opt.id}
+                                          type="button"
+                                          onClick={() =>
+                                            setVoiceCheckoutDraft((prev) => {
+                                              if (!prev) return prev;
+                                              const exists =
+                                                prev.selectedOptionIds.includes(opt.id);
+                                              return {
+                                                ...prev,
+                                                selectedOptionIds: exists
+                                                  ? prev.selectedOptionIds.filter(
+                                                      (id) => id !== opt.id
+                                                    )
+                                                  : [...prev.selectedOptionIds, opt.id],
+                                              };
+                                            })
+                                          }
+                                          className={`easy-compact min-h-[34px] px-2.5 py-1 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                                            selected
+                                              ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                              : 'bg-[#F7F8F5] border-[#E8ECE4] text-[#434B40] hover:border-[#82B440]'
+                                          }`}
+                                        >
+                                          {opt.name} +{formatWon(opt.priceDelta)}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                <div className="flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveCheckoutEditPanel('none')}
+                                    className="easy-compact px-3 py-1 rounded-lg bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
+                                  >
+                                    완료
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {activeCheckoutEditPanel === 'payment' && (
+                              <div className="space-y-2">
+                                <div className="text-xs font-bold text-[#3D5720]">
+                                  어떤 수단으로 결제할까요?
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {paymentOptions.map((opt) => {
+                                    const active =
+                                      activeDraft.paymentMethod === opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setVoiceCheckoutDraft((prev) =>
+                                            prev
+                                              ? { ...prev, paymentMethod: opt.id }
+                                              : prev
+                                          );
+                                          setActiveCheckoutEditPanel('none');
+                                        }}
+                                        className={`easy-compact min-h-[34px] px-2.5 py-1 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                                          active
+                                            ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
+                                            : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
+                                        }`}
+                                      >
+                                        {opt.shortLabel}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {activeCheckoutEditPanel === 'delivery' && (
+                              <div className="space-y-2">
+                                <div className="text-xs font-bold text-[#3D5720]">
+                                  배송 방식을 골라주세요
+                                </div>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {DELIVERY_METHOD_OPTIONS.map((opt) => {
+                                    const active =
+                                      (activeDraft.deliveryMethod ?? 'partner_direct') ===
+                                      opt.id;
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setVoiceCheckoutDraft((prev) =>
+                                            prev
+                                              ? { ...prev, deliveryMethod: opt.id }
+                                              : prev
+                                          );
+                                          setActiveCheckoutEditPanel('none');
+                                        }}
+                                        className={`easy-compact px-2 py-1.5 rounded-xl border text-center cursor-pointer transition-colors ${
+                                          active
+                                            ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
+                                            : 'bg-white border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
+                                        }`}
+                                      >
+                                        <div className="text-xs font-bold truncate">
+                                          {opt.shortLabel}
+                                        </div>
+                                        <div className="text-[10px] opacity-80 truncate">
+                                          {opt.badge}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {summary.deliveryFeeCalc.nextTierLabel && (
+                                  <p className="text-[11px] font-semibold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg">
+                                    {summary.deliveryFeeCalc.nextTierLabel}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {activeCheckoutEditPanel === 'extras' && (
+                              <div className="space-y-2">
+                                <div className="text-xs font-bold text-[#3D5720]">
+                                  {summary.store.name} 다른 메뉴 추가
+                                </div>
+                                <div className="space-y-1.5">
                                   {otherStoreMenus.slice(0, 4).map((extraM) => {
+                                    const curExtras = activeDraft.extraItems ?? [];
                                     const exQty =
-                                      curExtras.find(
-                                        (it) => it.menuId === extraM.id
-                                      )?.quantity ?? 0;
+                                      curExtras.find((it) => it.menuId === extraM.id)
+                                        ?.quantity ?? 0;
                                     const updateDraftExtra = (delta: number) => {
                                       setVoiceCheckoutDraft((prev) => {
                                         if (!prev) return prev;
@@ -4089,23 +4015,21 @@ export function AiChatOrderView({
                                     return (
                                       <div
                                         key={extraM.id}
-                                        className="flex items-center justify-between gap-2 text-xs bg-white px-2.5 py-1.5 rounded-lg border border-[#E8ECE4]"
+                                        className="flex items-center justify-between gap-2 text-xs bg-[#F7F8F5] px-2.5 py-1.5 rounded-xl border border-[#E8ECE4]"
                                       >
                                         <div className="min-w-0">
                                           <p className="font-semibold text-[#1A1D1A] truncate">
                                             {extraM.name}
                                           </p>
                                           <p className="text-[11px] font-mono text-[#4E6E2A]">
-                                            {formatWon(
-                                              getEffectiveMenuPrice(extraM)
-                                            )}
+                                            {formatWon(getEffectiveMenuPrice(extraM))}
                                           </p>
                                         </div>
                                         {exQty === 0 ? (
                                           <button
                                             type="button"
                                             onClick={() => updateDraftExtra(1)}
-                                            className="easy-compact px-2 py-1 rounded bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold shrink-0 cursor-pointer"
+                                            className="easy-compact px-2.5 py-1 rounded-lg bg-[#EAF1E2] text-[#3D5720] text-[11px] font-bold shrink-0 cursor-pointer"
                                           >
                                             + 추가
                                           </button>
@@ -4136,163 +4060,24 @@ export function AiChatOrderView({
                                     );
                                   })}
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-
-                        <div className="space-y-2 text-xs">
-                          {/* Compact 3 Delivery Method Pills */}
-                          <div className="space-y-1">
-                            <span className="text-[11px] font-bold text-[#687064]">
-                              배송 방식 (최소주문 없음)
-                            </span>
-                            <div className="grid grid-cols-3 gap-1.5">
-                              {DELIVERY_METHOD_OPTIONS.map((opt) => {
-                                const active =
-                                  (activeDraft.deliveryMethod ?? 'partner_direct') ===
-                                  opt.id;
-                                return (
+                                <div className="flex justify-end">
                                   <button
-                                    key={opt.id}
                                     type="button"
-                                    onClick={() =>
-                                      setVoiceCheckoutDraft((prev) =>
-                                        prev ? { ...prev, deliveryMethod: opt.id } : prev
-                                      )
-                                    }
-                                    className={`easy-compact px-2 py-1.5 rounded-xl border text-center cursor-pointer transition-colors ${
-                                      active
-                                        ? 'bg-[#EAF1E2] border-[#4E6E2A] text-[#3D5720]'
-                                        : 'bg-white border-[#E8ECE4] text-[#555E52] hover:border-[#82B440]'
-                                    }`}
+                                    onClick={() => setActiveCheckoutEditPanel('none')}
+                                    className="easy-compact px-3 py-1 rounded-lg bg-[#4E6E2A] text-white text-xs font-bold cursor-pointer"
                                   >
-                                    <div className="text-[11px] font-bold truncate">
-                                      {opt.shortLabel}
-                                    </div>
-                                    <div className="text-[10px] opacity-80 truncate">
-                                      {opt.badge}
-                                    </div>
+                                    완료
                                   </button>
-                                );
-                              })}
-                            </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-
-                          <div className="flex items-center justify-between text-[#687064]">
-                            <span>
-                              배달비 ({getDeliveryMethodMeta(summary.deliveryMethod).label})
-                            </span>
-                            <span className="font-mono tabular-nums font-bold text-[#1A1D1A]">
-                              {summary.deliveryFee === 0
-                                ? '무료 (0원)'
-                                : `+${formatWon(summary.deliveryFee)}`}
-                            </span>
-                          </div>
-                          {summary.deliveryFeeCalc.nextTierLabel && (
-                            <p className="text-[11px] font-semibold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg">
-                              {summary.deliveryFeeCalc.nextTierLabel}
-                            </p>
-                          )}
-                          {summary.bestCoupon && summary.couponDiscount > 0 && (
-                            <div className="flex items-center justify-between text-[#4E6E2A] font-semibold">
-                              <span className="inline-flex items-center gap-1">
-                                <Ticket className="w-3.5 h-3.5" />
-                                <span>{summary.bestCoupon.label} (자동 적용)</span>
-                              </span>
-                              <span className="font-mono tabular-nums">
-                                -{formatWon(summary.couponDiscount)}
-                              </span>
-                            </div>
-                          )}
-                          {summary.savings.totalSaved > 0 && (
-                            <div className="text-[11px] font-semibold text-[#3D5720] bg-[#EAF1E2]/70 rounded-lg px-2.5 py-1">
-                              착한가격으로 약 {formatWon(summary.savings.totalSaved)} 절약
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-1.5 pt-2 border-t border-[#E8ECE4]">
-                          <div className="text-[11px] font-bold text-[#687064]">
-                            결제 수단 (말씀하시거나 눌러서 변경)
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {paymentOptions.map((opt) => {
-                              const active =
-                                activeDraft.paymentMethod === opt.id;
-                              return (
-                                <button
-                                  key={opt.id}
-                                  type="button"
-                                  onClick={() =>
-                                    setVoiceCheckoutDraft((prev) =>
-                                      prev
-                                        ? { ...prev, paymentMethod: opt.id }
-                                        : prev
-                                    )
-                                  }
-                                  className={`min-h-[30px] px-2.5 py-1 rounded-lg border text-[11px] font-bold cursor-pointer transition-colors ${
-                                    active
-                                      ? 'bg-[#4E6E2A] border-[#4E6E2A] text-white'
-                                      : 'bg-white border-[#E8ECE4] text-[#434B40] hover:bg-[#EAF1E2]'
-                                  }`}
-                                >
-                                  {opt.shortLabel}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {activeDraft.customerNote && (
-                          <p className="text-[11px] text-[#687064]">
-                            요청사항: {activeDraft.customerNote}
-                          </p>
                         )}
-
-                        <div className="pt-2 border-t border-[#E8ECE4] flex items-baseline justify-between">
-                          <span className="text-xs font-bold text-[#1A1D1A]">
-                            최종 결제 금액
-                          </span>
-                          <span className="text-lg font-bold font-mono tabular-nums text-[#4E6E2A]">
-                            {formatWon(summary.finalTotal)}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVoiceCheckoutDraft(null);
-                              setMessages((prev) => [
-                                ...prev,
-                                {
-                                  id: `b-cancelbtn-${Date.now()}`,
-                                  sender: 'bot',
-                                  text: '결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
-                                  spokenText:
-                                    '결제를 취소했어요. 다른 어떤 음식을 찾아드릴까요?',
-                                  aiSource: 'rule',
-                                },
-                              ]);
-                            }}
-                            className="min-h-[42px] px-3 py-2 bg-[#F7F8F5] hover:bg-[#E8ECE4] text-[#1A1D1A] text-xs font-bold rounded-xl cursor-pointer"
-                          >
-                            취소
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => executeVoiceOrder(activeDraft)}
-                            className="col-span-2 min-h-[42px] px-3 py-2 bg-[#4E6E2A] hover:bg-[#3F5A21] text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span>지금 바로 결제 완료</span>
-                          </button>
-                        </div>
                       </div>
                     ) : (
-                      <div className="max-w-md px-3.5 py-2.5 rounded-xl bg-white border border-[#E8ECE4] text-xs text-[#687064]">
-                        {summary.store.name} · {summary.menu.name} 결제 안내 (종료됨)
+                      <div className="max-w-md px-3.5 py-2 rounded-xl bg-white border border-[#E8ECE4] text-xs text-[#687064]">
+                        {summary.store.name} · {summary.menu.name} {summary.qty}인분 (
+                        {formatWon(summary.finalTotal)}) · 종료됨
                       </div>
                     )}
                   </div>
