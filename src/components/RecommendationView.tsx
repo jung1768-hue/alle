@@ -953,6 +953,18 @@ export function RecommendationView({
                             <p className="text-sm text-[#1A1D1A] leading-relaxed">
                               {review.content}
                             </p>
+                            {review.photos && review.photos.length > 0 && (
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {review.photos.map((photo, pIdx) => (
+                                  <img
+                                    key={`${photo.name}-${pIdx}`}
+                                    src={photo.dataUrl}
+                                    alt={photo.name}
+                                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border border-[#E8ECE4]"
+                                  />
+                                ))}
+                              </div>
+                            )}
                             {ownerReply && (
                               <div className="p-3 bg-[#EAF1E2] border border-[#E8ECE4] rounded-xl text-xs text-[#3D5720] space-y-1">
                                 <div className="flex flex-wrap items-center justify-between gap-1 font-bold">

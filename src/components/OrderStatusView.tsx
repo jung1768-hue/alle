@@ -61,6 +61,7 @@ interface OrderStatusViewProps {
     content: string;
     prosTags: string[];
     consTags?: string[];
+    photos?: EvidencePhoto[];
   }) => void;
   onAdvanceErrand?: (errandId: string, nextStatus: ErrandStatus) => void;
   onQuickReorderToConfirm: (menuId: string, servings: number) => void;
@@ -238,6 +239,7 @@ export function OrderStatusView({
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewTags, setReviewTags] = useState<string[]>(['맛있어요']);
   const [reviewContent, setReviewContent] = useState<string>('');
+  const [reviewPhotos, setReviewPhotos] = useState<EvidencePhoto[]>([]);
 
   const reviewByOrderId = useMemo(() => {
     const map = new Map<string, Review>();
@@ -1415,6 +1417,7 @@ export function OrderStatusView({
                                       setReviewRating(5);
                                       setReviewTags(['맛있어요']);
                                       setReviewContent('');
+                                      setReviewPhotos([]);
                                     }
                                   }}
                                   className="min-h-[40px] px-3.5 py-1.5 border border-[#4E6E2A] bg-white hover:bg-[#EAF1E2] text-[#3D5720] text-xs font-bold rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
@@ -1461,11 +1464,29 @@ export function OrderStatusView({
                       {writtenReview && (() => {
                         const rawReply = reviewReplies[writtenReview.id]?.text?.trim() ?? '';
                         const replyText = rawReply.replace(/^\[점주 답글\]\s*/, '');
-                        if (!replyText) return null;
+                        const hasPhotos =
+                          Boolean(writtenReview.photos && writtenReview.photos.length > 0);
+                        if (!replyText && !hasPhotos) return null;
                         return (
-                          <div className="p-3 rounded-xl bg-[#EAF1E2]/70 border border-[#D4E1C5] text-xs text-[#3D5720]">
-                            <span className="font-bold">점주 답글:</span>{' '}
-                            {replyText}
+                          <div className="space-y-2">
+                            {hasPhotos && (
+                              <div className="flex flex-wrap gap-2">
+                                {writtenReview.photos!.map((photo, pIdx) => (
+                                  <img
+                                    key={`${photo.name}-${pIdx}`}
+                                    src={photo.dataUrl}
+                                    alt={photo.name}
+                                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border border-[#E8ECE4]"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {replyText && (
+                              <div className="p-3 rounded-xl bg-[#EAF1E2]/70 border border-[#D4E1C5] text-xs text-[#3D5720]">
+                                <span className="font-bold">점주 답글:</span>{' '}
+                                {replyText}
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -1537,6 +1558,69 @@ export function OrderStatusView({
                               className="w-full p-3 bg-white border border-[#D4E1C5] rounded-xl text-xs sm:text-sm text-[#1A1D1A] placeholder:text-[#687064]"
                             />
 
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <label
+                                  className={`easy-compact min-h-[34px] px-3 py-1.5 rounded-xl border text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${
+                                    reviewPhotos.length >= 3
+                                      ? 'bg-[#EFF2F5] border-[#E8ECE4] text-[#919A8D] cursor-not-allowed'
+                                      : 'bg-white border-[#D4E1C5] hover:bg-[#EAF1E2] text-[#3D5720] cursor-pointer'
+                                  }`}
+                                >
+                                  <Camera className="w-3.5 h-3.5 shrink-0" />
+                                  <span>사진 추가 ({reviewPhotos.length}/3)</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    disabled={reviewPhotos.length >= 3}
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const added = await readCompressedEvidencePhotos(
+                                        e,
+                                        reviewPhotos.length,
+                                        3
+                                      );
+                                      if (added.length > 0) {
+                                        setReviewPhotos((prev) =>
+                                          [...prev, ...added].slice(0, 3)
+                                        );
+                                      }
+                                    }}
+                                  />
+                                </label>
+                                <span className="text-[11px] text-[#687064]">
+                                  최대 3장 첨부 가능
+                                </span>
+                              </div>
+
+                              {reviewPhotos.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {reviewPhotos.map((photo, idx) => (
+                                    <div key={`${photo.name}-${idx}`} className="relative">
+                                      <img
+                                        src={photo.dataUrl}
+                                        alt={photo.name}
+                                        className="w-16 h-16 rounded-xl object-cover border border-[#D4E1C5]"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setReviewPhotos((prev) =>
+                                            prev.filter((_, i) => i !== idx)
+                                          )
+                                        }
+                                        aria-label="첨부 사진 삭제"
+                                        className="easy-compact absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#1A1D1A] text-white flex items-center justify-center shadow cursor-pointer"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
                             <div className="flex justify-end gap-2">
                               <button
                                 type="button"
@@ -1557,8 +1641,10 @@ export function OrderStatusView({
                                     rating: reviewRating,
                                     content: trimmed,
                                     prosTags: reviewTags,
+                                    photos: reviewPhotos,
                                   });
                                   setReviewContent('');
+                                  setReviewPhotos([]);
                                   setReviewOrderId(null);
                                 }}
                                 className="min-h-[36px] px-4 py-1.5 rounded-xl bg-[#4E6E2A] hover:bg-[#3F5A21] disabled:bg-[#D4DCD0] text-white font-bold cursor-pointer disabled:cursor-not-allowed"

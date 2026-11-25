@@ -28,6 +28,7 @@ import {
   VOICE_TRANSCRIPT_SAMPLES,
 } from '../data/seedData';
 import {
+  EvidencePhoto,
   MenuItem,
   Order,
   PaymentMethod,
@@ -100,6 +101,7 @@ interface ConditionHomeProps {
     rating: number;
     content: string;
     prosTags: string[];
+    photos?: EvidencePhoto[];
   }) => void;
   activeLocation?: SavedLocation;
 }

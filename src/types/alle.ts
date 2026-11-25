@@ -123,6 +123,7 @@ export interface Review {
   consTags: string[];
   isComplaint: boolean;
   content: string;
+  photos?: EvidencePhoto[];
 }
 
 export interface ReviewReply {

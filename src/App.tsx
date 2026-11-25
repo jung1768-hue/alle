@@ -57,6 +57,7 @@ import {
   DispatchMode,
   ErrandRequest,
   ErrandStatus,
+  EvidencePhoto,
   EvidenceRecord,
   MenuItem,
   Order,
@@ -2532,6 +2533,7 @@ export default function App() {
     prosTags: string[];
     consTags?: string[];
     author?: string;
+    photos?: EvidencePhoto[];
   }) => {
     const trimmedContent = payload.content.trim();
     if (!trimmedContent) return;
@@ -2548,6 +2550,8 @@ export default function App() {
       consTags: payload.consTags ?? [],
       isComplaint: safeRating <= 2,
       content: trimmedContent,
+      photos:
+        payload.photos && payload.photos.length > 0 ? payload.photos : undefined,
     };
     setAppState((prev) => ({
       ...prev,

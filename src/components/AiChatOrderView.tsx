@@ -5242,6 +5242,18 @@ export function AiChatOrderView({
                                 <p className="text-[#1A1D1A] leading-relaxed">
                                   {rev.content}
                                 </p>
+                                {rev.photos && rev.photos.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    {rev.photos.map((photo, pIdx) => (
+                                      <img
+                                        key={`${photo.name}-${pIdx}`}
+                                        src={photo.dataUrl}
+                                        alt={photo.name}
+                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border border-[#E8ECE4]"
+                                      />
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>

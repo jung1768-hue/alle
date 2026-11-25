@@ -3623,6 +3623,18 @@ export function OwnerDashboardView({
                       <p className="text-sm text-[#1A1D1A] leading-relaxed">
                         {rev.content}
                       </p>
+                      {rev.photos && rev.photos.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {rev.photos.map((photo, pIdx) => (
+                            <img
+                              key={`${photo.name}-${pIdx}`}
+                              src={photo.dataUrl}
+                              alt={photo.name}
+                              className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border border-[#E8ECE4]"
+                            />
+                          ))}
+                        </div>
+                      )}
 
                       <div className="flex flex-col sm:flex-row gap-2 pt-1">
                         <input
