@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Briefcase,
   Check,
@@ -45,6 +45,36 @@ export function LocationPickerModal({
   const [newAreaName, setNewAreaName] = useState('');
   const [newDetailAddress, setNewDetailAddress] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const prevHtmlOverflow = htmlEl.style.overflow;
+    const prevBodyOverflow = bodyEl.style.overflow;
+    const prevHtmlOverscroll = htmlEl.style.overscrollBehavior;
+    const prevBodyOverscroll = bodyEl.style.overscrollBehavior;
+    htmlEl.style.overflow = 'hidden';
+    bodyEl.style.overflow = 'hidden';
+    htmlEl.style.overscrollBehavior = 'none';
+    bodyEl.style.overscrollBehavior = 'none';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      htmlEl.style.overflow = prevHtmlOverflow;
+      bodyEl.style.overflow = prevBodyOverflow;
+      htmlEl.style.overscrollBehavior = prevHtmlOverscroll;
+      bodyEl.style.overscrollBehavior = prevBodyOverscroll;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -78,18 +108,18 @@ export function LocationPickerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#1A1D1A]/55 backdrop-blur-[2px] p-0 sm:p-4"
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-[#1A1D1A]/55 backdrop-blur-[2px] p-2 sm:p-3 overscroll-none"
       role="dialog"
       aria-modal="true"
       aria-label="내 등록 위치 변경"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-[#F7F8F5] rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
+        className="w-full sm:max-w-md bg-[#F7F8F5] rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden max-h-[calc(100dvh-16px)] sm:max-h-[calc(100dvh-24px)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 bg-white border-b border-[#E8ECE4] flex items-center justify-between">
+        <div className="px-5 py-4 bg-white border-b border-[#E8ECE4] flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-base font-bold text-[#1A1D1A]">
               내 등록 위치 변경
@@ -109,7 +139,7 @@ export function LocationPickerModal({
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+        <div className="flex-1 min-h-0 p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain">
           {/* Saved Locations List */}
           <div className="space-y-2">
             <div className="flex items-center justify-between px-0.5">
