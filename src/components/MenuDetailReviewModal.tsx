@@ -65,13 +65,21 @@ export function MenuDetailReviewModal({
 
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overscrollBehavior = 'none';
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const prevHtmlOverflow = htmlEl.style.overflow;
+    const prevBodyOverflow = bodyEl.style.overflow;
+    const prevHtmlOverscroll = htmlEl.style.overscrollBehavior;
+    const prevBodyOverscroll = bodyEl.style.overscrollBehavior;
+    htmlEl.style.overflow = 'hidden';
+    bodyEl.style.overflow = 'hidden';
+    htmlEl.style.overscrollBehavior = 'none';
+    bodyEl.style.overscrollBehavior = 'none';
     return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+      htmlEl.style.overflow = prevHtmlOverflow;
+      bodyEl.style.overflow = prevBodyOverflow;
+      htmlEl.style.overscrollBehavior = prevHtmlOverscroll;
+      bodyEl.style.overscrollBehavior = prevBodyOverscroll;
     };
   }, [isOpen]);
 
@@ -88,11 +96,11 @@ export function MenuDetailReviewModal({
       aria-modal="true"
       aria-label={`${menu.name} 상세 및 리뷰`}
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-none touch-none"
+      className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-xs flex items-start justify-center p-2 sm:p-3 overscroll-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-lg max-h-[88vh] overflow-y-auto overscroll-contain touch-pan-y bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl p-5 sm:p-6 space-y-4"
+        className="w-full sm:max-w-lg max-h-[calc(100dvh-16px)] sm:max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain touch-pan-y bg-white rounded-3xl border border-[#E8ECE4] shadow-2xl p-5 sm:p-6 space-y-4"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

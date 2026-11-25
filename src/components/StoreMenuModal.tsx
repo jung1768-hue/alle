@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -80,18 +80,42 @@ export function StoreMenuModal({
   const [expandedOptionsMenuId, setExpandedOptionsMenuId] = useState<string | null>(
     null
   );
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overscrollBehavior = 'none';
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const prevHtmlOverflow = htmlEl.style.overflow;
+    const prevBodyOverflow = bodyEl.style.overflow;
+    const prevHtmlOverscroll = htmlEl.style.overscrollBehavior;
+    const prevBodyOverscroll = bodyEl.style.overscrollBehavior;
+    htmlEl.style.overflow = 'hidden';
+    bodyEl.style.overflow = 'hidden';
+    htmlEl.style.overscrollBehavior = 'none';
+    bodyEl.style.overscrollBehavior = 'none';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+      window.removeEventListener('keydown', handleKeyDown);
+      htmlEl.style.overflow = prevHtmlOverflow;
+      bodyEl.style.overflow = prevBodyOverflow;
+      htmlEl.style.overscrollBehavior = prevHtmlOverscroll;
+      bodyEl.style.overscrollBehavior = prevBodyOverscroll;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    scrollBodyRef.current?.scrollTo({ top: 0 });
+  }, [isOpen, store?.id, activeTab]);
 
   useEffect(() => {
     if (!store) return;
@@ -475,153 +499,159 @@ export function StoreMenuModal({
       aria-modal="true"
       aria-label={`${store.name} 전체 메뉴`}
       onClick={onClose}
-      className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-[2px] flex items-end sm:items-center justify-center pt-20 sm:pt-24 px-0 sm:px-4 pb-0 sm:pb-4 overscroll-none touch-none"
+      className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-[2px] flex items-start justify-center p-2 sm:p-3 overscroll-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-2xl max-h-[78vh] bg-white rounded-t-3xl sm:rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden flex flex-col touch-pan-y"
+        className="w-full sm:max-w-2xl max-h-[calc(100dvh-16px)] sm:max-h-[calc(100dvh-24px)] bg-white rounded-3xl border border-[#E8ECE4] shadow-2xl overflow-hidden flex flex-col"
       >
-        {/* Store Header */}
-        <div className="px-5 py-4 bg-white border-b border-[#E8ECE4] space-y-2.5 shrink-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-13 h-13 rounded-2xl overflow-hidden border border-[#E8ECE4] shrink-0">
-                <FoodImage
-                  src={store.image}
-                  alt={store.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#4E6E2A]">
-                  <span className="inline-flex items-center gap-1">
-                    <StoreIcon className="w-3.5 h-3.5" />
-                    {store.category}
-                  </span>
-                  {!store.singlePriceRevoked && (
-                    <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] font-bold">
-                      💚 착한가격 · 매장 동일가
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-[#1A1D1A] truncate mt-0.5">
-                  {store.name}
-                </h2>
-              </div>
+        {/* Compact Sticky Store Header */}
+        <div className="px-4 sm:px-5 py-3 bg-white border-b border-[#E8ECE4] flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-[#E8ECE4] shrink-0">
+              <FoodImage
+                src={store.image}
+                alt={store.name}
+                className="w-full h-full object-cover"
+              />
             </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="가게 메뉴 창 닫기"
-              className="easy-compact w-9 h-9 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] flex items-center justify-center cursor-pointer shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#687064] tabular-nums">
-            <span className="inline-flex items-center gap-1 font-bold text-[#1A1D1A]">
-              <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
-              {(store.rating ?? 4.9).toFixed(1)} (
-              {(store.reviewCount ?? 850).toLocaleString('ko-KR')})
-            </span>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
-              약 {store.basePrepMinutes + 8 + (store.extraPrepMinutes ?? 0)}분
-            </span>
-            <span>·</span>
-            <span>
-              배달비 {store.deliveryFee === 0 ? '무료' : formatWon(store.deliveryFee)}
-            </span>
-            <span>·</span>
-            <span className="font-bold text-[#3D5720]">
-              최소주문 없음 · 1개도 배달
-            </span>
-          </div>
-
-          {store.deliveryFeeTiers && store.deliveryFeeTiers.length > 0 && (
-            <p className="text-[11px] font-semibold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg inline-block">
-              🤝 점주 상생 배달비:{' '}
-              {[...store.deliveryFeeTiers]
-                .sort((a, b) => a.minSubtotal - b.minSubtotal)
-                .map(
-                  (t) =>
-                    `${formatWon(t.minSubtotal)}↑ ${
-                      t.deliveryFee === 0 ? '무료' : formatWon(t.deliveryFee)
-                    }`
-                )
-                .join(' · ')}
-            </p>
-          )}
-
-          {(activeStorePromos.length > 0 || activeStoreCoupons.length > 0) && (
-            <div className="space-y-1.5 pt-0.5">
-              {activeStorePromos.map((promo) => (
-                <div
-                  key={promo.id}
-                  className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950"
-                >
-                  <span className="font-extrabold mr-1.5">
-                    🎉 [{promo.badgeText ?? '가게 이벤트'}]
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#4E6E2A]">
+                <span className="inline-flex items-center gap-1">
+                  <StoreIcon className="w-3.5 h-3.5" />
+                  {store.category}
+                </span>
+                {!store.singlePriceRevoked && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#EAF1E2] text-[#3D5720] font-bold">
+                    💚 착한가격 · 매장 동일가
                   </span>
-                  <span className="font-bold">{promo.title}</span>
-                  {promo.description && (
-                    <p className="text-[11px] text-amber-900 mt-0.5">
-                      {promo.description}
-                    </p>
-                  )}
-                </div>
-              ))}
-              {activeStoreCoupons.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {activeStoreCoupons.map((cp) => (
-                    <span
-                      key={cp.id}
-                      className="px-2.5 py-1 rounded-lg bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-[11px] font-bold"
-                    >
-                      🎟️ {cp.label} (결제 시 자동 적용)
-                    </span>
-                  ))}
-                </div>
-              )}
+                )}
+              </div>
+              <h2 className="text-base sm:text-lg font-extrabold text-[#1A1D1A] truncate mt-0.5">
+                {store.name}
+              </h2>
             </div>
-          )}
-
-          <div className="flex items-center gap-1 text-[11px] text-[#687064]">
-            <MapPin className="w-3 h-3 text-[#4E6E2A] shrink-0" />
-            <span className="truncate">{store.areaLabel}</span>
           </div>
 
-          <div className="grid grid-cols-2 p-1 bg-[#F0F3EC] rounded-xl border border-[#E8ECE4]">
-            <button
-              type="button"
-              onClick={() => setActiveTab('menus')}
-              className={`easy-compact min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
-                activeTab === 'menus'
-                  ? 'bg-[#4E6E2A] text-white'
-                  : 'text-[#555E52] hover:text-[#1A1D1A]'
-              }`}
-            >
-              전체 메뉴 ({availableMenus.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('reviews')}
-              className={`easy-compact min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
-                activeTab === 'reviews'
-                  ? 'bg-[#4E6E2A] text-white'
-                  : 'text-[#555E52] hover:text-[#1A1D1A]'
-              }`}
-            >
-              가게 리뷰 ({storeReviews.length})
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="가게 메뉴 창 닫기"
+            className="easy-compact w-9 h-9 rounded-xl bg-[#F7F8F5] hover:bg-[#EAF1E2] text-[#687064] flex items-center justify-center cursor-pointer shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-5 bg-[#F7F8F5]">
+        {/* Unified Scrollable Body (Store Metadata + Sticky Tabs + Menu List) */}
+        <div
+          ref={scrollBodyRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#F7F8F5]"
+        >
+          <div className="bg-white px-4 sm:px-5 py-3 border-b border-[#E8ECE4] space-y-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#687064] tabular-nums">
+              <span className="inline-flex items-center gap-1 font-bold text-[#1A1D1A]">
+                <Star className="w-3.5 h-3.5 fill-[#82B440] text-[#82B440]" />
+                {(store.rating ?? 4.9).toFixed(1)} (
+                {(store.reviewCount ?? 850).toLocaleString('ko-KR')})
+              </span>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-[#4E6E2A]" />
+                약 {store.basePrepMinutes + 8 + (store.extraPrepMinutes ?? 0)}분
+              </span>
+              <span>·</span>
+              <span>
+                배달비 {store.deliveryFee === 0 ? '무료' : formatWon(store.deliveryFee)}
+              </span>
+              <span>·</span>
+              <span className="font-bold text-[#3D5720]">
+                최소주문 없음 · 1개도 배달
+              </span>
+            </div>
+
+            {store.deliveryFeeTiers && store.deliveryFeeTiers.length > 0 && (
+              <p className="text-[11px] font-semibold text-[#4E6E2A] bg-[#F7F8F5] px-2.5 py-1 rounded-lg inline-block">
+                🤝 점주 상생 배달비:{' '}
+                {[...store.deliveryFeeTiers]
+                  .sort((a, b) => a.minSubtotal - b.minSubtotal)
+                  .map(
+                    (t) =>
+                      `${formatWon(t.minSubtotal)}↑ ${
+                        t.deliveryFee === 0 ? '무료' : formatWon(t.deliveryFee)
+                      }`
+                  )
+                  .join(' · ')}
+              </p>
+            )}
+
+            {(activeStorePromos.length > 0 || activeStoreCoupons.length > 0) && (
+              <div className="space-y-1.5 pt-0.5">
+                {activeStorePromos.map((promo) => (
+                  <div
+                    key={promo.id}
+                    className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950"
+                  >
+                    <span className="font-extrabold mr-1.5">
+                      🎉 [{promo.badgeText ?? '가게 이벤트'}]
+                    </span>
+                    <span className="font-bold">{promo.title}</span>
+                    {promo.description && (
+                      <p className="text-[11px] text-amber-900 mt-0.5">
+                        {promo.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+                {activeStoreCoupons.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeStoreCoupons.map((cp) => (
+                      <span
+                        key={cp.id}
+                        className="px-2.5 py-1 rounded-lg bg-[#EAF1E2] border border-[#82B440] text-[#3D5720] text-[11px] font-bold"
+                      >
+                        🎟️ {cp.label} (결제 시 자동 적용)
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1 text-[11px] text-[#687064]">
+              <MapPin className="w-3 h-3 text-[#4E6E2A] shrink-0" />
+              <span className="truncate">{store.areaLabel}</span>
+            </div>
+          </div>
+
+          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-xs px-4 sm:px-5 py-2.5 border-b border-[#E8ECE4]">
+            <div className="grid grid-cols-2 p-1 bg-[#F0F3EC] rounded-xl border border-[#E8ECE4]">
+              <button
+                type="button"
+                onClick={() => setActiveTab('menus')}
+                className={`easy-compact min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                  activeTab === 'menus'
+                    ? 'bg-[#4E6E2A] text-white'
+                    : 'text-[#555E52] hover:text-[#1A1D1A]'
+                }`}
+              >
+                전체 메뉴 ({availableMenus.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('reviews')}
+                className={`easy-compact min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                  activeTab === 'reviews'
+                    ? 'bg-[#4E6E2A] text-white'
+                    : 'text-[#555E52] hover:text-[#1A1D1A]'
+                }`}
+              >
+                가게 리뷰 ({storeReviews.length})
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 space-y-5">
           {activeTab === 'menus' ? (
             <>
               {highlightMenu && (
@@ -721,10 +751,11 @@ export function StoreMenuModal({
               )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Sticky Bottom Action Bar */}
-        <div className="px-4 sm:px-5 py-3.5 bg-white border-t border-[#E8ECE4] space-y-2.5 shrink-0">
+        <div className="px-4 sm:px-5 py-3 bg-white border-t border-[#E8ECE4] space-y-2.5 shrink-0">
           {draftItems.length > 0 && totals.nextTierLabel && (
             <p className="text-[11px] font-bold text-[#3D5720] bg-[#EAF1E2] px-3 py-1 rounded-xl text-center">
               💡 {totals.nextTierLabel}

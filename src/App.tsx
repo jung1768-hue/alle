@@ -3537,7 +3537,7 @@ export default function App() {
               © 2026 올이. All rights reserved.
             </p>
             <p className="text-xs sm:text-sm text-[#6B7280] break-keep leading-relaxed">
-              본 화면은 경북대학교 경영대학원 경영정보세미나 프로젝트 시연용 서비스입니다.
+              경북대학교 경영대학원 경영정보세미나 프로젝트 시연용 서비스이며, 디자인 및 아이디어의 소유는 올이에게 있습니다.
             </p>
           </div>
           <div className="hidden md:flex items-center gap-5 shrink-0 text-sm">
