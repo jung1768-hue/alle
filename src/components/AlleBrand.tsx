@@ -8,6 +8,7 @@ export const BARO_CHARACTER_WAVE_LIGHT_SRC =
   '/assets/brand/baro-character-wave-light.png';
 export const BARO_PARTNER_KIT_SRC = '/assets/brand/baro-partner-kit.jpg';
 export const BARO_PARTNER_GEAR_SRC = '/assets/brand/baro-partner-gear.jpg';
+export const BARO_PARTNER_RIDER_SRC = '/assets/brand/baro-partner-rider.jpg';
 
 interface AlleLogoProps {
   className?: string;

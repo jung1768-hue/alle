@@ -625,6 +625,7 @@ export function AiChatOrderView({
   const voiceReplyEnabledRef = useRef(voiceReplyEnabled);
   const isListeningRef = useRef(isListening);
   const isSpeakingRef = useRef(isSpeaking);
+  const isAnalyzingRef = useRef(isAnalyzing);
   const isNearSpeechEndRef = useRef(false);
   const pendingVoiceQueryRef = useRef<string | null>(null);
   const currentSpokenTextRef = useRef('');
@@ -643,6 +644,7 @@ export function AiChatOrderView({
   voiceReplyEnabledRef.current = voiceReplyEnabled;
   isListeningRef.current = isListening;
   isSpeakingRef.current = isSpeaking;
+  isAnalyzingRef.current = isAnalyzing;
   voiceCheckoutCompletedRef.current = voiceCheckoutCompleted;
 
   const [activeCondition, setActiveCondition] = useState<ParsedCondition>(() =>
@@ -873,6 +875,7 @@ export function AiChatOrderView({
     let lastErrCode = '';
     stopVoiceRef.current = startKoreanVoiceInput({
       continuous: true,
+      utterancePauseMs: 1350,
       onInterim: (text) => {
         const cleaned = text.trim();
         if (!cleaned || isLikelyAmbientNoise(cleaned)) {
@@ -980,6 +983,7 @@ export function AiChatOrderView({
           elapsed >= 1500 &&
           consecutiveEmptyListenRef.current <= 1 &&
           !isSpeakingRef.current &&
+          !isAnalyzingRef.current &&
           shouldContinueListeningRef.current &&
           voiceReplyEnabledRef.current &&
           !voiceCheckoutCompletedRef.current &&
@@ -3789,7 +3793,13 @@ export function AiChatOrderView({
                   {headline}
                 </span>
               </div>
-              <p className="text-[12.5px] sm:text-[13px] font-medium opacity-90 truncate mt-0.5">
+              <p
+                className={`text-[12.5px] sm:text-[13px] font-medium opacity-90 mt-0.5 ${
+                  isListening && interimTranscript
+                    ? 'line-clamp-2 break-keep'
+                    : 'truncate'
+                }`}
+              >
                 {subline}
               </p>
             </div>

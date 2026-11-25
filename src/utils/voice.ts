@@ -40,6 +40,37 @@ export function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor 
   return win.SpeechRecognition ?? win.webkitSpeechRecognition ?? null;
 }
 
+export function mergeTranscriptParts(base: string, next: string): string {
+  const cleanBase = base.trim().replace(/\s+/g, ' ');
+  const cleanNext = next.trim().replace(/\s+/g, ' ');
+  if (!cleanBase) return cleanNext;
+  if (!cleanNext) return cleanBase;
+  if (cleanNext === cleanBase) return cleanBase;
+
+  const compactBase = cleanBase.replace(/\s+/g, '');
+  const compactNext = cleanNext.replace(/\s+/g, '');
+  if (compactNext === compactBase) {
+    return cleanNext.length >= cleanBase.length ? cleanNext : cleanBase;
+  }
+  if (compactNext.startsWith(compactBase)) {
+    return cleanNext;
+  }
+  if (compactBase.endsWith(compactNext)) {
+    return cleanBase;
+  }
+
+  const baseTokens = cleanBase.split(' ');
+  const nextTokens = cleanNext.split(' ');
+  const maxOverlap = Math.min(baseTokens.length, nextTokens.length);
+  for (let k = maxOverlap; k >= 1; k -= 1) {
+    if (baseTokens.slice(-k).join(' ') === nextTokens.slice(0, k).join(' ')) {
+      return [...baseTokens, ...nextTokens.slice(k)].join(' ');
+    }
+  }
+
+  return `${cleanBase} ${cleanNext}`;
+}
+
 export function startKoreanVoiceInput(callbacks: {
   onTranscript: (text: string) => void;
   onInterim?: (text: string) => void;
@@ -47,6 +78,7 @@ export function startKoreanVoiceInput(callbacks: {
   onUnavailableOrError: () => void;
   onEnd: () => void;
   continuous?: boolean;
+  utterancePauseMs?: number;
 }): () => void {
   const Ctor = getSpeechRecognitionConstructor();
   if (!Ctor) {
@@ -59,8 +91,44 @@ export function startKoreanVoiceInput(callbacks: {
   let stopped = false;
   let deliveredFinal = false;
   let processedFinalCount = 0;
+  let bufferedFinal = '';
+  let latestInterim = '';
+  let flushTimer: number | null = null;
   let lastContinuousFinal = '';
   let lastContinuousFinalAt = 0;
+
+  const clearFlushTimer = () => {
+    if (flushTimer !== null) {
+      window.clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+  };
+
+  const flushBufferedUtterance = () => {
+    clearFlushTimer();
+    const candidate = mergeTranscriptParts(bufferedFinal, latestInterim).trim();
+    bufferedFinal = '';
+    latestInterim = '';
+    if (!candidate) return;
+
+    const isShortAffirm = /^(네|예|응|어)$/.test(candidate);
+    if (candidate.length < 2 && !isShortAffirm) {
+      return;
+    }
+
+    const nowTs = Date.now();
+    if (
+      candidate === lastContinuousFinal &&
+      nowTs - lastContinuousFinalAt < 2500
+    ) {
+      return;
+    }
+
+    lastContinuousFinal = candidate;
+    lastContinuousFinalAt = nowTs;
+    callbacks.onInterim?.('');
+    callbacks.onTranscript(candidate);
+  };
 
   try {
     const recognition = new Ctor();
@@ -73,6 +141,9 @@ export function startKoreanVoiceInput(callbacks: {
       if (stopped) return;
 
       if (callbacks.continuous) {
+        if (event.results.length < processedFinalCount) {
+          processedFinalCount = 0;
+        }
         let startIdx =
           typeof event.resultIndex === 'number'
             ? event.resultIndex
@@ -81,7 +152,7 @@ export function startKoreanVoiceInput(callbacks: {
           startIdx = processedFinalCount;
         }
 
-        let interimText = '';
+        let currentInterim = '';
         for (let i = startIdx; i < event.results.length; i += 1) {
           const res = event.results[i];
           const alt = res?.[0];
@@ -94,28 +165,39 @@ export function startKoreanVoiceInput(callbacks: {
             if (
               typeof confidence === 'number' &&
               confidence > 0 &&
-              confidence < 0.45 &&
-              !isShortAffirm
+              confidence < 0.38 &&
+              !isShortAffirm &&
+              !bufferedFinal
             ) {
               continue;
             }
-            if (part.length < 2 && !isShortAffirm) {
-              continue;
-            }
-            const nowTs = Date.now();
-            if (part === lastContinuousFinal && nowTs - lastContinuousFinalAt < 2500) {
-              continue;
-            }
-            lastContinuousFinal = part;
-            lastContinuousFinalAt = nowTs;
-            callbacks.onTranscript(part);
-          } else if (part.length >= 2) {
-            interimText += `${part} `;
+            bufferedFinal = mergeTranscriptParts(bufferedFinal, part);
+          } else {
+            currentInterim = mergeTranscriptParts(currentInterim, part);
           }
         }
 
-        if (callbacks.onInterim) {
-          callbacks.onInterim(interimText.trim());
+        latestInterim = currentInterim;
+        const combinedPreview = mergeTranscriptParts(bufferedFinal, latestInterim);
+        callbacks.onInterim?.(combinedPreview);
+
+        clearFlushTimer();
+        if (combinedPreview) {
+          const pauseMs = callbacks.utterancePauseMs ?? 1350;
+          const isQuickCommand =
+            /^(네|예|응|어|아니|아니요|취소|그만|닫아|다음\s*메뉴|결제해\s*줘|마이크\s*꺼)$/.test(
+              bufferedFinal
+            );
+          const delayMs = latestInterim
+            ? Math.max(pauseMs + 850, 2200)
+            : isQuickCommand
+              ? 750
+              : pauseMs;
+          flushTimer = window.setTimeout(() => {
+            if (!stopped) {
+              flushBufferedUtterance();
+            }
+          }, delayMs);
         }
         return;
       }
@@ -123,10 +205,14 @@ export function startKoreanVoiceInput(callbacks: {
       if (deliveredFinal) return;
 
       if (!callbacks.onInterim) {
-        const first = event.results[0]?.[0]?.transcript?.trim();
-        if (first) {
+        let merged = '';
+        for (let i = 0; i < event.results.length; i += 1) {
+          const part = event.results[i]?.[0]?.transcript?.trim() ?? '';
+          if (part) merged = mergeTranscriptParts(merged, part);
+        }
+        if (merged) {
           deliveredFinal = true;
-          callbacks.onTranscript(first);
+          callbacks.onTranscript(merged);
         } else {
           callbacks.onUnavailableOrError();
         }
@@ -140,9 +226,9 @@ export function startKoreanVoiceInput(callbacks: {
         const part = res?.[0]?.transcript ?? '';
         if (!part) continue;
         if (res.isFinal) {
-          finalText += `${part} `;
+          finalText = mergeTranscriptParts(finalText, part);
         } else {
-          interimText += `${part} `;
+          interimText = mergeTranscriptParts(interimText, part);
         }
       }
 
@@ -166,6 +252,10 @@ export function startKoreanVoiceInput(callbacks: {
     };
 
     recognition.onend = () => {
+      clearFlushTimer();
+      if (!stopped && callbacks.continuous && (bufferedFinal || latestInterim)) {
+        flushBufferedUtterance();
+      }
       if (!stopped) {
         callbacks.onEnd();
       }
@@ -175,6 +265,9 @@ export function startKoreanVoiceInput(callbacks: {
 
     return () => {
       stopped = true;
+      clearFlushTimer();
+      bufferedFinal = '';
+      latestInterim = '';
       try {
         recognition.stop();
       } catch {

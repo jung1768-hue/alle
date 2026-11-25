@@ -28,7 +28,7 @@ import {
   getDeliveryMethodMeta,
   MATCHING_FEE_PER_CASE,
 } from '../utils/pricing';
-import { BARO_PARTNER_KIT_SRC } from './AlleBrand';
+import { BARO_PARTNER_KIT_SRC, BARO_PARTNER_RIDER_SRC } from './AlleBrand';
 import { LiveDeliveryMapCard } from './LiveDeliveryMapCard';
 
 interface PartnerDashboardViewProps {
@@ -174,16 +174,9 @@ export function PartnerDashboardView({
         </div>
       </div>
 
-      {/* Baro Official Partner Kit Showcase */}
-      <div className="bg-[#F1F7F4] border border-[#D5E8DF] rounded-3xl p-4 sm:p-5 grid grid-cols-1 md:grid-cols-[1.15fr_1fr] gap-4 items-center">
-        <div className="rounded-2xl overflow-hidden bg-[#F1F7F4]">
-          <img
-            src={BARO_PARTNER_KIT_SRC}
-            alt="Baro 공식 파트너 앱, 모자, 보온 배달 가방 킷"
-            className="w-full h-44 sm:h-52 object-cover block"
-          />
-        </div>
-        <div className="space-y-2">
+      {/* Baro Official Partner Kit & Rider Showcase */}
+      <div className="bg-[#F1F7F4] border border-[#D5E8DF] rounded-3xl p-4 sm:p-5 space-y-4">
+        <div className="space-y-1.5">
           <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#DCF2E7] text-[#0B4F34] text-xs font-bold">
             Baro 공식 배달 · 심부름 킷
           </span>
@@ -193,6 +186,34 @@ export function PartnerDashboardView({
           <p className="text-xs sm:text-sm text-[#374151] leading-relaxed break-keep">
             일반 음식 배달과 바로 심부름 파트너로 활동할 때 Baro 공식 모자와 야간 반사띠 보온 가방을 착용하고 안전하게 배송합니다.
           </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-stretch">
+          <div className="rounded-2xl overflow-hidden bg-[#EFF5F3] border border-[#D5E8DF] flex flex-col">
+            <div className="flex-1 flex items-center justify-center p-2.5 sm:p-3 bg-[#EFF5F3]">
+              <img
+                src={BARO_PARTNER_KIT_SRC}
+                alt="Baro 공식 파트너 앱, 모자, 보온 배달 가방 킷"
+                className="w-full h-auto max-h-56 object-contain block"
+              />
+            </div>
+            <div className="px-3 py-2 bg-white/90 border-t border-[#D5E8DF]/80 text-xs font-bold text-[#0B4F34]">
+              공식 파트너 앱 · 모자 · 야간 반사띠 보온 가방
+            </div>
+          </div>
+
+          <div className="rounded-2xl overflow-hidden bg-white border border-[#D5E8DF] flex flex-col">
+            <div className="flex-1 overflow-hidden bg-[#E6EFEA]">
+              <img
+                src={BARO_PARTNER_RIDER_SRC}
+                alt="Baro 공식 모자와 보온 가방을 착용하고 전기자전거로 배송 중인 파트너"
+                className="w-full h-full aspect-[16/10] object-cover object-center block"
+              />
+            </div>
+            <div className="px-3 py-2 bg-white/90 border-t border-[#D5E8DF]/80 text-xs font-bold text-[#0B4F34]">
+              우리 동네 현장 배송 · Baro 파트너 라이더
+            </div>
+          </div>
         </div>
       </div>
 
