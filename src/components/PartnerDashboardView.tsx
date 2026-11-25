@@ -142,16 +142,16 @@ export function PartnerDashboardView({
 
   return (
     <div className="space-y-6">
-      {/* Baro Olive Partner Banner */}
-      <div className="bg-gradient-to-br from-[#2C3612] to-[#3B4719] text-white rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#4E5C25]">
+      {/* Midnight-Emerald Partner Banner */}
+      <div className="bg-gradient-to-br from-[#0D2821] via-[#12382E] to-[#0B221C] text-white rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#1D4A3C]">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[#DCE7BE]">
+          <p className="text-xs font-semibold text-[#D1F5E5]">
             배달 파트너 센터
           </p>
           <h1 className="text-xl font-bold tracking-tight">
             이웃 도보 · 라이더 배차
           </h1>
-          <p className="text-xs sm:text-sm text-[#F1F5E6]">
+          <p className="text-xs sm:text-sm text-[#E6F5EE]">
             조리 중인 주문을 수락해 픽업·배달을 완료하세요.
           </p>
         </div>
@@ -160,14 +160,14 @@ export function PartnerDashboardView({
           <button
             type="button"
             onClick={onSwitchToConsumer}
-            className="min-h-[42px] px-4 py-2 bg-[#F5F3EC] hover:bg-white text-[#2C3612] text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
+            className="min-h-[42px] px-4 py-2 bg-[#EAF6F0] hover:bg-white text-[#0D2821] text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
           >
             고객 홈
           </button>
           <button
             type="button"
             onClick={onSwitchToOwner}
-            className="min-h-[42px] px-4 py-2 bg-[#5A6A28] hover:bg-[#495620] text-white text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
+            className="min-h-[42px] px-4 py-2 bg-[#0F6B46] hover:bg-[#0B5638] text-white text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap cursor-pointer"
           >
             점주 · 관리자
           </button>
@@ -175,8 +175,8 @@ export function PartnerDashboardView({
       </div>
 
       {/* Baro Official Partner Kit Showcase */}
-      <div className="bg-[#F5F3EC] border border-[#E4E0D3] rounded-3xl p-4 sm:p-5 grid grid-cols-1 md:grid-cols-[1.15fr_1fr] gap-4 items-center">
-        <div className="rounded-2xl overflow-hidden bg-[#F5F3EC]">
+      <div className="bg-[#F1F7F4] border border-[#D5E8DF] rounded-3xl p-4 sm:p-5 grid grid-cols-1 md:grid-cols-[1.15fr_1fr] gap-4 items-center">
+        <div className="rounded-2xl overflow-hidden bg-[#F1F7F4]">
           <img
             src={BARO_PARTNER_KIT_SRC}
             alt="Baro 공식 파트너 앱, 모자, 보온 배달 가방 킷"
@@ -184,13 +184,13 @@ export function PartnerDashboardView({
           />
         </div>
         <div className="space-y-2">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E6ECD6] text-[#364215] text-xs font-bold">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#DCF2E7] text-[#0B4F34] text-xs font-bold">
             Baro 공식 배달 · 심부름 킷
           </span>
-          <h2 className="text-base sm:text-lg font-extrabold text-[#1A1D1A] tracking-tight">
+          <h2 className="text-base sm:text-lg font-extrabold text-[#111827] tracking-tight">
             바로 모자 · 보온 가방 착용 배송
           </h2>
-          <p className="text-xs sm:text-sm text-[#4B5548] leading-relaxed break-keep">
+          <p className="text-xs sm:text-sm text-[#374151] leading-relaxed break-keep">
             일반 음식 배달과 바로 심부름 파트너로 활동할 때 Baro 공식 모자와 야간 반사띠 보온 가방을 착용하고 안전하게 배송합니다.
           </p>
         </div>

@@ -261,6 +261,43 @@
   .text-\[\#4E6E2A\] {
     color: #0F6B46;
   }
+
+  .text-\[\#3D5720\] {
+    color: #0B4F34;
+  }
+
+  .bg-\[\#4E6E2A\] {
+    background-color: #0F6B46;
+  }
+
+  .hover\:bg-\[\#3F5A21\]:hover {
+    background-color: #0B5638;
+  }
+
+  .bg-\[\#3D5720\] {
+    background-color: #0B4F34;
+  }
+
+  .bg-\[\#EAF1E2\] {
+    background-color: #EAF6F0;
+  }
+
+  .hover\:bg-\[\#EAF1E2\]:hover {
+    background-color: #EAF6F0;
+  }
+
+  .hover\:bg-\[\#DCE7CF\]:hover {
+    background-color: #D7EDE2;
+  }
+
+  .border-\[\#4E6E2A\] {
+    border-color: #0F6B46;
+  }
+
+  .border-\[\#D4E1C5\],
+  .border-\[\#DCE7CF\] {
+    border-color: #CBE3D7;
+  }
 }
 
 @keyframes baro-voice-pulse {

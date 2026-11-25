@@ -1175,28 +1175,28 @@ export function MyHubView({
       </section>
 
       {/* Baro Partner / Errand Rider Application Card */}
-      <section className="os-card rounded-2xl overflow-hidden bg-[#F5F3EC] border-[#E4E0D3] p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4">
+      <section className="os-card rounded-2xl overflow-hidden bg-[#F1F7F4] border-[#D5E8DF] p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4">
         <img
           src={BARO_PARTNER_KIT_SRC}
           alt="Baro 모자와 보온 배달 가방"
-          className="w-full sm:w-44 h-28 rounded-2xl object-cover bg-[#F5F3EC] shrink-0"
+          className="w-full sm:w-44 h-28 rounded-2xl object-cover bg-[#F1F7F4] shrink-0"
         />
         <div className="min-w-0 flex-1 space-y-2 text-center sm:text-left">
           <div>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#E6ECD6] text-[#364215] text-xs font-bold">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#DCF2E7] text-[#0B4F34] text-xs font-bold">
               바로 배달 · 심부름 파트너
             </span>
-            <h2 className="text-base font-extrabold text-[#1A1D1A] mt-1">
+            <h2 className="text-base font-extrabold text-[#111827] mt-1">
               바로 배달원 · 심부름 파트너 신청
             </h2>
-            <p className="text-xs sm:text-sm text-[#4B5548] mt-0.5 break-keep leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#374151] mt-0.5 break-keep leading-relaxed">
               Baro 공식 모자와 보온 가방을 매고 우리 동네 배달·심부름 파트너로 활동해 보세요.
             </p>
           </div>
           <button
             type="button"
             onClick={() => onChangeRole(DemoRole.PARTNER)}
-            className="easy-compact min-h-[40px] px-4 py-2 rounded-xl bg-[#454F1E] hover:bg-[#343D15] text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
+            className="easy-compact min-h-[40px] px-4 py-2 rounded-xl bg-[#0F6B46] hover:bg-[#0B5638] text-white text-xs sm:text-sm font-bold cursor-pointer transition-colors"
           >
             배달 파트너 · 심부름 신청하기
           </button>

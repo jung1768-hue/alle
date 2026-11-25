@@ -339,7 +339,7 @@ export function RecommendationView({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#F3F6EC] border border-[#DCE5CC] p-1 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-[#EAF6F0] border border-[#CBE3D7] p-1 flex items-center justify-center shrink-0">
             <AlleBotIllustration size="sm" variant="bowl" />
           </div>
           <div className="bg-[#F7F8F5] border border-[#E8ECE4] rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm text-[#1A1D1A]">

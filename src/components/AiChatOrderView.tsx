@@ -3798,7 +3798,7 @@ export function AiChatOrderView({
           return (
             <div key={msg.id} className="space-y-3">
               <div className="flex items-start gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-[#F3F6EC] border border-[#DCE5CC] p-1 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-10 h-10 rounded-2xl bg-[#EAF6F0] border border-[#CBE3D7] p-1 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
                   <AlleBotIllustration
                     size="sm"
                     variant={msg.id === 'welcome' ? 'wave' : 'main'}
@@ -4649,7 +4649,7 @@ export function AiChatOrderView({
 
         {isAnalyzing && (
           <div className="flex items-start gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-[#F3F6EC] border border-[#DCE5CC] p-1 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-10 h-10 rounded-2xl bg-[#EAF6F0] border border-[#CBE3D7] p-1 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
               <AlleBotIllustration size="sm" variant="bowl" />
             </div>
             <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">

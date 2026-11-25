@@ -839,17 +839,17 @@ export function OrderConfirmationView({
             })}
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#F5F3EC] border border-[#E4E0D3] flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-[#F1F7F4] border border-[#D5E8DF] flex items-center gap-3">
             <img
               src={BARO_PARTNER_GEAR_SRC}
               alt="Baro 모자와 보온 배달 가방"
-              className="w-20 h-14 rounded-xl object-cover shrink-0 bg-[#F5F3EC] border border-[#E4E0D3]"
+              className="w-20 h-14 rounded-xl object-cover shrink-0 bg-[#F1F7F4] border border-[#D5E8DF]"
             />
             <div className="min-w-0 space-y-0.5">
-              <p className="text-xs sm:text-sm font-bold text-[#364215]">
+              <p className="text-xs sm:text-sm font-bold text-[#0B4F34]">
                 Baro 공식 모자 · 보온 가방 착용 파트너 배송
               </p>
-              <p className="text-[11px] sm:text-xs text-[#555E52] leading-snug break-keep">
+              <p className="text-[11px] sm:text-xs text-[#374151] leading-snug break-keep">
                 일반 배달 신청 시 Baro 전용 보온 가방으로 음식을 따뜻하고 안전하게 전해드려요.
               </p>
             </div>
