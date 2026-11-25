@@ -3,7 +3,6 @@ import {
   CalendarClock,
   Check,
   ChevronDown,
-  ChevronUp,
   MapPin,
   Minus,
   Plus,
@@ -158,8 +157,6 @@ export function MyHubView({
   const [editingRoutine, setEditingRoutine] = useState<boolean>(false);
   const [draftRoutine, setDraftRoutine] = useState<ZeroClickRoutine>(routine);
   const [routineSavedNotice, setRoutineSavedNotice] = useState<boolean>(false);
-  const [showOperatorSettings, setShowOperatorSettings] =
-    useState<boolean>(false);
   const [editingPrefs, setEditingPrefs] = useState<boolean>(false);
   const [draftPrefs, setDraftPrefs] = useState<UserPreferences>(preferences);
   const [prefsSavedNotice, setPrefsSavedNotice] = useState<boolean>(false);
@@ -1203,51 +1200,37 @@ export function MyHubView({
         </div>
       </section>
 
-      {/* Collapsible Demo Role Settings (Separated from Consumer Flow) */}
+      {/* Always-Open Demo Role Settings (Separated from Consumer Flow) */}
       <section className="os-card rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowOperatorSettings((prev) => !prev)}
-          aria-expanded={showOperatorSettings}
-          className="w-full min-h-[54px] px-5 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-[#F7F8F5] transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#434B40]">
-            <UserCheck className="w-4 h-4 text-[#0F6B46]" />
-            <span>고객 / 점주 관리자 / 배달 파트너 시연 설정</span>
-          </div>
-          {showOperatorSettings ? (
-            <ChevronUp className="w-4 h-4 text-[#687064]" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-[#687064]" />
-          )}
-        </button>
+        <div className="w-full px-5 py-3.5 flex items-center gap-2 text-xs sm:text-sm font-bold text-[#434B40]">
+          <UserCheck className="w-4 h-4 text-[#0F6B46]" />
+          <span>고객 / 점주 관리자 / 배달 파트너 시연 설정</span>
+        </div>
 
-        {showOperatorSettings && (
-          <div className="px-5 pb-5 pt-3 border-t border-[#E8ECE4]">
-            <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#EFF2F5] border border-[#E5E8EC] rounded-2xl">
-              {(
-                [
-                  { id: DemoRole.CONSUMER, label: '고객' },
-                  { id: DemoRole.OWNER, label: '점주 · 관리자' },
-                  { id: DemoRole.PARTNER, label: '배달 파트너' },
-                ] as const
-              ).map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => onChangeRole(r.id)}
-                  className={`min-h-[42px] px-2 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
-                    role === r.id
-                      ? 'bg-[#0F6B46] text-white shadow-2xs'
-                      : 'text-[#4B5563] hover:text-[#111827]'
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+        <div className="px-5 pb-5 pt-3 border-t border-[#E8ECE4]">
+          <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#EFF2F5] border border-[#E5E8EC] rounded-2xl">
+            {(
+              [
+                { id: DemoRole.CONSUMER, label: '고객' },
+                { id: DemoRole.OWNER, label: '점주 · 관리자' },
+                { id: DemoRole.PARTNER, label: '배달 파트너' },
+              ] as const
+            ).map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onChangeRole(r.id)}
+                className={`min-h-[42px] px-2 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
+                  role === r.id
+                    ? 'bg-[#0F6B46] text-white shadow-2xs'
+                    : 'text-[#4B5563] hover:text-[#111827]'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </section>
 
       {/* Final Confirmation Modal for allePay Top-Up */}

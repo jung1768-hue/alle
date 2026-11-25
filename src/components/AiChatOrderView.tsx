@@ -261,6 +261,109 @@ function extractExplicitQuantity(rawText: string): number | null {
   return null;
 }
 
+interface AnalyzingStatus {
+  bubbleText: string;
+  barHeadline: string;
+  barSubline: string;
+}
+
+const DEFAULT_ANALYZING_STATUS: AnalyzingStatus = {
+  bubbleText: '말씀하신 조건에 맞는 매장과 메뉴를 찾고 있어요...',
+  barHeadline: '잠시만요, 요청을 확인하고 있어요',
+  barSubline: '금방 맞춤 답변을 드릴게요',
+};
+
+function buildAnalyzingStatus(
+  rawText: string,
+  options: {
+    inCheckout: boolean;
+    activeMenuName?: string;
+    areaName?: string;
+  }
+): AnalyzingStatus {
+  const trimmed = rawText.trim();
+  const parsed = parseConditionInput(trimmed);
+  const areaPrefix = options.areaName ? `${options.areaName} ` : '';
+
+  if (
+    options.inCheckout &&
+    /(결제|주문|진행|할게|할래|응|네|예|좋아|맞아|오케이)/.test(trimmed)
+  ) {
+    return {
+      bubbleText: '말씀하신 주문과 결제 내용을 최종 확인하고 있어요...',
+      barHeadline: '결제 내용을 확인하고 있어요',
+      barSubline: '곧 결제 완료 여부를 안내해드릴게요',
+    };
+  }
+
+  if (/(취소|안\s*할|그만|말고)/.test(trimmed)) {
+    return {
+      bubbleText: '요청하신 변경·취소 내용을 정리하고 있어요...',
+      barHeadline: '변경·취소 요청을 처리하고 있어요',
+      barSubline: '대화 흐름을 바로 이어갈게요',
+    };
+  }
+
+  if (parsed.tags.length > 0) {
+    const tagPreview = parsed.tags.slice(0, 2).join(' · ');
+    return {
+      bubbleText: `말씀하신 ‘${tagPreview}’ 조건에 맞는 ${areaPrefix}주변 맛집을 찾고 있어요...`,
+      barHeadline: `‘${tagPreview}’ 메뉴를 찾고 있어요`,
+      barSubline: '착한가격·배달 시간 순으로 고르는 중이에요',
+    };
+  }
+
+  if (/(몇\s*분|얼마나\s*걸|빨리|빠른|시간|언제\s*와|도착)/.test(trimmed)) {
+    return {
+      bubbleText: '가장 빨리 도착하는 매장과 예상 배달 시간을 확인하고 있어요...',
+      barHeadline: '배달 시간을 확인하고 있어요',
+      barSubline: '가장 빠른 가게를 추려볼게요',
+    };
+  }
+
+  if (/(얼마|싼|저렴|가성비|배달비|무료|예산|원\s*이하|만원|가격)/.test(trimmed)) {
+    return {
+      bubbleText: '예산과 배달비 조건에 맞는 착한가격 메뉴를 비교하고 있어요...',
+      barHeadline: '가격·배달비 조건을 비교하고 있어요',
+      barSubline: '부담 없는 메뉴를 찾아드릴게요',
+    };
+  }
+
+  if (/(이벤트|쿠폰|할인|특가|마감|혜택|세일)/.test(trimmed)) {
+    return {
+      bubbleText: '지금 바로 쓸 수 있는 쿠폰과 할인 혜택을 찾고 있어요...',
+      barHeadline: '할인·쿠폰 혜택을 찾고 있어요',
+      barSubline: '적용 가능한 매장을 확인 중이에요',
+    };
+  }
+
+  if (/(리뷰|후기|별점|평점|인기|맛집|맛있)/.test(trimmed)) {
+    return {
+      bubbleText: '실제 고객 리뷰와 평점이 좋은 메뉴를 살펴보고 있어요...',
+      barHeadline: '리뷰·평점이 좋은 메뉴를 찾고 있어요',
+      barSubline: '후기를 정리해서 알려드릴게요',
+    };
+  }
+
+  if (
+    options.activeMenuName &&
+    /(인분|개|옵션|추가|빼|맵기|어때|설명|알려)/.test(trimmed)
+  ) {
+    return {
+      bubbleText: `‘${options.activeMenuName}’ 관련 요청을 확인하고 있어요...`,
+      barHeadline: `‘${options.activeMenuName}’ 내용을 확인 중이에요`,
+      barSubline: '바로 답변해드릴게요',
+    };
+  }
+
+  const snippet = trimmed.length > 18 ? `${trimmed.slice(0, 18)}…` : trimmed;
+  return {
+    bubbleText: `“${snippet}” 요청에 맞춰 생각하고 있어요...`,
+    barHeadline: `“${snippet}” 요청을 확인 중이에요`,
+    barSubline: '잠시만 기다려 주세요',
+  };
+}
+
 function getVoicePaymentOptions(
   areaName: string,
   walletBalance: number
@@ -475,6 +578,9 @@ export function AiChatOrderView({
     useState<VoiceCheckoutDraft | null>(null);
   const [voiceCheckoutCompleted, setVoiceCheckoutCompleted] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingStatus, setAnalyzingStatus] = useState<AnalyzingStatus>(
+    DEFAULT_ANALYZING_STATUS
+  );
   const [aiReady, setAiReady] = useState(() => hasGeminiApiKey());
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState<boolean>(() => {
     try {
@@ -2021,6 +2127,13 @@ export function AiChatOrderView({
         ? reviews.filter((r) => r.menuId === activeMenu.id)
         : [];
 
+      setAnalyzingStatus(
+        buildAnalyzingStatus(trimmed, {
+          inCheckout: Boolean(voiceCheckoutDraft),
+          activeMenuName: activeMenu?.name,
+          areaName: activeLocation?.areaName,
+        })
+      );
       setIsAnalyzing(true);
       const aiTurn = await understandChatTurnWithAI({
         userInput: trimmed,
@@ -3278,6 +3391,13 @@ export function AiChatOrderView({
       (aiReady || hasGeminiApiKey()) &&
       !/초기화|처음부터|새로/.test(trimmed)
     ) {
+      setAnalyzingStatus(
+        buildAnalyzingStatus(trimmed, {
+          inCheckout: Boolean(voiceCheckoutDraft),
+          activeMenuName: activeMenu?.name,
+          areaName: activeLocation?.areaName,
+        })
+      );
       setIsAnalyzing(true);
       const aiResult = await parseConditionWithAI(trimmed, activeCondition);
       setIsAnalyzing(false);
@@ -3623,8 +3743,8 @@ export function AiChatOrderView({
         'bg-[#FFFBEB]/95 border-[#D97706] text-[#92400E] shadow-[0_10px_28px_-8px_rgba(217,119,6,0.18)]';
       badgeText = '찾는 중';
       badgeClass = 'bg-[#FEF3C7] text-[#92400E]';
-      headline = '잠시만요, 메뉴를 찾고 있어요';
-      subline = '금방 결과를 읽어드릴게요';
+      headline = analyzingStatus.barHeadline;
+      subline = analyzingStatus.barSubline;
     }
 
     return (
@@ -4653,8 +4773,8 @@ export function AiChatOrderView({
               <AlleBotIllustration size="sm" variant="bowl" />
             </div>
             <div className="bg-white border border-[#D4E1C5] rounded-2xl rounded-tl-xs px-4 py-3 text-xs font-semibold text-[#3D5720] shadow-sm inline-flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse" />
-              <span>Baro 분석이 컨디션과 조건에 맞는 매장을 찾고 있어요...</span>
+              <Sparkles className="w-4 h-4 text-[#4E6E2A] animate-pulse shrink-0" />
+              <span>{analyzingStatus.bubbleText}</span>
             </div>
           </div>
         )}

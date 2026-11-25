@@ -304,6 +304,99 @@ export default function App() {
   const lastHistoryKeyRef = useRef<string>(
     `${DemoRole.CONSUMER}:${ConsumerStep.HOME}`
   );
+  const scrollPositionsRef = useRef<Record<string, number>>({});
+  const pendingScrollRestoreRef = useRef<number | null>(null);
+  const isRestoringScrollRef = useRef<boolean>(false);
+  const activeScrollKeyRef = useRef<string>('tab:HOME');
+
+  const getNavScrollKey = (r: DemoRole, s: ConsumerStep): string => {
+    if (r !== DemoRole.CONSUMER) return `role:${r}`;
+    if (s === ConsumerStep.HOME) return 'tab:HOME';
+    if (
+      s === ConsumerStep.AI_CHAT ||
+      s === ConsumerStep.RECOMMEND ||
+      s === ConsumerStep.CONFIRM
+    ) {
+      return 'tab:AI_CHAT';
+    }
+    if (s === ConsumerStep.STATUS) return 'tab:STATUS';
+    if (s === ConsumerStep.WISHLIST) return 'tab:WISHLIST';
+    if (s === ConsumerStep.MY) return 'tab:MY';
+    return `consumer:${s}`;
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isRestoringScrollRef.current) return;
+      scrollPositionsRef.current[activeScrollKeyRef.current] = window.scrollY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const nextScrollKey = getNavScrollKey(role, step);
+    const pendingY = pendingScrollRestoreRef.current;
+    if (pendingY === null) {
+      activeScrollKeyRef.current = nextScrollKey;
+      isRestoringScrollRef.current = false;
+      return;
+    }
+
+    pendingScrollRestoreRef.current = null;
+    isRestoringScrollRef.current = true;
+    let raf1 = 0;
+    let raf2 = 0;
+    let raf3 = 0;
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        window.scrollTo({ top: pendingY, behavior: 'auto' });
+        activeScrollKeyRef.current = nextScrollKey;
+        raf3 = window.requestAnimationFrame(() => {
+          isRestoringScrollRef.current = false;
+        });
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      window.cancelAnimationFrame(raf3);
+      isRestoringScrollRef.current = false;
+    };
+  }, [role, step]);
+
+  const handleBottomTabSelect = (targetStep: ConsumerStep) => {
+    if (!isRestoringScrollRef.current) {
+      scrollPositionsRef.current[getNavScrollKey(role, step)] = window.scrollY;
+    }
+    if (role === DemoRole.CONSUMER && step === targetStep) {
+      return;
+    }
+    const targetKey = getNavScrollKey(DemoRole.CONSUMER, targetStep);
+    pendingScrollRestoreRef.current = scrollPositionsRef.current[targetKey] ?? 0;
+    isRestoringScrollRef.current = true;
+    if (targetStep === ConsumerStep.AI_CHAT) {
+      setAiChatInitialPrompt(undefined);
+    }
+    setRole(DemoRole.CONSUMER);
+    setStep(targetStep);
+  };
+
+  const handleSwitchRoleToTop = (nextRole: DemoRole) => {
+    if (!isRestoringScrollRef.current) {
+      scrollPositionsRef.current[getNavScrollKey(role, step)] = window.scrollY;
+    }
+    pendingScrollRestoreRef.current = 0;
+    isRestoringScrollRef.current = true;
+    if (nextRole === DemoRole.CONSUMER) {
+      setRole(DemoRole.CONSUMER);
+      setStep(ConsumerStep.HOME);
+    } else {
+      setRole(nextRole);
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
   const lastSharedJsonRef = useRef<string>(
     JSON.stringify(extractSharedState(initialLoad.state))
   );
@@ -3171,8 +3264,8 @@ export default function App() {
             onAddStoreCoupon={handleAddStoreCoupon}
             onToggleStoreCoupon={handleToggleStoreCoupon}
             onDeleteStoreCoupon={handleDeleteStoreCoupon}
-            onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
-            onSwitchToPartner={() => setRole(DemoRole.PARTNER)}
+            onSwitchToConsumer={() => handleSwitchRoleToTop(DemoRole.CONSUMER)}
+            onSwitchToPartner={() => handleSwitchRoleToTop(DemoRole.PARTNER)}
           />
         ) : role === DemoRole.PARTNER ? (
           <PartnerDashboardView
@@ -3183,8 +3276,8 @@ export default function App() {
             onAttachRiderPhotos={(orderId, photos) =>
               handleAttachOrderPhotos(orderId, 'rider', photos)
             }
-            onSwitchToConsumer={() => setRole(DemoRole.CONSUMER)}
-            onSwitchToOwner={() => setRole(DemoRole.OWNER)}
+            onSwitchToConsumer={() => handleSwitchRoleToTop(DemoRole.CONSUMER)}
+            onSwitchToOwner={() => handleSwitchRoleToTop(DemoRole.OWNER)}
           />
         ) : step === ConsumerStep.HOME ? (
           <ConditionHome
@@ -3361,7 +3454,7 @@ export default function App() {
             activeLocation={activeLocation}
             onTopupWalletConfirmed={handleTopupWalletConfirmed}
             onEarnStamp={handleEarnStamp}
-            onChangeRole={setRole}
+            onChangeRole={handleSwitchRoleToTop}
             onShareDemoSummary={handleShareDemoSummary}
             onSavePreferences={handleSavePreferences}
             onSaveRoutine={handleSaveRoutine}
@@ -3537,10 +3630,7 @@ export default function App() {
         <div className={`${containerWidthClass} mx-auto h-full grid grid-cols-5 items-center px-2`}>
           <button
             type="button"
-            onClick={() => {
-              setRole(DemoRole.CONSUMER);
-              setStep(ConsumerStep.HOME);
-            }}
+            onClick={() => handleBottomTabSelect(ConsumerStep.HOME)}
             className={`easy-compact min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.HOME
                 ? 'text-[#0B4F34] font-extrabold'
@@ -3566,11 +3656,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => {
-              setAiChatInitialPrompt(undefined);
-              setRole(DemoRole.CONSUMER);
-              setStep(ConsumerStep.AI_CHAT);
-            }}
+            onClick={() => handleBottomTabSelect(ConsumerStep.AI_CHAT)}
             className={`easy-compact min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER &&
               (step === ConsumerStep.AI_CHAT ||
@@ -3607,10 +3693,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => {
-              setRole(DemoRole.CONSUMER);
-              setStep(ConsumerStep.STATUS);
-            }}
+            onClick={() => handleBottomTabSelect(ConsumerStep.STATUS)}
             className={`easy-compact min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.STATUS
                 ? 'text-[#0B4F34] font-extrabold'
@@ -3638,10 +3721,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => {
-              setRole(DemoRole.CONSUMER);
-              setStep(ConsumerStep.WISHLIST);
-            }}
+            onClick={() => handleBottomTabSelect(ConsumerStep.WISHLIST)}
             className={`easy-compact min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.WISHLIST
                 ? 'text-[#0B4F34] font-extrabold'
@@ -3669,10 +3749,7 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => {
-              setRole(DemoRole.CONSUMER);
-              setStep(ConsumerStep.MY);
-            }}
+            onClick={() => handleBottomTabSelect(ConsumerStep.MY)}
             className={`easy-compact min-h-[58px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
               role === DemoRole.CONSUMER && step === ConsumerStep.MY
                 ? 'text-[#0B4F34] font-extrabold'
