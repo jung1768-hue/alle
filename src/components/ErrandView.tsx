@@ -111,38 +111,38 @@ export function ErrandView({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-[#1A1D1A] text-white rounded-3xl p-5 sm:p-6 border border-[#3A4038] grid grid-cols-1 md:grid-cols-[1.25fr_1fr] gap-4 items-center">
-        <div className="space-y-1.5">
+      <div className="bg-[#F5F3EC] text-[#1A1D1A] rounded-3xl p-5 sm:p-6 border border-[#E4E0D3] grid grid-cols-1 md:grid-cols-[1.25fr_1fr] gap-4 items-center">
+        <div className="space-y-2">
           <button
             type="button"
             onClick={onBackToHome}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D4E1C5] hover:text-white cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#454F1E] hover:text-[#2C3612] cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>홈으로 돌아가기</span>
           </button>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#4E6E2A] text-xs font-extrabold inline-flex items-center gap-1">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#454F1E] text-white text-xs font-extrabold inline-flex items-center gap-1">
               <Footprints className="w-3.5 h-3.5" />
               <span>생활 심부름</span>
             </span>
-            <span className="text-xs text-[#C8D0C4]">
+            <span className="text-xs font-medium text-[#555E52]">
               금지 품목 자동 차단 · 영수증 실비 정산 · 매칭 수수료{' '}
               {formatWon(MATCHING_FEE_PER_CASE)}
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#1A1D1A]">
             동네 장보기 · 세탁물 · 생활 심부름 대행
           </h1>
-          <p className="text-xs sm:text-sm text-[#C8D0C4] break-keep">
+          <p className="text-xs sm:text-sm text-[#4B5548] break-keep leading-relaxed">
             가까운 이웃 도보·개인 파트너가 Baro 모자와 보온 가방을 매고 심부름을 대신 처리하며, 영수증 실비 차액은 즉시 환불됩니다.
           </p>
           {onOpenPartnerDemo && (
-            <div className="pt-1.5">
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={onOpenPartnerDemo}
-                className="easy-compact min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#EAF1E2] hover:bg-white text-[#1A1D1A] text-xs font-bold cursor-pointer transition-colors"
+                className="easy-compact min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#454F1E] hover:bg-[#343D15] text-white text-xs font-bold cursor-pointer transition-colors"
               >
                 파트너 · 심부름 배달원 보기 →
               </button>
@@ -150,13 +150,13 @@ export function ErrandView({
           )}
         </div>
 
-        <div className="rounded-2xl overflow-hidden border border-[#3A4038] bg-[#F4DEC9]">
+        <div className="rounded-2xl overflow-hidden bg-[#F5F3EC]">
           <img
             src={BARO_PARTNER_KIT_SRC}
             alt="Baro 모자와 보온 배달 가방 착용 심부름 파트너 킷"
             className="w-full h-40 sm:h-44 object-cover block"
           />
-          <div className="px-3 py-1.5 bg-[#242924] text-[11px] font-semibold text-[#D4E1C5] text-center">
+          <div className="px-3 py-1.5 bg-[#EAE6DA] text-[11px] font-bold text-[#364215] text-center">
             Baro 모자 · 보온 가방 착용 이웃 파트너 방문
           </div>
         </div>

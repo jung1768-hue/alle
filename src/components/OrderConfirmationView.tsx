@@ -839,14 +839,14 @@ export function OrderConfirmationView({
             })}
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#FDF7EE] border border-[#E8DFC8] flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-[#F5F3EC] border border-[#E4E0D3] flex items-center gap-3">
             <img
               src={BARO_PARTNER_GEAR_SRC}
               alt="Baro 모자와 보온 배달 가방"
-              className="w-20 h-14 rounded-xl object-cover shrink-0 border border-[#E8DFC8]"
+              className="w-20 h-14 rounded-xl object-cover shrink-0 bg-[#F5F3EC] border border-[#E4E0D3]"
             />
             <div className="min-w-0 space-y-0.5">
-              <p className="text-xs sm:text-sm font-bold text-[#3D5720]">
+              <p className="text-xs sm:text-sm font-bold text-[#364215]">
                 Baro 공식 모자 · 보온 가방 착용 파트너 배송
               </p>
               <p className="text-[11px] sm:text-xs text-[#555E52] leading-snug break-keep">

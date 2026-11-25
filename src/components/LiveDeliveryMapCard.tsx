@@ -108,12 +108,12 @@ export function LiveDeliveryMapCard({
       </div>
 
       {/* Prominent AI Dispatch & Live ETA Banner */}
-      <div className="px-3.5 py-2.5 bg-[#EAF1E2] border border-[#DCE7CF] text-[#3D5720] rounded-xl flex flex-wrap items-center justify-between gap-2">
+      <div className="px-3.5 py-2.5 bg-[#F4F5EE] border border-[#DFE4D2] text-[#364215] rounded-xl flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 text-xs font-bold min-w-0">
           <img
             src={BARO_PARTNER_GEAR_SRC}
             alt="Baro 모자와 보온 가방"
-            className="w-12 h-9 rounded-lg object-cover border border-[#D4E1C5] shrink-0"
+            className="w-12 h-9 rounded-lg object-cover bg-[#F5F3EC] border border-[#E4E0D3] shrink-0"
           />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

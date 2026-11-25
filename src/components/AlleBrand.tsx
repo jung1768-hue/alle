@@ -4,6 +4,8 @@ export const ALLE_ICON_SRC = BARO_APP_ICON_SRC;
 export const BARO_CHARACTER_MAIN_SRC = '/assets/brand/baro-character-main.png';
 export const BARO_CHARACTER_BOWL_SRC = '/assets/brand/baro-character-bowl.png';
 export const BARO_CHARACTER_WAVE_SRC = '/assets/brand/baro-character-wave.png';
+export const BARO_CHARACTER_WAVE_LIGHT_SRC =
+  '/assets/brand/baro-character-wave-light.png';
 export const BARO_PARTNER_KIT_SRC = '/assets/brand/baro-partner-kit.jpg';
 export const BARO_PARTNER_GEAR_SRC = '/assets/brand/baro-partner-gear.jpg';
 
@@ -29,7 +31,7 @@ export function AlleBotIllustration({
   className = '',
 }: {
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'main' | 'bowl' | 'wave';
+  variant?: 'main' | 'bowl' | 'wave' | 'wave-light';
   className?: string;
 }) {
   const dimensions =
@@ -43,13 +45,15 @@ export function AlleBotIllustration({
       ? BARO_CHARACTER_BOWL_SRC
       : variant === 'wave'
         ? BARO_CHARACTER_WAVE_SRC
-        : BARO_CHARACTER_MAIN_SRC;
+        : variant === 'wave-light'
+          ? BARO_CHARACTER_WAVE_LIGHT_SRC
+          : BARO_CHARACTER_MAIN_SRC;
 
   return (
     <img
       src={src}
       alt="Baro 바로 캐릭터"
-      className={`${dimensions} rounded-2xl bg-[#FDF2E4] object-contain shrink-0 select-none ${className}`}
+      className={`${dimensions} object-contain shrink-0 select-none ${className}`}
     />
   );
 }

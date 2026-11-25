@@ -742,22 +742,22 @@ export function ConditionHome({
 
   return (
     <div className="w-full space-y-9 sm:space-y-11">
-      {/* Section 1: Architectural Midnight-Emerald Hero (Pure White High-Contrast Voice CTA) */}
-      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0D2821] via-[#12382E] to-[#0B221C] text-white p-5 sm:p-7 shadow-[0_18px_44px_-16px_rgba(11,34,28,0.42)]">
+      {/* Section 1: Baro Olive Hero (Warm Cream Voice CTA & Floating Mascot) */}
+      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#2C3612] via-[#3D4A1A] to-[#262F10] text-white p-5 sm:p-7 shadow-[0_18px_44px_-16px_rgba(38,47,16,0.48)]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#1DB978]/20 blur-3xl"
+          className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#97B44A]/20 blur-3xl"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-[#0F6B46]/20 blur-3xl"
+          className="pointer-events-none absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-[#C8DF78]/12 blur-3xl"
         />
 
         <div className="relative z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <span className="inline-flex items-center gap-2 bg-white/[0.1] border border-white/[0.14] text-[#D1F5E5] text-[14px] sm:text-[15px] font-semibold px-3.5 py-1.5 rounded-full">
-                <span className="w-2 h-2 rounded-full bg-[#34D399] shrink-0" />
+              <span className="inline-flex items-center gap-2 bg-white/[0.1] border border-white/[0.16] text-[#F1F6DE] text-[14px] sm:text-[15px] font-semibold px-3.5 py-1.5 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-[#C8DF78] shrink-0" />
                 <span>수수료 0% · 매장 동일가 · 최소주문 없음</span>
               </span>
 
@@ -767,8 +767,8 @@ export function ConditionHome({
             </div>
             <AlleBotIllustration
               size="md"
-              variant="wave"
-              className="rounded-2xl shadow-lg ring-2 ring-white/25 shrink-0 mt-0.5"
+              variant="wave-light"
+              className="drop-shadow-[0_6px_16px_rgba(0,0,0,0.22)] shrink-0 mt-0.5"
             />
           </div>
 
@@ -779,14 +779,14 @@ export function ConditionHome({
               className={`easy-compact w-full min-h-[62px] px-4 sm:px-5 rounded-2xl text-[18px] sm:text-[19.5px] font-extrabold flex items-center justify-center gap-3 transition-all cursor-pointer ${
                 isListening
                   ? 'bg-[#DC2626] hover:bg-[#B91C1C] text-white baro-voice-pulse'
-                  : 'bg-white hover:bg-[#F3FBF7] active:scale-[0.99] text-[#0D2821] shadow-[0_10px_28px_-6px_rgba(0,0,0,0.3)]'
+                  : 'bg-[#FCFBF7] hover:bg-white active:scale-[0.99] text-[#2C3612] shadow-[0_10px_28px_-6px_rgba(0,0,0,0.28)]'
               }`}
             >
               <span
                 className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                   isListening
                     ? 'bg-white/20 text-white'
-                    : 'bg-[#0F6B46] text-white'
+                    : 'bg-[#454F1E] text-white'
                 }`}
               >
                 {isListening ? (
@@ -811,15 +811,15 @@ export function ConditionHome({
                   onOpenAiChat(easySearchQuery.trim());
                 }
               }}
-              className="min-h-[62px] rounded-2xl bg-white/[0.11] hover:bg-white/[0.15] focus-within:bg-white/[0.18] border border-white/[0.18] focus-within:border-[#34D399]/80 px-3.5 sm:px-4 flex items-center gap-2.5 transition-colors"
+              className="min-h-[62px] rounded-2xl bg-white/[0.11] hover:bg-white/[0.15] focus-within:bg-white/[0.18] border border-white/[0.18] focus-within:border-[#C8DF78]/80 px-3.5 sm:px-4 flex items-center gap-2.5 transition-colors"
             >
-              <Search className="w-5 h-5 text-[#B7E4D0] shrink-0" />
+              <Search className="w-5 h-5 text-[#DCE7BE] shrink-0" />
               <input
                 type="text"
                 value={easySearchQuery}
                 onChange={(e) => setEasySearchQuery(e.target.value)}
                 placeholder="가게·메뉴 검색 (국밥, 치킨)"
-                className="w-full bg-transparent border-0 text-white placeholder:text-[#C5E0D4] text-[15.5px] sm:text-[17px] font-medium focus:outline-none !min-h-0 py-2"
+                className="w-full bg-transparent border-0 text-white placeholder:text-[#DCE4CB] text-[15.5px] sm:text-[17px] font-medium focus:outline-none !min-h-0 py-2"
               />
               <button
                 type="submit"
@@ -831,7 +831,7 @@ export function ConditionHome({
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-bold text-[#A5D5C0] shrink-0">
+            <span className="text-[14px] font-bold text-[#DCE7BE] shrink-0">
               예시
             </span>
             {HOME_VOICE_SAMPLES.map((sample) => (
@@ -839,7 +839,7 @@ export function ConditionHome({
                 key={sample.label}
                 type="button"
                 onClick={() => onOpenAiChat(sample.text)}
-                className="easy-compact shrink-0 px-3.5 py-1.5 rounded-full bg-white/[0.1] hover:bg-white/[0.18] border border-white/[0.14] text-[14.5px] sm:text-[15px] font-semibold text-[#EDF9F3] whitespace-nowrap cursor-pointer transition-colors"
+                className="easy-compact shrink-0 px-3.5 py-1.5 rounded-full bg-white/[0.1] hover:bg-white/[0.18] border border-white/[0.16] text-[14.5px] sm:text-[15px] font-semibold text-[#F6F9EE] whitespace-nowrap cursor-pointer transition-colors"
               >
                 “{sample.label}”
               </button>
@@ -847,8 +847,8 @@ export function ConditionHome({
           </div>
 
           {showVoiceFallback && (
-            <div className="p-4 mt-4 bg-white/[0.11] border border-[#34D399]/40 rounded-2xl space-y-3">
-              <p className="text-[15px] sm:text-[16px] font-bold text-[#D1F5E5]">
+            <div className="p-4 mt-4 bg-white/[0.11] border border-[#C8DF78]/40 rounded-2xl space-y-3">
+              <p className="text-[15px] sm:text-[16px] font-bold text-[#F1F6DE]">
                 마이크 대신 아래 문장을 눌러도 바로가 찾아드려요
               </p>
               <div className="grid grid-cols-1 gap-2">
@@ -1067,19 +1067,19 @@ export function ConditionHome({
         </section>
       )}
 
-      {/* Section 4: Refined Dual Services Bento (Emerald Mint & Slate Blue) */}
+      {/* Section 4: Harmonized Dual Services Bento (Botanical Soft Olive & Soft Warm Linen) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <button
           type="button"
           onClick={onOpenB2BMeal}
-          className="easy-compact group rounded-[24px] bg-[#EAF6F0] hover:bg-[#DCEFE6] p-5 flex items-center justify-between gap-4 text-left cursor-pointer transition-colors"
+          className="easy-compact group rounded-[24px] bg-[#EEF3E5] hover:bg-[#E4ECD6] p-5 flex items-center justify-between gap-4 text-left cursor-pointer transition-colors"
         >
           <div className="flex items-center gap-4 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm text-[#0F6B46] flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm text-[#454F1E] flex items-center justify-center shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <div className="text-[14px] font-bold text-[#0F6B46] tracking-tight">
+              <div className="text-[14px] font-bold text-[#454F1E] tracking-tight">
                 법인 · 단체 예약
               </div>
               <div className="text-[19px] sm:text-[20px] font-extrabold text-[#111827] tracking-[-0.02em] mt-0.5">
@@ -1090,16 +1090,16 @@ export function ConditionHome({
               </div>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-[#0F6B46] group-hover:translate-x-0.5 transition-transform shrink-0" />
+          <ChevronRight className="w-5 h-5 text-[#454F1E] group-hover:translate-x-0.5 transition-transform shrink-0" />
         </button>
 
         <button
           type="button"
           onClick={onOpenErrand}
-          className="easy-compact group rounded-[24px] bg-[#EEF4FC] hover:bg-[#E1ECFA] p-5 flex items-center justify-between gap-4 text-left cursor-pointer transition-colors"
+          className="easy-compact group rounded-[24px] bg-[#F5F3EC] hover:bg-[#ECE8DC] border border-[#E5E1D4] p-5 flex items-center justify-between gap-4 text-left cursor-pointer transition-colors"
         >
           <div className="flex items-center gap-4 min-w-0">
-            <div className="w-16 h-14 rounded-2xl overflow-hidden bg-[#F8E7D5] shadow-sm border border-white shrink-0">
+            <div className="w-16 h-14 rounded-2xl overflow-hidden bg-[#F5F3EC] border border-[#E5E1D4] shadow-2xs shrink-0">
               <img
                 src={BARO_PARTNER_GEAR_SRC}
                 alt="Baro 모자와 보온 가방"
@@ -1107,7 +1107,7 @@ export function ConditionHome({
               />
             </div>
             <div className="min-w-0">
-              <div className="text-[14px] font-bold text-[#1D4ED8] tracking-tight">
+              <div className="text-[14px] font-bold text-[#454F1E] tracking-tight">
                 매칭 수수료 100원
               </div>
               <div className="text-[19px] sm:text-[20px] font-extrabold text-[#111827] tracking-[-0.02em] mt-0.5">
@@ -1118,7 +1118,7 @@ export function ConditionHome({
               </div>
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-[#1D4ED8] group-hover:translate-x-0.5 transition-transform shrink-0" />
+          <ChevronRight className="w-5 h-5 text-[#454F1E] group-hover:translate-x-0.5 transition-transform shrink-0" />
         </button>
       </section>
 
